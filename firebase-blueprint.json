@@ -1,0 +1,254 @@
+{
+  "entities": {
+    "users": {
+      "title": "users",
+      "description": "User profiles for customers, riders, and admins",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "phone": { "type": "string" },
+        "role": { "type": "string", "enum": ["customer", "rider", "admin"] },
+        "avatar_url": { "type": "string" },
+        "university_id": { "type": "string" },
+        "campus_id": { "type": "string" },
+        "preferred_zone_id": { "type": "string" },
+        "fcm_token": { "type": "string" },
+        "created_at": { "type": "string" }
+      },
+      "required": ["uid", "email", "role"]
+    },
+    "universities": {
+      "title": "universities",
+      "description": "Nigerian Universities catalog",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "short_name": { "type": "string" },
+        "slug": { "type": "string" },
+        "description": { "type": "string" },
+        "logo_url": { "type": "string" },
+        "cover_image_url": { "type": "string" },
+        "state": { "type": "string" },
+        "city": { "type": "string" },
+        "country": { "type": "string" },
+        "latitude": { "type": "number" },
+        "longitude": { "type": "number" },
+        "is_active": { "type": "boolean" },
+        "created_at": { "type": "string" },
+        "updated_at": { "type": "string" }
+      },
+      "required": ["name", "short_name", "slug", "is_active"]
+    },
+    "campuses": {
+      "title": "campuses",
+      "description": "University Campuses",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "university_id": { "type": "string" },
+        "name": { "type": "string" },
+        "slug": { "type": "string" },
+        "description": { "type": "string" },
+        "address": { "type": "string" },
+        "latitude": { "type": "number" },
+        "longitude": { "type": "number" },
+        "is_active": { "type": "boolean" },
+        "created_at": { "type": "string" },
+        "updated_at": { "type": "string" }
+      },
+      "required": ["university_id", "name", "slug", "is_active"]
+    },
+    "food_zones": {
+      "title": "food_zones",
+      "description": "Campus food zones and hubs",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "campus_id": { "type": "string" },
+        "university_id": { "type": "string" },
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "landmark": { "type": "string" },
+        "latitude": { "type": "number" },
+        "longitude": { "type": "number" },
+        "is_active": { "type": "boolean" },
+        "created_at": { "type": "string" },
+        "updated_at": { "type": "string" }
+      },
+      "required": ["campus_id", "name", "is_active"]
+    },
+    "vendors": {
+      "title": "vendors",
+      "description": "Campus vendors, cafeterias, bukas, and food stalls",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "university_id": { "type": "string" },
+        "campus_id": { "type": "string" },
+        "food_zone_id": { "type": "string" },
+        "name": { "type": "string" },
+        "slug": { "type": "string" },
+        "description": { "type": "string" },
+        "vendor_type": { "type": "string" },
+        "logo_url": { "type": "string" },
+        "cover_image_url": { "type": "string" },
+        "phone": { "type": "string" },
+        "email": { "type": "string" },
+        "address": { "type": "string" },
+        "latitude": { "type": "number" },
+        "longitude": { "type": "number" },
+        "rating": { "type": "number" },
+        "review_count": { "type": "number" },
+        "delivery_available": { "type": "boolean" },
+        "pickup_available": { "type": "boolean" },
+        "is_open": { "type": "boolean" },
+        "is_verified": { "type": "boolean" },
+        "is_active": { "type": "boolean" },
+        "opening_time": { "type": "string" },
+        "closing_time": { "type": "string" },
+        "created_at": { "type": "string" },
+        "updated_at": { "type": "string" }
+      },
+      "required": ["university_id", "campus_id", "name", "vendor_type", "is_open", "is_active"]
+    },
+    "food_categories": {
+      "title": "food_categories",
+      "description": "Food categories catalog",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "slug": { "type": "string" },
+        "description": { "type": "string" },
+        "image_url": { "type": "string" },
+        "icon": { "type": "string" },
+        "is_active": { "type": "boolean" },
+        "created_at": { "type": "string" },
+        "updated_at": { "type": "string" }
+      },
+      "required": ["name", "is_active"]
+    },
+    "menu_items": {
+      "title": "menu_items",
+      "description": "Dishes and menu items for campus vendors",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "vendor_id": { "type": "string" },
+        "category_id": { "type": "string" },
+        "name": { "type": "string" },
+        "slug": { "type": "string" },
+        "description": { "type": "string" },
+        "image_url": { "type": "string" },
+        "base_price": { "type": "number" },
+        "available": { "type": "boolean" },
+        "featured": { "type": "boolean" },
+        "popular": { "type": "boolean" },
+        "student_friendly": { "type": "boolean" },
+        "spicy_level": { "type": "number" },
+        "preparation_time": { "type": "string" },
+        "verification_status": { "type": "string" },
+        "status": { "type": "string" },
+        "created_at": { "type": "string" },
+        "updated_at": { "type": "string" }
+      },
+      "required": ["vendor_id", "name", "available"]
+    },
+    "menu_item_variants": {
+      "title": "menu_item_variants",
+      "description": "Dish portion variants and prices",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "menu_item_id": { "type": "string" },
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "price": { "type": "number" },
+        "available": { "type": "boolean" },
+        "created_at": { "type": "string" },
+        "updated_at": { "type": "string" }
+      },
+      "required": ["menu_item_id", "name"]
+    },
+    "menu_price_history": {
+      "title": "menu_price_history",
+      "description": "Price changes history logs",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "menu_item_id": { "type": "string" },
+        "variant_id": { "type": "string" },
+        "old_price": { "type": "number" },
+        "new_price": { "type": "number" },
+        "changed_by": { "type": "string" },
+        "changed_at": { "type": "string" },
+        "reason": { "type": "string" }
+      },
+      "required": ["menu_item_id", "changed_by", "changed_at"]
+    },
+    "menu_availability": {
+      "title": "menu_availability",
+      "description": "Real-time menu item availability status and stock tracking",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "menu_item_id": { "type": "string" },
+        "variant_id": { "type": "string" },
+        "vendor_id": { "type": "string" },
+        "is_available": { "type": "boolean" },
+        "stock_count": { "type": "number" },
+        "last_updated": { "type": "string" },
+        "updated_by": { "type": "string" }
+      },
+      "required": ["menu_item_id", "vendor_id", "is_available"]
+    },
+    "food_reviews": {
+      "title": "food_reviews",
+      "description": "Ratings and reviews for food and vendors",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "user_id": { "type": "string" },
+        "vendor_id": { "type": "string" },
+        "menu_item_id": { "type": "string" },
+        "order_id": { "type": "string" },
+        "overall_rating": { "type": "number" },
+        "comment": { "type": "string" },
+        "would_buy_again": { "type": "boolean" },
+        "created_at": { "type": "string" }
+      },
+      "required": ["user_id", "vendor_id", "overall_rating"]
+    },
+    "orders": {
+      "title": "orders",
+      "description": "Food orders placed by customers",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "user_id": { "type": "string" },
+        "vendor_id": { "type": "string" },
+        "status": { "type": "string" },
+        "total_price": { "type": "number" },
+        "created_at": { "type": "string" }
+      },
+      "required": ["user_id", "vendor_id", "status", "total_price"]
+    },
+    "riders": {
+      "title": "riders",
+      "description": "Rider availability and status catalog",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "phone": { "type": "string" },
+        "is_online": { "type": "boolean" },
+        "is_active": { "type": "boolean" },
+        "updated_at": { "type": "string" }
+      },
+      "required": ["id", "is_online"]
+    }
+  }
+}

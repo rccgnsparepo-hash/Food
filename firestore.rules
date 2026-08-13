@@ -1,0 +1,99 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Users collection
+    match /users/{userId} {
+      allow read, write: if true;
+    }
+
+    // Universities
+    match /universities/{universityId} {
+      allow read, write: if true;
+    }
+
+    // Campuses
+    match /campuses/{campusId} {
+      allow read, write: if true;
+    }
+
+    // Food Zones
+    match /food_zones/{zoneId} {
+      allow read, write: if true;
+    }
+
+    // Vendors (and legacy restaurants)
+    match /vendors/{vendorId} {
+      allow read, write: if true;
+    }
+    match /restaurants/{restaurantId} {
+      allow read, write: if true;
+    }
+
+    // Food Categories
+    match /food_categories/{categoryId} {
+      allow read, write: if true;
+    }
+    match /categories/{categoryId} {
+      allow read, write: if true;
+    }
+
+    // Menu Items
+    match /menu_items/{itemId} {
+      allow read, write: if true;
+    }
+
+    // Menu Item Variants
+    match /menu_item_variants/{variantId} {
+      allow read, write: if true;
+    }
+
+    // Price History
+    match /menu_price_history/{historyId} {
+      allow read, write: if true;
+    }
+
+    // Availability Schedules
+    match /menu_availability/{availabilityId} {
+      allow read, write: if true;
+    }
+
+    // Food Reviews
+    match /food_reviews/{reviewId} {
+      allow read, write: if true;
+    }
+
+    // Orders
+    match /orders/{orderId} {
+      allow read, write: if true;
+    }
+
+    // Chat messages for orders
+    match /messages/{messageId} {
+      allow read, write: if true;
+    }
+
+    // Favorites
+    match /favorites/{favoriteId} {
+      allow read, write: if true;
+    }
+    match /vendor_favorites/{favoriteId} {
+      allow read, write: if true;
+    }
+
+    // Rider Locations
+    match /rider_locations/{locationId} {
+      allow read, write: if true;
+    }
+
+    // Riders
+    match /riders/{riderId} {
+      allow read, write: if true;
+    }
+
+    // Promotions
+    match /promotions/{promoId} {
+      allow read, write: if true;
+    }
+  }
+}

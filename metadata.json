@@ -1,0 +1,6 @@
+{
+  "name": "BUKKIT — Campus Food Marketplace",
+  "description": "A Nigerian University Food Marketplace for Mountain Top University (MTU) powered by real Firebase Authentication and Firestore real-time data persistence.",
+  "requestFramePermissions": ["geolocation"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
