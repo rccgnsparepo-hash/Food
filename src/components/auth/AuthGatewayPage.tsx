@@ -41,6 +41,7 @@ export const AuthGatewayPage: React.FC = () => {
     loginWithEmail,
     registerWithEmail,
     loginWithGoogle,
+    loginAsGuest,
     resetPassword,
     resendVerificationEmail,
     reloadUser,

@@ -9,6 +9,9 @@ import { BottomNav } from './components/layout/BottomNav';
 
 import { SplashOnboarding } from './components/customer/SplashOnboarding';
 import { HomeFeed } from './components/customer/HomeFeed';
+import { MenuView } from './components/customer/MenuView';
+import { VendorsView } from './components/customer/VendorsView';
+import { WalletDealsView } from './components/customer/WalletDealsView';
 import { FoodDetailModal } from './components/customer/FoodDetailModal';
 import { CartDrawer } from './components/customer/CartDrawer';
 import { CheckoutModal } from './components/customer/CheckoutModal';
@@ -27,10 +30,11 @@ import { useOrderNotificationListener } from './services/orderNotificationServic
 import { requestFCMToken, setupForegroundFCMListener } from './lib/fcm';
 
 export default function App() {
-  const { initAuth, user, role, setRole, logout, isLoading, isEmailVerified } = useAuthStore();
+  const { initAuth, user, role, setRole, logout, isInitLoading, isEmailVerified } = useAuthStore();
   const { isOpen: isCartOpen, setCartOpen } = useCartStore();
 
   const [activeView, setActiveView] = useState<string>('home');
+  const [targetVendorId, setTargetVendorId] = useState<string | undefined>(undefined);
   const [selectedFood, setSelectedFood] = useState<MenuItem | null>(null);
   const [showCheckout, setShowCheckout] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
@@ -72,8 +76,8 @@ export default function App() {
     setActiveView('tracking');
   };
 
-  // 1. Loading State
-  if (isLoading) {
+  // 1. Initial Page Load State
+  if (isInitLoading) {
     return (
       <div className="min-h-screen bg-[#F9ECEC] flex flex-col items-center justify-center p-6 text-center">
         <div className="w-16 h-16 bg-[#D6001C] text-white rounded-3xl font-black text-3xl flex items-center justify-center shadow-xl shadow-red-500/30 animate-pulse mb-4">
@@ -83,7 +87,7 @@ export default function App() {
         <p className="text-xs font-extrabold text-[#D6001C] uppercase tracking-widest mt-1">Mountain Top University • Prayer City</p>
         <div className="mt-6 flex items-center gap-2 text-xs font-bold text-slate-500">
           <div className="w-4 h-4 border-2 border-[#D6001C] border-t-transparent rounded-full animate-spin"></div>
-          <span>Verifying Firebase Authentication...</span>
+          <span>Loading BUKKIT Marketplace...</span>
         </div>
       </div>
     );
@@ -141,9 +145,38 @@ export default function App() {
                   {activeView === 'home' && (
                     <HomeFeed
                       onSelectFood={(item) => setSelectedFood(item)}
-                      onSelectRestaurant={() => {}}
+                      onSelectRestaurant={(vendor) => {
+                        setTargetVendorId(vendor.id);
+                        setActiveView('menu');
+                      }}
+                      onNavigateToMenu={(vendorId) => {
+                        setTargetVendorId(vendorId);
+                        setActiveView('menu');
+                      }}
                     />
                   )}
+
+                  {activeView === 'menu' && (
+                    <MenuView
+                      onSelectFood={(item) => setSelectedFood(item)}
+                      initialVendorId={targetVendorId}
+                    />
+                  )}
+
+                  {activeView === 'vendors' && (
+                    <VendorsView
+                      onSelectRestaurant={(vendor) => {
+                        setTargetVendorId(vendor.id);
+                        setActiveView('menu');
+                      }}
+                      onExploreMenuForVendor={(vendorId) => {
+                        setTargetVendorId(vendorId);
+                        setActiveView('menu');
+                      }}
+                    />
+                  )}
+
+                  {activeView === 'wallet' && <WalletDealsView />}
 
                   {activeView === 'favorites' && (
                     <FavoritesView onSelectFood={(item) => setSelectedFood(item)} />

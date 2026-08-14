@@ -6,8 +6,9 @@ import {
   initializeDatabaseSeed,
   FALLBACK_MTU_UNIVERSITY,
   FALLBACK_MTU_CAMPUS,
-  FALLBACK_MTU_CANTEEN,
+  FALLBACK_MTU_VENDORS,
   FALLBACK_MTU_CATEGORIES,
+  FALLBACK_MTU_MENU_ITEMS,
 } from '../services/seedService';
 
 interface MarketplaceState {
@@ -75,8 +76,9 @@ export const useMarketplaceStore = create<MarketplaceState>((set, get) => ({
     set({
       universities: [FALLBACK_MTU_UNIVERSITY],
       campuses: [FALLBACK_MTU_CAMPUS],
-      vendors: [FALLBACK_MTU_CANTEEN],
+      vendors: FALLBACK_MTU_VENDORS,
       categories: FALLBACK_MTU_CATEGORIES,
+      menuItems: FALLBACK_MTU_MENU_ITEMS,
       isLoading: false,
     });
 

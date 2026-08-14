@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'motion/react';
-import { Home, Heart, ShoppingBag, User, Clock } from 'lucide-react';
+import { Home, UtensilsCrossed, Heart, ShoppingBag, User, Clock } from 'lucide-react';
 import { useCartStore } from '../../stores/useCartStore';
 
 interface BottomNavProps {
@@ -14,7 +14,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({ activeView, setActiveView 
 
   const navItems = [
     { id: 'home', label: 'Home', icon: Home },
-    { id: 'favorites', label: 'Favorites', icon: Heart },
+    { id: 'menu', label: 'Menu', icon: UtensilsCrossed },
     { id: 'cart', label: 'Cart', icon: ShoppingBag, badge: totalCartItems },
     { id: 'orders', label: 'Orders', icon: Clock },
     { id: 'profile', label: 'Profile', icon: User }

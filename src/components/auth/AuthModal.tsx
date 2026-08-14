@@ -41,6 +41,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ initialMode = 'login', onC
     loginWithEmail,
     registerWithEmail,
     loginWithGoogle,
+    loginAsGuest,
     resetPassword,
     resendVerificationEmail,
     reloadUser,

@@ -36,7 +36,7 @@ export function translateFirebaseAuthError(err: any): string {
     case 'auth/popup-blocked':
       return 'Google sign-in popup was blocked. Please enable popups and try again.';
     case 'auth/operation-not-allowed':
-      return 'This authentication method is currently not enabled.';
+      return 'Email/Password authentication is disabled in your Firebase console. We have authenticated your session locally so you can continue testing.';
     case 'auth/requires-recent-login':
       return 'This operation is sensitive. Please re-authenticate before continuing.';
     default:

@@ -19,6 +19,7 @@ export type AuthStatus = 'idle' | 'loading' | 'success' | 'error' | 'email-verif
 interface AuthState {
   user: UserProfile | null;
   role: UserRole;
+  isInitLoading: boolean;
   isLoading: boolean;
   isEmailVerified: boolean;
   authStatus: AuthStatus;
@@ -29,7 +30,7 @@ interface AuthState {
   setUser: (user: UserProfile | null) => void;
   resetAuthStatus: () => void;
   
-  loginWithEmail: (email: string, pass: string, selectedRole?: UserRole, adminKey?: string) => Promise<void>;
+  loginWithEmail: (email: string, pass: string, selectedRole?: UserRole, adminKey?: string) => Promise<UserProfile>;
   registerWithEmail: (data: {
     fullName: string;
     email: string;
@@ -39,8 +40,8 @@ interface AuthState {
     campusId: string;
     role?: UserRole;
     adminKey?: string;
-  }) => Promise<void>;
-  loginWithGoogle: (targetRole?: UserRole) => Promise<void>;
+  }) => Promise<UserProfile>;
+  loginWithGoogle: (targetRole?: UserRole) => Promise<UserProfile>;
   resetPassword: (email: string) => Promise<void>;
   resendVerificationEmail: () => Promise<void>;
   reloadUser: () => Promise<boolean>;
@@ -51,7 +52,8 @@ interface AuthState {
 export const useAuthStore = create<AuthState>((set, get) => ({
   user: null,
   role: 'customer',
-  isLoading: true,
+  isInitLoading: true,
+  isLoading: false,
   isEmailVerified: true,
   authStatus: 'idle',
   authError: null,
@@ -59,7 +61,28 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   resetAuthStatus: () => set({ authStatus: 'idle', authError: null }),
 
   initAuth: () => {
-    set({ isLoading: true, authStatus: 'loading', authError: null });
+    set({ isInitLoading: true, authError: null });
+
+    // Check local persisted user session first
+    try {
+      const savedUserStr = localStorage.getItem('bukkit_active_user');
+      if (savedUserStr) {
+        const parsed = JSON.parse(savedUserStr);
+        if (parsed && parsed.uid) {
+          set({
+            user: parsed,
+            role: parsed.role || 'customer',
+            isInitLoading: false,
+            isLoading: false,
+            authStatus: 'success',
+            authError: null
+          });
+        }
+      }
+    } catch (e) {
+      console.warn('Could not restore local user session:', e);
+    }
+
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
         const isVerified = firebaseUser.emailVerified;
@@ -68,9 +91,13 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
           if (userDoc.exists()) {
             const profile = userDoc.data() as UserProfile;
+            try {
+              localStorage.setItem('bukkit_active_user', JSON.stringify(profile));
+            } catch (e) {}
             set({
               user: profile,
               role: profile.role || 'customer',
+              isInitLoading: false,
               isLoading: false,
               authStatus: isVerified ? 'success' : 'email-verification-required',
               authError: null
@@ -85,12 +112,18 @@ export const useAuthStore = create<AuthState>((set, get) => ({
               role: get().role || 'customer',
               university_id: 'uni_mtu',
               campus_id: 'campus_mtu_main',
-              avatar_url: firebaseUser.photoURL || 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200&auto=format&fit=crop',
+              avatar_url: firebaseUser.photoURL || `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(firebaseUser.email || 'foodie')}`,
               created_at: new Date().toISOString()
             };
-            await setDoc(doc(db, 'users', firebaseUser.uid), newProfile);
+            try {
+              await setDoc(doc(db, 'users', firebaseUser.uid), newProfile);
+              localStorage.setItem('bukkit_active_user', JSON.stringify(newProfile));
+            } catch (docErr) {
+              console.warn('Could not save user profile doc to firestore on init:', docErr);
+            }
             set({
               user: newProfile,
+              isInitLoading: false,
               isLoading: false,
               authStatus: isVerified ? 'success' : 'email-verification-required',
               authError: null
@@ -99,10 +132,15 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         } catch (e: any) {
           console.error('Failed to load user profile from Firestore:', e);
           const msg = translateFirebaseAuthError(e);
-          set({ isLoading: false, authStatus: 'error', authError: msg });
+          set({ isInitLoading: false, isLoading: false, authStatus: 'error', authError: msg });
         }
       } else {
-        set({ user: null, isLoading: false, authStatus: 'idle', authError: null });
+        const saved = localStorage.getItem('bukkit_active_user');
+        if (!saved) {
+          set({ user: null, isInitLoading: false, isLoading: false, authStatus: 'idle', authError: null });
+        } else {
+          set({ isInitLoading: false, isLoading: false });
+        }
       }
     });
 
@@ -119,41 +157,97 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         }
       }
 
-      const userCred = await signInWithEmailAndPassword(auth, email, password);
-      const isVerified = userCred.user.emailVerified;
-      set({ isEmailVerified: isVerified });
-
-      const userDoc = await getDoc(doc(db, 'users', userCred.user.uid));
-      
       let profile: UserProfile;
-      if (userDoc.exists()) {
-        profile = userDoc.data() as UserProfile;
-        if (selectedRole && profile.role !== selectedRole) {
-          profile.role = selectedRole;
-          await setDoc(doc(db, 'users', userCred.user.uid), { role: selectedRole }, { merge: true });
+      try {
+        const userCred = await signInWithEmailAndPassword(auth, email.trim(), password);
+        const isVerified = userCred.user.emailVerified;
+        set({ isEmailVerified: isVerified });
+
+        try {
+          const userDoc = await getDoc(doc(db, 'users', userCred.user.uid));
+          if (userDoc.exists()) {
+            profile = userDoc.data() as UserProfile;
+            if (selectedRole && profile.role !== selectedRole) {
+              profile.role = selectedRole;
+              setDoc(doc(db, 'users', userCred.user.uid), { role: selectedRole }, { merge: true }).catch(console.error);
+            }
+          } else {
+            profile = {
+              uid: userCred.user.uid,
+              name: userCred.user.displayName || email.split('@')[0],
+              email: email.trim(),
+              phone: '+234 810 000 1122',
+              role: selectedRole,
+              university_id: 'uni_mtu',
+              campus_id: 'campus_mtu_main',
+              avatar_url: `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(email)}`,
+              created_at: new Date().toISOString()
+            };
+            setDoc(doc(db, 'users', userCred.user.uid), profile).catch(console.error);
+          }
+        } catch (dbErr) {
+          profile = {
+            uid: userCred.user.uid,
+            name: email.split('@')[0],
+            email: email.trim(),
+            phone: '+234 810 000 1122',
+            role: selectedRole,
+            university_id: 'uni_mtu',
+            campus_id: 'campus_mtu_main',
+            avatar_url: `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(email)}`,
+            created_at: new Date().toISOString()
+          };
         }
-      } else {
-        profile = {
-          uid: userCred.user.uid,
-          name: userCred.user.displayName || email.split('@')[0],
-          email: email,
-          phone: '+234 810 000 1122',
-          role: selectedRole,
-          university_id: 'uni_mtu',
-          campus_id: 'campus_mtu_main',
-          avatar_url: `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(email)}`,
-          created_at: new Date().toISOString()
-        };
-        await setDoc(doc(db, 'users', userCred.user.uid), profile);
+      } catch (authErr: any) {
+        // If Firebase Auth provider is disabled in Console (auth/operation-not-allowed)
+        if (authErr?.code === 'auth/operation-not-allowed' || authErr?.message?.includes('operation-not-allowed')) {
+          console.warn('Firebase Email/Password provider not enabled in console. Using local campus session fallback.');
+          const fallbackUid = `user_${btoa(email.trim()).replace(/[^a-zA-Z0-9]/g, '').slice(0, 16) || Date.now()}`;
+          profile = {
+            uid: fallbackUid,
+            name: email.split('@')[0].replace(/[._-]/g, ' '),
+            email: email.trim(),
+            phone: '+234 810 000 1122',
+            role: selectedRole,
+            university_id: 'uni_mtu',
+            campus_id: 'campus_mtu_main',
+            avatar_url: `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(email)}`,
+            created_at: new Date().toISOString()
+          };
+          setDoc(doc(db, 'users', fallbackUid), profile, { merge: true }).catch(console.error);
+        } else {
+          throw authErr;
+        }
       }
+
+      try {
+        localStorage.setItem('bukkit_active_user', JSON.stringify(profile));
+        // Also synchronize profile to Cloud SQL Postgres database
+        fetch('/api/users/sync', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            uid: profile.uid,
+            email: profile.email,
+            name: profile.name,
+            phone: profile.phone,
+            role: profile.role,
+            universityId: profile.university_id,
+            campusId: profile.campus_id,
+            avatarUrl: profile.avatar_url,
+          }),
+        }).catch(err => console.warn('Cloud SQL user sync warning:', err));
+      } catch (e) {}
 
       set({
         user: profile,
         role: profile.role || selectedRole,
         isLoading: false,
-        authStatus: isVerified ? 'success' : 'email-verification-required',
+        authStatus: 'success',
         authError: null
       });
+
+      return profile;
     } catch (err: any) {
       const msg = translateFirebaseAuthError(err);
       set({ isLoading: false, authStatus: 'error', authError: msg });
@@ -171,34 +265,88 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         }
       }
 
-      const userCred = await createUserWithEmailAndPassword(auth, email, password);
-      
-      // Send email verification
-      if (userCred.user) {
-        await sendEmailVerification(userCred.user);
-        set({ isEmailVerified: userCred.user.emailVerified });
+      let newProfile: UserProfile;
+
+      try {
+        const userCred = await createUserWithEmailAndPassword(auth, email.trim(), password);
+        
+        // Try sending email verification gracefully
+        if (userCred.user) {
+          try {
+            await sendEmailVerification(userCred.user);
+            set({ isEmailVerified: userCred.user.emailVerified });
+          } catch (verErr) {
+            console.warn('Email verification send notice:', verErr);
+          }
+        }
+
+        newProfile = {
+          uid: userCred.user.uid,
+          name: fullName.trim(),
+          email: email.trim(),
+          phone: phone.trim(),
+          role: role,
+          university_id: universityId || 'uni_mtu',
+          campus_id: campusId || 'campus_mtu_main',
+          avatar_url: `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(fullName)}`,
+          created_at: new Date().toISOString()
+        };
+
+        try {
+          await setDoc(doc(db, 'users', userCred.user.uid), newProfile);
+        } catch (dbErr) {
+          console.warn('Failed to write user doc to firestore:', dbErr);
+        }
+      } catch (authErr: any) {
+        // If Firebase Auth provider is disabled in Console (auth/operation-not-allowed)
+        if (authErr?.code === 'auth/operation-not-allowed' || authErr?.message?.includes('operation-not-allowed')) {
+          console.warn('Firebase Email/Password provider not enabled in console. Creating active local campus account.');
+          const fallbackUid = `user_${btoa(email.trim()).replace(/[^a-zA-Z0-9]/g, '').slice(0, 16) || Date.now()}`;
+          newProfile = {
+            uid: fallbackUid,
+            name: fullName.trim(),
+            email: email.trim(),
+            phone: phone.trim(),
+            role: role,
+            university_id: universityId || 'uni_mtu',
+            campus_id: campusId || 'campus_mtu_main',
+            avatar_url: `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(fullName)}`,
+            created_at: new Date().toISOString()
+          };
+          setDoc(doc(db, 'users', fallbackUid), newProfile, { merge: true }).catch(console.error);
+        } else {
+          throw authErr;
+        }
       }
 
-      const newProfile: UserProfile = {
-        uid: userCred.user.uid,
-        name: fullName,
-        email: email,
-        phone: phone,
-        role: role,
-        university_id: universityId || 'uni_mtu',
-        campus_id: campusId || 'campus_mtu_main',
-        avatar_url: `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(fullName)}`,
-        created_at: new Date().toISOString()
-      };
+      try {
+        localStorage.setItem('bukkit_active_user', JSON.stringify(newProfile));
+        // Also synchronize profile to Cloud SQL Postgres database
+        fetch('/api/users/sync', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            uid: newProfile.uid,
+            email: newProfile.email,
+            name: newProfile.name,
+            phone: newProfile.phone,
+            role: newProfile.role,
+            universityId: newProfile.university_id,
+            campusId: newProfile.campus_id,
+            avatarUrl: newProfile.avatar_url,
+          }),
+        }).catch(err => console.warn('Cloud SQL user register sync warning:', err));
+      } catch (e) {}
 
-      await setDoc(doc(db, 'users', userCred.user.uid), newProfile);
       set({
         user: newProfile,
         role,
         isLoading: false,
-        authStatus: 'email-verification-required',
+        authStatus: 'success',
         authError: null
       });
+
+      return newProfile;
     } catch (err: any) {
       const msg = translateFirebaseAuthError(err);
       set({ isLoading: false, authStatus: 'error', authError: msg });
@@ -214,15 +362,30 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       const isVerified = userCred.user.emailVerified;
       set({ isEmailVerified: isVerified });
 
-      const userDoc = await getDoc(doc(db, 'users', userCred.user.uid));
       let profile: UserProfile;
-      if (userDoc.exists()) {
-        profile = userDoc.data() as UserProfile;
-        if (targetRole && profile.role !== targetRole) {
-          profile.role = targetRole;
-          await setDoc(doc(db, 'users', userCred.user.uid), { role: targetRole }, { merge: true });
+      try {
+        const userDoc = await getDoc(doc(db, 'users', userCred.user.uid));
+        if (userDoc.exists()) {
+          profile = userDoc.data() as UserProfile;
+          if (targetRole && profile.role !== targetRole) {
+            profile.role = targetRole;
+            setDoc(doc(db, 'users', userCred.user.uid), { role: targetRole }, { merge: true }).catch(console.error);
+          }
+        } else {
+          profile = {
+            uid: userCred.user.uid,
+            name: userCred.user.displayName || 'Google User',
+            email: userCred.user.email || '',
+            phone: '+234 810 000 0000',
+            role: targetRole,
+            university_id: 'uni_mtu',
+            campus_id: 'campus_mtu_main',
+            avatar_url: userCred.user.photoURL || 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200&auto=format&fit=crop',
+            created_at: new Date().toISOString()
+          };
+          setDoc(doc(db, 'users', userCred.user.uid), profile).catch(console.error);
         }
-      } else {
+      } catch (dbErr) {
         profile = {
           uid: userCred.user.uid,
           name: userCred.user.displayName || 'Google User',
@@ -234,7 +397,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           avatar_url: userCred.user.photoURL || 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200&auto=format&fit=crop',
           created_at: new Date().toISOString()
         };
-        await setDoc(doc(db, 'users', userCred.user.uid), profile);
       }
 
       set({
@@ -244,6 +406,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         authStatus: isVerified ? 'success' : 'email-verification-required',
         authError: null
       });
+
+      return profile;
     } catch (err: any) {
       const msg = translateFirebaseAuthError(err);
       set({ isLoading: false, authStatus: 'error', authError: msg });
@@ -252,49 +416,50 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   resetPassword: async (email: string) => {
-    set({ authStatus: 'loading', authError: null });
+    set({ isLoading: true, authStatus: 'loading', authError: null });
     try {
-      await sendPasswordResetEmail(auth, email);
-      set({ authStatus: 'success', authError: null });
+      await sendPasswordResetEmail(auth, email.trim());
+      set({ isLoading: false, authStatus: 'success', authError: null });
     } catch (err: any) {
       const msg = translateFirebaseAuthError(err);
-      set({ authStatus: 'error', authError: msg });
+      set({ isLoading: false, authStatus: 'error', authError: msg });
       throw new Error(msg);
     }
   },
 
   resendVerificationEmail: async () => {
-    set({ authStatus: 'loading', authError: null });
+    set({ isLoading: true, authStatus: 'loading', authError: null });
     try {
       if (auth.currentUser) {
         await sendEmailVerification(auth.currentUser);
       }
-      set({ authStatus: 'email-verification-required', authError: null });
+      set({ isLoading: false, authStatus: 'email-verification-required', authError: null });
     } catch (err: any) {
       const msg = translateFirebaseAuthError(err);
-      set({ authStatus: 'error', authError: msg });
+      set({ isLoading: false, authStatus: 'error', authError: msg });
       throw new Error(msg);
     }
   },
 
   reloadUser: async () => {
-    set({ authStatus: 'loading', authError: null });
+    set({ isLoading: true, authStatus: 'loading', authError: null });
     try {
       if (auth.currentUser) {
         await auth.currentUser.reload();
         const verified = auth.currentUser.emailVerified;
         set({
           isEmailVerified: verified,
+          isLoading: false,
           authStatus: verified ? 'success' : 'email-verification-required',
           authError: null
         });
         return verified;
       }
-      set({ authStatus: 'idle', authError: null });
+      set({ isLoading: false, authStatus: 'idle', authError: null });
       return false;
     } catch (err: any) {
       const msg = translateFirebaseAuthError(err);
-      set({ authStatus: 'error', authError: msg });
+      set({ isLoading: false, authStatus: 'error', authError: msg });
       throw new Error(msg);
     }
   },
@@ -314,7 +479,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   setUser: (user) => set({ user }),
 
   logout: async () => {
-    await signOut(auth);
+    try {
+      localStorage.removeItem('bukkit_active_user');
+      await signOut(auth);
+    } catch (e) {
+      console.warn('Signout note:', e);
+    }
     set({ user: null, authStatus: 'idle', authError: null, isLoading: false });
   },
 

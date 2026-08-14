@@ -1,6 +1,7 @@
 import express from 'express';
 import path from 'path';
 import { createServer as createViteServer } from 'vite';
+import { getOrCreateUser, getVendorsList, createSqlOrder, getUserOrders } from './src/db/helpers.ts';
 
 async function startServer() {
   const app = express();
@@ -10,7 +11,51 @@ async function startServer() {
 
   // Health check API
   app.get('/api/health', (req, res) => {
-    res.json({ status: 'ok', timestamp: new Date().toISOString() });
+    res.json({ status: 'ok', database: 'cloud_sql_postgres', timestamp: new Date().toISOString() });
+  });
+
+  // Database API: Sync/Upsert User
+  app.post('/api/users/sync', async (req, res) => {
+    try {
+      const user = await getOrCreateUser(req.body);
+      res.json({ success: true, user });
+    } catch (error: any) {
+      console.error('API user sync error:', error);
+      res.status(500).json({ success: false, error: error.message || 'Database user sync failed' });
+    }
+  });
+
+  // Database API: Fetch Vendors
+  app.get('/api/vendors', async (req, res) => {
+    try {
+      const vendors = await getVendorsList();
+      res.json({ success: true, vendors });
+    } catch (error: any) {
+      console.error('API vendors fetch error:', error);
+      res.status(500).json({ success: false, error: 'Failed to fetch vendors' });
+    }
+  });
+
+  // Database API: Create Order
+  app.post('/api/orders', async (req, res) => {
+    try {
+      const order = await createSqlOrder(req.body);
+      res.json({ success: true, order });
+    } catch (error: any) {
+      console.error('API order creation error:', error);
+      res.status(500).json({ success: false, error: error.message || 'Could not save order' });
+    }
+  });
+
+  // Database API: Get User Orders
+  app.get('/api/orders/user/:uid', async (req, res) => {
+    try {
+      const orders = await getUserOrders(req.params.uid);
+      res.json({ success: true, orders });
+    } catch (error: any) {
+      console.error('API fetch user orders error:', error);
+      res.status(500).json({ success: false, error: 'Could not fetch orders' });
+    }
   });
 
   // Paystack Initialize Endpoint
