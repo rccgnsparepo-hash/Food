@@ -1,11 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Clock, TrendingUp, Eye, ArrowRight } from 'lucide-react';
+import { Clock, TrendingUp, Eye, ArrowRight, FileText, Download } from 'lucide-react';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 import { Order } from '../../types';
 import { useAuthStore } from '../../stores/useAuthStore';
 import { OrderDetailModal } from './OrderDetailModal';
+import { OrderReceiptModal } from './OrderReceiptModal';
+import { downloadOrderReceiptPDF } from './OrderTracking';
 import { triggerHaptic } from '../../utils/haptics';
 import { staggerContainer, staggerItem } from '../../utils/motion';
 import {
@@ -32,6 +34,7 @@ export const OrdersHistory: React.FC<OrdersHistoryProps> = ({ onTrackOrder }) =>
   const { user } = useAuthStore();
   const [orders, setOrders] = useState<Order[]>([]);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [receiptOrder, setReceiptOrder] = useState<Order | null>(null);
 
   useEffect(() => {
     if (!user?.uid) return;
@@ -224,7 +227,7 @@ export const OrdersHistory: React.FC<OrdersHistoryProps> = ({ onTrackOrder }) =>
                 <div className="flex items-center justify-between pt-2 border-t border-slate-100">
                   <div>
                     <span className="text-[10px] font-bold text-slate-400 block uppercase">
-                      Total Paid
+                      {ord.payment_status === 'paid' ? 'Total Paid' : 'Amount Due'}
                     </span>
                     <span className="text-base font-black text-[#D6001C]">
                       ₦{ord.total_price.toLocaleString()}
@@ -236,13 +239,27 @@ export const OrdersHistory: React.FC<OrdersHistoryProps> = ({ onTrackOrder }) =>
                       whileHover={{ scale: 1.05 }}
                       whileTap={{ scale: 0.95 }}
                       onClick={() => {
+                        triggerHaptic(30);
+                        setReceiptOrder(ord);
+                      }}
+                      className="p-2.5 bg-rose-50 hover:bg-rose-100 text-[#D6001C] rounded-2xl text-xs font-bold transition-colors cursor-pointer border border-rose-100 flex items-center gap-1.5"
+                      title="View Official Receipt"
+                    >
+                      <FileText className="w-4 h-4" />
+                      <span className="hidden sm:inline">Receipt</span>
+                    </motion.button>
+
+                    <motion.button
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                      onClick={() => {
                         triggerHaptic(40);
                         setSelectedOrder(ord);
                       }}
                       className="bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold px-4 py-2.5 rounded-2xl text-xs flex items-center gap-1.5 transition-colors cursor-pointer"
                     >
                       <Eye className="w-3.5 h-3.5" />
-                      <span>Order Details</span>
+                      <span>Details</span>
                     </motion.button>
 
                     {isActive && (
@@ -273,6 +290,15 @@ export const OrdersHistory: React.FC<OrdersHistoryProps> = ({ onTrackOrder }) =>
           order={selectedOrder}
           onClose={() => setSelectedOrder(null)}
           onTrackOrder={onTrackOrder}
+        />
+      )}
+
+      {/* Authoritative Order Receipt Modal */}
+      {receiptOrder && (
+        <OrderReceiptModal
+          order={receiptOrder}
+          customerProfile={user}
+          onClose={() => setReceiptOrder(null)}
         />
       )}
     </motion.div>

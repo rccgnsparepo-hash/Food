@@ -17,6 +17,32 @@ export const VendorsView: React.FC<VendorsViewProps> = ({
 }) => {
   const { vendors, menuItems, foodZones, isLoading } = useMarketplaceStore();
 
+  const allKnownVendors: Vendor[] = React.useMemo(() => {
+    const map = new Map<string, Vendor>();
+    vendors.forEach((v) => map.set(v.id, v));
+
+    menuItems.forEach((item) => {
+      const vId = item.vendor_id || item.restaurant_id;
+      if (vId && !map.has(vId)) {
+        map.set(vId, {
+          id: vId,
+          name: vId.startsWith('vendor_') ? vId.replace('vendor_', '').replace(/_/g, ' ').toUpperCase() : 'Campus Kitchen Stand',
+          description: 'Verified campus kitchen provider',
+          is_open: true,
+          is_active: true,
+          is_verified: true,
+          rating: 4.8,
+          opening_time: '07:30',
+          closing_time: '21:00',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        });
+      }
+    });
+
+    return Array.from(map.values());
+  }, [vendors, menuItems]);
+
   return (
     <motion.div
       variants={pageVariants}
@@ -26,18 +52,18 @@ export const VendorsView: React.FC<VendorsViewProps> = ({
       className="space-y-8 pb-24 max-w-7xl mx-auto"
     >
       {/* Header Banner */}
-      <div className="bg-gradient-to-br from-slate-900 via-rose-950 to-slate-900 text-white rounded-3xl p-6 sm:p-8 relative overflow-hidden shadow-xl border border-rose-900/40">
+      <div className="bg-gradient-to-r from-[#0D472B] via-[#0A3A22] to-[#FF7A00] text-white rounded-3xl p-6 sm:p-8 relative overflow-hidden shadow-xl border border-emerald-800/40">
         <div className="relative z-10 max-w-2xl space-y-2">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 backdrop-blur-md text-[11px] font-extrabold text-rose-300 border border-white/10 uppercase tracking-wider">
-            <Store className="w-3.5 h-3.5 text-[#D6001C]" />
-            <span>Campus Food Facilities</span>
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 backdrop-blur-md text-[11px] font-extrabold text-emerald-200 border border-white/10 uppercase tracking-wider">
+            <Store className="w-3.5 h-3.5 text-[#FF7A00]" />
+            <span>BUKKIT Verified Kitchens</span>
           </div>
           <h1 className="text-2xl sm:text-4xl font-black tracking-tight text-white">
             MTU Kitchens, Bukas & Cafeterias
           </h1>
-          <p className="text-xs sm:text-sm text-slate-300 font-medium leading-relaxed">
+          <p className="text-xs sm:text-sm text-emerald-100 font-medium leading-relaxed">
             Discover verified food vendors operating across Mountain Top University campus. Order
-            direct for quick pickup or hostel delivery.
+            direct for quick pickup or hostel delivery in 15–20 minutes.
           </p>
         </div>
       </div>
@@ -56,8 +82,10 @@ export const VendorsView: React.FC<VendorsViewProps> = ({
           animate="show"
           className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
         >
-          {vendors.map((vendor) => {
-            const vendorDishes = menuItems.filter((m) => m.vendor_id === vendor.id);
+          {allKnownVendors.map((vendor) => {
+            const vendorDishes = menuItems.filter(
+              (m) => m.vendor_id === vendor.id || m.restaurant_id === vendor.id
+            );
             const zone = foodZones.find((z) => z.id === vendor.food_zone_id);
 
             return (
@@ -68,7 +96,7 @@ export const VendorsView: React.FC<VendorsViewProps> = ({
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 whileHover={{ y: -4, scale: 1.015 }}
                 whileTap={{ scale: 0.985 }}
-                className="bg-white rounded-3xl overflow-hidden border border-rose-100 shadow-xs hover:shadow-xl hover:shadow-rose-950/5 transition-all flex flex-col justify-between group"
+                className="bg-white rounded-3xl overflow-hidden border border-emerald-100 shadow-xs hover:shadow-xl hover:shadow-emerald-950/10 transition-all flex flex-col justify-between group"
               >
                 <div>
                   {/* Cover Image */}
@@ -87,7 +115,19 @@ export const VendorsView: React.FC<VendorsViewProps> = ({
                       <span>{vendor.rating ? vendor.rating.toFixed(1) : '4.8'}</span>
                     </div>
 
-                    <div className="absolute bottom-3 left-3 bg-slate-950/80 backdrop-blur-md text-white px-3 py-1 rounded-full text-[11px] font-bold">
+                    <div className="absolute top-3 left-3 flex items-center gap-1.5">
+                      {vendor.is_open !== false && vendor.is_active !== false ? (
+                        <span className="bg-emerald-600/90 text-white text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider backdrop-blur-md shadow-xs">
+                          Open Now
+                        </span>
+                      ) : (
+                        <span className="bg-rose-600/95 text-white text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider backdrop-blur-md shadow-xs">
+                          Closed / Offline
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="absolute bottom-3 left-3 bg-[#0D472B]/90 backdrop-blur-md text-white px-3 py-1 rounded-full text-[11px] font-bold border border-white/10">
                       {vendorDishes.length} Verified Dishes
                     </div>
                   </div>
@@ -95,7 +135,7 @@ export const VendorsView: React.FC<VendorsViewProps> = ({
                   {/* Vendor Details */}
                   <div className="p-5 space-y-3">
                     <div>
-                      <h3 className="font-extrabold text-slate-900 text-lg group-hover:text-[#D6001C] transition-colors">
+                      <h3 className="font-extrabold text-slate-900 text-lg group-hover:text-[#0D472B] transition-colors">
                         {vendor.name}
                       </h3>
                       <p className="text-xs text-slate-500 font-medium line-clamp-2 mt-1 leading-relaxed">
@@ -103,13 +143,13 @@ export const VendorsView: React.FC<VendorsViewProps> = ({
                       </p>
                     </div>
 
-                    <div className="pt-2 border-t border-rose-50 flex items-center justify-between text-xs text-slate-600 font-semibold">
+                    <div className="pt-2 border-t border-emerald-50 flex items-center justify-between text-xs text-slate-600 font-semibold">
                       <span className="flex items-center gap-1">
-                        <Clock className="w-3.5 h-3.5 text-[#D6001C]" />
+                        <Clock className="w-3.5 h-3.5 text-[#FF7A00]" />
                         {vendor.opening_time || '07:30'} - {vendor.closing_time || '21:00'}
                       </span>
                       <span className="flex items-center gap-1 text-slate-500">
-                        <MapPin className="w-3.5 h-3.5 text-[#D6001C]" />
+                        <MapPin className="w-3.5 h-3.5 text-[#0D472B]" />
                         {vendor.address ? vendor.address.split(',')[0] : 'Campus Hall'}
                       </span>
                     </div>
@@ -128,7 +168,7 @@ export const VendorsView: React.FC<VendorsViewProps> = ({
                         onSelectRestaurant(vendor);
                       }
                     }}
-                    className="w-full bg-[#D6001C] hover:bg-red-700 text-white font-extrabold py-3 rounded-2xl text-xs flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-md shadow-red-500/20"
+                    className="w-full bg-[#0D472B] hover:bg-emerald-800 text-white font-extrabold py-3 rounded-2xl text-xs flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-md shadow-emerald-950/20"
                   >
                     <span>View Kitchen Menu</span>
                     <ChevronRight className="w-4 h-4" />

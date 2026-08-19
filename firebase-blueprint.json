@@ -91,10 +91,12 @@
         "food_zone_id": { "type": "string" },
         "name": { "type": "string" },
         "slug": { "type": "string" },
+        "slogan": { "type": "string" },
         "description": { "type": "string" },
         "vendor_type": { "type": "string" },
         "logo_url": { "type": "string" },
         "cover_image_url": { "type": "string" },
+        "worker_ids": { "type": "array" },
         "phone": { "type": "string" },
         "email": { "type": "string" },
         "address": { "type": "string" },
@@ -113,6 +115,21 @@
         "updated_at": { "type": "string" }
       },
       "required": ["university_id", "campus_id", "name", "vendor_type", "is_open", "is_active"]
+    },
+    "kitchen_details": {
+      "title": "kitchen_details",
+      "description": "Extended profile details for campus kitchens and food stands",
+      "type": "object",
+      "properties": {
+        "slogan": { "type": "string" },
+        "cover_image_url": { "type": "string" },
+        "worker_ids": { "type": "array" },
+        "banner_url": { "type": "string" },
+        "bio": { "type": "string" },
+        "operating_status": { "type": "string" },
+        "updated_at": { "type": "string" }
+      },
+      "required": ["slogan", "cover_image_url", "worker_ids"]
     },
     "food_categories": {
       "title": "food_categories",
@@ -249,6 +266,75 @@
         "updated_at": { "type": "string" }
       },
       "required": ["id", "is_online"]
+    },
+    "wallets": {
+      "title": "wallets",
+      "description": "User BUKKIT wallet balances",
+      "type": "object",
+      "properties": {
+        "wallet_id": { "type": "string" },
+        "user_id": { "type": "string" },
+        "available_balance": { "type": "number" },
+        "pending_balance": { "type": "number" },
+        "currency": { "type": "string" },
+        "status": { "type": "string" },
+        "created_at": { "type": "string" },
+        "updated_at": { "type": "string" }
+      },
+      "required": ["wallet_id", "user_id", "available_balance", "status"]
+    },
+    "wallet_transactions": {
+      "title": "wallet_transactions",
+      "description": "Atomic wallet ledger transactions",
+      "type": "object",
+      "properties": {
+        "transaction_id": { "type": "string" },
+        "wallet_id": { "type": "string" },
+        "user_id": { "type": "string" },
+        "order_id": { "type": "string" },
+        "type": { "type": "string" },
+        "amount": { "type": "number" },
+        "balance_before": { "type": "number" },
+        "balance_after": { "type": "number" },
+        "status": { "type": "string" },
+        "reference": { "type": "string" },
+        "description": { "type": "string" },
+        "created_at": { "type": "string" }
+      },
+      "required": ["transaction_id", "wallet_id", "user_id", "type", "amount", "status"]
+    },
+    "rider_earnings": {
+      "title": "rider_earnings",
+      "description": "Rider delivery earnings ledger",
+      "type": "object",
+      "properties": {
+        "delivery_earning_id": { "type": "string" },
+        "rider_id": { "type": "string" },
+        "order_id": { "type": "string" },
+        "delivery_fee": { "type": "number" },
+        "rider_earning": { "type": "number" },
+        "platform_commission": { "type": "number" },
+        "status": { "type": "string" },
+        "created_at": { "type": "string" }
+      },
+      "required": ["delivery_earning_id", "rider_id", "order_id", "rider_earning"]
+    },
+    "audit_logs": {
+      "title": "audit_logs",
+      "description": "Authoritative immutable audit log of status and financial transitions",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "actor_id": { "type": "string" },
+        "actor_name": { "type": "string" },
+        "actor_role": { "type": "string" },
+        "action": { "type": "string" },
+        "order_id": { "type": "string" },
+        "previous_state": { "type": "string" },
+        "new_state": { "type": "string" },
+        "timestamp": { "type": "string" }
+      },
+      "required": ["id", "actor_id", "action", "timestamp"]
     }
   }
 }

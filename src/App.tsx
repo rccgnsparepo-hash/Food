@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useAuthStore } from './stores/useAuthStore';
 import { useCartStore } from './stores/useCartStore';
+import { useMarketplaceStore } from './stores/useMarketplaceStore';
 import { seedInitialDataIfNeeded } from './lib/seed';
 import { MenuItem } from './types';
 
@@ -20,6 +21,7 @@ import { FavoritesView } from './components/customer/FavoritesView';
 import { OrdersHistory } from './components/customer/OrdersHistory';
 
 import { RiderDashboard } from './components/rider/RiderDashboard';
+import { KitchenDashboard } from './components/kitchen/KitchenDashboard';
 import { AdminDashboard } from './components/admin/AdminDashboard';
 import { AuthModal } from './components/auth/AuthModal';
 import { AuthGatewayPage } from './components/auth/AuthGatewayPage';
@@ -32,6 +34,7 @@ import { requestFCMToken, setupForegroundFCMListener } from './lib/fcm';
 export default function App() {
   const { initAuth, user, role, setRole, logout, isInitLoading, isEmailVerified } = useAuthStore();
   const { isOpen: isCartOpen, setCartOpen } = useCartStore();
+  const { initMarketplace } = useMarketplaceStore();
 
   const [activeView, setActiveView] = useState<string>('home');
   const [targetVendorId, setTargetVendorId] = useState<string | undefined>(undefined);
@@ -47,6 +50,7 @@ export default function App() {
 
   useEffect(() => {
     const unsub = initAuth();
+    initMarketplace();
     seedInitialDataIfNeeded();
 
     // Check notification permission state
@@ -137,9 +141,9 @@ export default function App() {
           )}
 
           {/* Main View Container */}
-          <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 pt-6">
+          <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 pt-6 pb-20">
             <ErrorBoundary>
-              {/* Customer Views */}
+              {/* Customer Views: Strictly home, menu, vendors, wallet, orders, tracking, profile */}
               {role === 'customer' && (
                 <>
                   {activeView === 'home' && (
@@ -202,7 +206,7 @@ export default function App() {
                     <div className="max-w-md mx-auto bg-white rounded-3xl p-8 shadow-xs border border-rose-100 text-center space-y-4">
                       <div className="w-20 h-20 rounded-full overflow-hidden border-4 border-[#D6001C] mx-auto shadow-md">
                         <img
-                          src={user?.avatar_url || 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200&auto=format&fit=crop'}
+                          src={user?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(user?.email || 'user')}`}
                           alt={user?.name}
                           className="w-full h-full object-cover"
                         />
@@ -211,7 +215,7 @@ export default function App() {
                         <h2 className="font-extrabold text-xl text-slate-900">{user?.name}</h2>
                         <p className="text-xs text-slate-400 font-medium">{user?.email}</p>
                         <span className="inline-block mt-1 bg-red-100 text-red-800 text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase">
-                          Role: {user?.role || role}
+                          Account: {user?.role || role}
                         </span>
                       </div>
 
@@ -222,7 +226,7 @@ export default function App() {
                         </div>
                         <div className="flex items-center gap-2">
                           <MapPin className="w-4 h-4 text-[#D6001C]" />
-                          <span>{user?.address || 'Prayer City, Mountain Top University'}</span>
+                          <span>{user?.address || 'Mountain Top University Campus'}</span>
                         </div>
                       </div>
 
@@ -231,14 +235,14 @@ export default function App() {
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2 font-bold text-slate-200">
                             <Bell className="w-4 h-4 text-[#D6001C]" />
-                            <span>FCM Status Push Alerts</span>
+                            <span>Live Order Notifications</span>
                           </div>
                           <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${fcmPermissionGranted ? 'bg-emerald-500/20 text-emerald-400' : 'bg-amber-500/20 text-amber-300'}`}>
                             {fcmPermissionGranted ? 'ENABLED' : 'DISABLED'}
                           </span>
                         </div>
                         <p className="text-[11px] text-slate-400">
-                          Receive real-time push notifications when your order document status updates in Firestore.
+                          Receive real-time push alerts when the kitchen prepares your meal and the rider heads your way.
                         </p>
                         {!fcmPermissionGranted && (
                           <button
@@ -249,7 +253,7 @@ export default function App() {
                             className="w-full mt-2 bg-[#D6001C] hover:bg-red-700 text-white font-extrabold py-2 rounded-xl text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-md shadow-red-500/20"
                           >
                             <Bell className="w-3.5 h-3.5" />
-                            <span>Enable Firebase Notifications</span>
+                            <span>Enable Real-Time Alerts</span>
                           </button>
                         )}
                       </div>
@@ -263,14 +267,32 @@ export default function App() {
                       </button>
                     </div>
                   )}
+
+                  {/* Fallback if an unexpected view is passed */}
+                  {!['home', 'menu', 'vendors', 'wallet', 'favorites', 'orders', 'tracking', 'profile'].includes(activeView) && (
+                    <HomeFeed
+                      onSelectFood={(item) => setSelectedFood(item)}
+                      onSelectRestaurant={(vendor) => {
+                        setTargetVendorId(vendor.id);
+                        setActiveView('menu');
+                      }}
+                      onNavigateToMenu={(vendorId) => {
+                        setTargetVendorId(vendorId);
+                        setActiveView('menu');
+                      }}
+                    />
+                  )}
                 </>
               )}
 
-              {/* Rider View */}
+              {/* Kitchen / Stand View: Strictly Kitchen Stand Dashboard */}
+              {(role === 'kitchen' || role === 'kitchen_manager' || role === 'kitchen_staff') && <KitchenDashboard />}
+
+              {/* Rider View: Strictly Rider Delivery Dashboard */}
               {role === 'rider' && <RiderDashboard />}
 
-              {/* Admin View */}
-              {role === 'admin' && <AdminDashboard />}
+              {/* Admin View: Strictly Campus Operations & Admin Console */}
+              {(role === 'admin' || role === 'super_admin') && <AdminDashboard />}
             </ErrorBoundary>
           </main>
 

@@ -1,8 +1,10 @@
-import React from 'react';
-import { ArrowLeft, Clock, MapPin, CheckCircle2, ShoppingBag, Truck, CreditCard, ChevronRight, RefreshCw, User, Phone } from 'lucide-react';
+import React, { useState } from 'react';
+import { ArrowLeft, Clock, MapPin, CheckCircle2, ShoppingBag, Truck, CreditCard, ChevronRight, RefreshCw, User, Phone, FileText } from 'lucide-react';
 import { Order, OrderStatus } from '../../types';
 import { MapPicker } from '../ui/MapPicker';
 import { useCartStore } from '../../stores/useCartStore';
+import { useAuthStore } from '../../stores/useAuthStore';
+import { OrderReceiptModal } from './OrderReceiptModal';
 import { triggerHaptic } from '../../utils/haptics';
 
 interface OrderDetailModalProps {
@@ -13,6 +15,8 @@ interface OrderDetailModalProps {
 
 export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({ order, onClose, onTrackOrder }) => {
   const { addItem, setCartOpen } = useCartStore();
+  const { user } = useAuthStore();
+  const [showReceipt, setShowReceipt] = useState(false);
 
   const isCompleted = order.status === 'delivered';
   const isCancelled = order.status === 'cancelled';
@@ -233,6 +237,17 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({ order, onClo
 
         {/* Bottom Actions Bar */}
         <div className="p-6 bg-slate-50 border-t border-rose-100 flex flex-wrap gap-3">
+          <button
+            onClick={() => {
+              triggerHaptic(40);
+              setShowReceipt(true);
+            }}
+            className="bg-slate-900 hover:bg-black text-white font-extrabold py-3.5 px-5 rounded-2xl text-xs flex items-center justify-center gap-2 shadow-xs cursor-pointer transition-colors shrink-0"
+          >
+            <FileText className="w-4 h-4 text-rose-400" />
+            <span>Official Receipt</span>
+          </button>
+
           {isActive && onTrackOrder && (
             <button
               onClick={() => {
@@ -261,6 +276,15 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({ order, onClo
         </div>
 
       </div>
+
+      {/* Authoritative Order Receipt Modal */}
+      {showReceipt && (
+        <OrderReceiptModal
+          order={order}
+          customerProfile={user}
+          onClose={() => setShowReceipt(false)}
+        />
+      )}
     </div>
   );
 };

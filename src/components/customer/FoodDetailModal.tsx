@@ -1,12 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { ArrowLeft, Heart, Minus, Plus, ShoppingBag } from 'lucide-react';
+import { ArrowLeft, Heart, Minus, Plus, ShoppingBag, AlertTriangle, Ban, Store } from 'lucide-react';
 import { MenuItem } from '../../types';
 import { useCartStore } from '../../stores/useCartStore';
 import { useFavoriteStore } from '../../stores/useFavoriteStore';
 import { useAuthStore } from '../../stores/useAuthStore';
+import { useMarketplaceStore } from '../../stores/useMarketplaceStore';
+import { getItemAvailability } from '../../utils/availability';
 import { triggerHaptic } from '../../utils/haptics';
 import { modalOverlayVariants, modalDialogVariants } from '../../utils/motion';
+import { toast } from 'sonner';
 
 interface FoodDetailModalProps {
   item: MenuItem | null;
@@ -22,6 +25,11 @@ export const FoodDetailModal: React.FC<FoodDetailModalProps> = ({ item, onClose 
   const { addItem, setCartOpen } = useCartStore();
   const { user } = useAuthStore();
   const { isFavorite, toggleFavorite } = useFavoriteStore();
+  const { vendors } = useMarketplaceStore();
+
+  const vendorId = item?.vendor_id || item?.restaurant_id;
+  const vendor = vendorId ? vendors.find((v) => v.id === vendorId) : undefined;
+  const availability = getItemAvailability(item, vendor);
 
   const favorite = item ? isFavorite(item.id) : false;
 
@@ -38,15 +46,24 @@ export const FoodDetailModal: React.FC<FoodDetailModalProps> = ({ item, onClose 
   if (!item) return null;
 
   const handleAddToCart = () => {
+    if (!availability.isAvailable) {
+      toast.error(`Cannot add: ${availability.reasonText}`);
+      return;
+    }
     triggerHaptic([50, 30, 50]);
-    addItem(item, undefined, quantity, selectedOptions);
-    onClose();
-    setCartOpen(true);
+    const success = addItem(item, vendor, quantity, selectedOptions);
+    if (success) {
+      onClose();
+      setCartOpen(true);
+    }
   };
 
   const handleOptionSelect = (optionName: string, choiceName: string) => {
+    if (!availability.isAvailable) return;
     setSelectedOptions((prev) => ({ ...prev, [optionName]: choiceName }));
   };
+
+  const rawPrice = item.base_price ?? item.price ?? 0;
 
   return (
     <AnimatePresence>
@@ -56,7 +73,7 @@ export const FoodDetailModal: React.FC<FoodDetailModalProps> = ({ item, onClose 
         animate="animate"
         exit="exit"
         onClick={onClose}
-        className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-0 sm:p-4 overflow-y-auto"
+        className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 backdrop-blur-xs p-0 sm:p-4 overflow-y-auto"
       >
         <motion.div
           variants={modalDialogVariants}
@@ -64,9 +81,9 @@ export const FoodDetailModal: React.FC<FoodDetailModalProps> = ({ item, onClose 
           animate="animate"
           exit="exit"
           onClick={(e) => e.stopPropagation()}
-          className="bg-[#D6001C] w-full max-w-lg min-h-screen sm:min-h-0 sm:max-h-[90vh] sm:rounded-3xl overflow-y-auto relative flex flex-col justify-between shadow-2xl"
+          className="bg-gradient-to-b from-[#0D472B] via-[#0A3A22] to-[#0D472B] w-full max-w-lg min-h-screen sm:min-h-0 sm:max-h-[90vh] sm:rounded-3xl overflow-y-auto relative flex flex-col justify-between shadow-2xl"
         >
-          {/* Top Navigation Bar on Red Backdrop */}
+          {/* Top Navigation Bar */}
           <div className="p-6 flex items-center justify-between text-white z-20">
             <motion.button
               whileHover={{ scale: 1.1 }}
@@ -83,53 +100,90 @@ export const FoodDetailModal: React.FC<FoodDetailModalProps> = ({ item, onClose 
               onClick={() => user?.uid && toggleFavorite(user.uid, item.id, 'menu_item')}
               className="w-10 h-10 rounded-full bg-white/20 hover:bg-white/30 backdrop-blur-md flex items-center justify-center text-white transition-colors cursor-pointer"
             >
-              <Heart className={`w-5 h-5 ${favorite ? 'fill-white text-white' : ''}`} />
+              <Heart className={`w-5 h-5 ${favorite ? 'fill-[#FF7A00] text-[#FF7A00]' : ''}`} />
             </motion.button>
           </div>
 
-          {/* Curved Header Arch & Food Photography Image */}
-          <div className="relative w-full pt-4 pb-12 flex items-center justify-center">
+          {/* Food Photography Image */}
+          <div className="relative w-full pt-2 pb-10 flex items-center justify-center">
             <motion.div
-              initial={{ scale: 0.8, opacity: 0 }}
+              initial={{ scale: 0.85, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               transition={{ type: 'spring', stiffness: 300, damping: 25 }}
-              className="w-64 h-64 sm:w-72 sm:h-72 rounded-full overflow-hidden border-4 border-white/20 shadow-2xl z-10 bg-white/10"
+              className="w-60 h-60 sm:w-68 sm:h-68 rounded-full overflow-hidden border-4 border-white/20 shadow-2xl z-10 bg-white/10 relative"
             >
               <img
-                src={item.image_url}
+                src={
+                  item.image_url ||
+                  'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400'
+                }
                 alt={item.name}
-                className="w-full h-full object-cover transform hover:scale-110 transition-transform duration-500"
+                className={`w-full h-full object-cover transform hover:scale-108 transition-transform duration-500 ${
+                  !availability.isAvailable ? 'grayscale-40 opacity-80' : ''
+                }`}
               />
+              {!availability.isAvailable && (
+                <div className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center text-white p-3 text-center">
+                  <Ban className="w-8 h-8 text-rose-400 mb-1" />
+                  <span className="text-xs font-black uppercase tracking-wider bg-rose-600 px-3 py-1 rounded-full shadow-md">
+                    {availability.badgeLabel}
+                  </span>
+                </div>
+              )}
             </motion.div>
           </div>
 
           {/* White Rounded Bottom Content Sheet */}
-          <div className="bg-white rounded-t-[36px] p-6 sm:p-8 space-y-6 z-20 shadow-xl flex-1 flex flex-col justify-between text-slate-900">
+          <div className="bg-white rounded-t-[36px] p-6 sm:p-8 space-y-5 z-20 shadow-xl flex-1 flex flex-col justify-between text-slate-900">
             <div>
+              {/* Availability Alert Banner (Strict Void notification) */}
+              {!availability.isAvailable && (
+                <motion.div
+                  initial={{ opacity: 0, y: -6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="mb-4 bg-rose-50 border border-rose-200 p-3.5 rounded-2xl flex items-start gap-3 text-rose-900"
+                >
+                  <AlertTriangle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
+                  <div className="text-xs">
+                    <p className="font-black text-rose-800 uppercase tracking-wide">
+                      {availability.badgeLabel} — Cannot Order
+                    </p>
+                    <p className="text-rose-700 font-medium mt-0.5 leading-relaxed">
+                      {availability.reasonText} This item cannot be added to your cart at this time.
+                    </p>
+                  </div>
+                </motion.div>
+              )}
+
               {/* Title & Price Row */}
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <h2 className="text-2xl font-black text-slate-900 tracking-tight">
                     {item.name}
                   </h2>
-                  <span className="text-xs font-semibold text-slate-400 capitalize block mt-0.5">
-                    Category: Campus Special
-                  </span>
+                  <div className="flex items-center gap-2 mt-1 text-xs font-semibold text-slate-500">
+                    <span className="flex items-center gap-1 text-[#0D472B] font-bold">
+                      <Store className="w-3.5 h-3.5" />
+                      {vendor?.name || 'Verified Campus Kitchen'}
+                    </span>
+                    <span>•</span>
+                    <span className="capitalize">{item.category || 'Special'}</span>
+                  </div>
                 </div>
                 <div className="text-right">
-                  <span className="text-2xl font-black text-[#D6001C]">
-                    ₦{item.price.toLocaleString()}
+                  <span className="text-2xl font-black text-[#0D472B]">
+                    ₦{Number(rawPrice).toLocaleString()}
                   </span>
                 </div>
               </div>
 
               {/* Details vs Reviews Pill Tab Selector */}
-              <div className="flex items-center gap-3 mt-6 border-b border-rose-100 pb-4">
+              <div className="flex items-center gap-3 mt-5 border-b border-slate-100 pb-3">
                 <button
                   onClick={() => setActiveTab('details')}
-                  className={`px-6 py-2 rounded-full font-bold text-xs tracking-wide transition-all cursor-pointer ${
+                  className={`px-5 py-2 rounded-full font-bold text-xs tracking-wide transition-all cursor-pointer ${
                     activeTab === 'details'
-                      ? 'bg-[#D6001C] text-white shadow-md shadow-red-500/20'
+                      ? 'bg-[#0D472B] text-white shadow-md shadow-emerald-950/20'
                       : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                   }`}
                 >
@@ -137,9 +191,9 @@ export const FoodDetailModal: React.FC<FoodDetailModalProps> = ({ item, onClose 
                 </button>
                 <button
                   onClick={() => setActiveTab('reviews')}
-                  className={`px-6 py-2 rounded-full font-bold text-xs tracking-wide transition-all cursor-pointer ${
+                  className={`px-5 py-2 rounded-full font-bold text-xs tracking-wide transition-all cursor-pointer ${
                     activeTab === 'reviews'
-                      ? 'bg-[#D6001C] text-white shadow-md shadow-red-500/20'
+                      ? 'bg-[#0D472B] text-white shadow-md shadow-emerald-950/20'
                       : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                   }`}
                 >
@@ -151,11 +205,11 @@ export const FoodDetailModal: React.FC<FoodDetailModalProps> = ({ item, onClose 
               {activeTab === 'details' ? (
                 <div className="mt-4 space-y-4">
                   <p className="text-xs sm:text-sm text-slate-600 leading-relaxed font-medium">
-                    {showFullDesc ? item.description : item.description.slice(0, 140)}
-                    {item.description.length > 140 && (
+                    {showFullDesc ? item.description : (item.description || '').slice(0, 140)}
+                    {(item.description || '').length > 140 && (
                       <button
                         onClick={() => setShowFullDesc(!showFullDesc)}
-                        className="text-[#D6001C] font-bold ml-1 hover:underline cursor-pointer"
+                        className="text-[#FF7A00] font-bold ml-1 hover:underline cursor-pointer"
                       >
                         {showFullDesc ? 'Show less' : 'See more.'}
                       </button>
@@ -176,11 +230,14 @@ export const FoodDetailModal: React.FC<FoodDetailModalProps> = ({ item, onClose 
                               return (
                                 <button
                                   key={c.name}
+                                  disabled={!availability.isAvailable}
                                   onClick={() => handleOptionSelect(opt.name, c.name)}
-                                  className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${
-                                    isSelected
-                                      ? 'bg-rose-50 border-[#D6001C] text-[#D6001C]'
-                                      : 'bg-slate-50 border-slate-200 text-slate-600'
+                                  className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold border transition-all ${
+                                    !availability.isAvailable
+                                      ? 'bg-slate-50 text-slate-400 border-slate-200 cursor-not-allowed'
+                                      : isSelected
+                                      ? 'bg-emerald-50 border-[#0D472B] text-[#0D472B]'
+                                      : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100 cursor-pointer'
                                   }`}
                                 >
                                   {c.name} {c.price > 0 && `(+₦${c.price})`}
@@ -195,14 +252,14 @@ export const FoodDetailModal: React.FC<FoodDetailModalProps> = ({ item, onClose 
                 </div>
               ) : (
                 <div className="mt-4 space-y-3">
-                  <div className="bg-rose-50/60 p-3.5 rounded-2xl border border-rose-100 text-xs space-y-1">
+                  <div className="bg-emerald-50/60 p-3.5 rounded-2xl border border-emerald-100 text-xs space-y-1">
                     <div className="flex items-center justify-between">
                       <span className="font-bold text-slate-900">David O.</span>
                       <span className="text-amber-500 font-bold">★★★★★</span>
                     </div>
                     <p className="text-slate-600">Super fresh and delicious! Arrived piping hot in my hostel.</p>
                   </div>
-                  <div className="bg-rose-50/60 p-3.5 rounded-2xl border border-rose-100 text-xs space-y-1">
+                  <div className="bg-emerald-50/60 p-3.5 rounded-2xl border border-emerald-100 text-xs space-y-1">
                     <div className="flex items-center justify-between">
                       <span className="font-bold text-slate-900">Grace A.</span>
                       <span className="text-amber-500 font-bold">★★★★★</span>
@@ -214,13 +271,18 @@ export const FoodDetailModal: React.FC<FoodDetailModalProps> = ({ item, onClose 
             </div>
 
             {/* Bottom Controls Row: Quantity Selectors & Add To Cart Button */}
-            <div className="pt-6 flex items-center justify-between gap-4">
+            <div className="pt-4 flex items-center justify-between gap-4 border-t border-slate-100">
               <div className="flex items-center gap-3 bg-slate-100 p-1.5 rounded-2xl">
                 <motion.button
-                  whileHover={{ scale: 1.1 }}
-                  whileTap={{ scale: 0.9 }}
+                  whileHover={availability.isAvailable ? { scale: 1.1 } : undefined}
+                  whileTap={availability.isAvailable ? { scale: 0.9 } : undefined}
+                  disabled={!availability.isAvailable}
                   onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                  className="w-10 h-10 rounded-xl bg-[#D6001C] text-white flex items-center justify-center font-bold transition-transform cursor-pointer"
+                  className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold transition-transform ${
+                    availability.isAvailable
+                      ? 'bg-[#0D472B] text-white cursor-pointer'
+                      : 'bg-slate-300 text-slate-400 cursor-not-allowed'
+                  }`}
                 >
                   <Minus className="w-4 h-4 stroke-[3]" />
                 </motion.button>
@@ -228,24 +290,36 @@ export const FoodDetailModal: React.FC<FoodDetailModalProps> = ({ item, onClose 
                   {quantity}
                 </span>
                 <motion.button
-                  whileHover={{ scale: 1.1 }}
-                  whileTap={{ scale: 0.9 }}
+                  whileHover={availability.isAvailable ? { scale: 1.1 } : undefined}
+                  whileTap={availability.isAvailable ? { scale: 0.9 } : undefined}
+                  disabled={!availability.isAvailable}
                   onClick={() => setQuantity(quantity + 1)}
-                  className="w-10 h-10 rounded-xl bg-[#D6001C] text-white flex items-center justify-center font-bold transition-transform cursor-pointer"
+                  className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold transition-transform ${
+                    availability.isAvailable
+                      ? 'bg-[#0D472B] text-white cursor-pointer'
+                      : 'bg-slate-300 text-slate-400 cursor-not-allowed'
+                  }`}
                 >
                   <Plus className="w-4 h-4 stroke-[3]" />
                 </motion.button>
               </div>
 
-              <motion.button
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.96 }}
-                onClick={handleAddToCart}
-                className="flex-1 bg-[#D6001C] hover:bg-red-700 text-white font-extrabold py-4 px-6 rounded-full shadow-xl shadow-red-500/30 flex items-center justify-center gap-2 text-sm transition-all cursor-pointer"
-              >
-                <ShoppingBag className="w-4 h-4" />
-                <span>Add to cart</span>
-              </motion.button>
+              {!availability.isAvailable ? (
+                <div className="flex-1 bg-slate-100 border border-slate-200 text-slate-400 font-extrabold py-4 px-6 rounded-full flex items-center justify-center gap-2 text-xs uppercase tracking-wider cursor-not-allowed select-none">
+                  <Ban className="w-4 h-4 text-rose-500" />
+                  <span>{availability.badgeLabel} — Void</span>
+                </div>
+              ) : (
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.96 }}
+                  onClick={handleAddToCart}
+                  className="flex-1 bg-[#FF7A00] hover:bg-[#E65100] text-white font-extrabold py-4 px-6 rounded-full shadow-xl shadow-orange-500/30 flex items-center justify-center gap-2 text-sm transition-all cursor-pointer"
+                >
+                  <ShoppingBag className="w-4 h-4" />
+                  <span>Add to cart • ₦{(Number(rawPrice) * quantity).toLocaleString()}</span>
+                </motion.button>
+              )}
             </div>
 
           </div>
@@ -255,4 +329,5 @@ export const FoodDetailModal: React.FC<FoodDetailModalProps> = ({ item, onClose 
     </AnimatePresence>
   );
 };
+
 

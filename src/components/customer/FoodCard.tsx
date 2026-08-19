@@ -1,10 +1,12 @@
 import React from 'react';
 import { motion } from 'motion/react';
-import { Heart, Plus, ShieldAlert, Check } from 'lucide-react';
+import { Heart, Plus, Check, Clock, Star, Ban } from 'lucide-react';
 import { MenuItem } from '../../types';
 import { useFavoriteStore } from '../../stores/useFavoriteStore';
 import { useAuthStore } from '../../stores/useAuthStore';
 import { useCartStore } from '../../stores/useCartStore';
+import { useMarketplaceStore } from '../../stores/useMarketplaceStore';
+import { getItemAvailability } from '../../utils/availability';
 import { LazyImage } from '../ui/LazyImage';
 import { triggerHaptic } from '../../utils/haptics';
 
@@ -17,6 +19,11 @@ export const FoodCard: React.FC<FoodCardProps> = ({ item, onSelect }) => {
   const { user } = useAuthStore();
   const { isFavorite, toggleFavorite } = useFavoriteStore();
   const { addItem, getItemQuantity } = useCartStore();
+  const { vendors } = useMarketplaceStore();
+
+  const vendorId = item.vendor_id || item.restaurant_id;
+  const vendor = vendorId ? vendors.find((v) => v.id === vendorId) : undefined;
+  const availability = getItemAvailability(item, vendor);
 
   const favorite = isFavorite(item.id);
   const cartQty = getItemQuantity(item.id);
@@ -31,112 +38,120 @@ export const FoodCard: React.FC<FoodCardProps> = ({ item, onSelect }) => {
 
   const handleAddToCart = (e: React.MouseEvent) => {
     e.stopPropagation();
+    if (!availability.isAvailable) {
+      triggerHaptic(100);
+      return;
+    }
     triggerHaptic(50);
-    addItem(item);
+    addItem(item, vendor);
   };
 
-  const displayPrice =
-    item.base_price !== null && item.base_price !== undefined
-      ? `₦${Number(item.base_price).toLocaleString()}`
-      : item.price && item.price > 0
-      ? `₦${Number(item.price).toLocaleString()}`
-      : null;
+  const rawPrice = item.base_price ?? item.price ?? 0;
+  const displayPrice = rawPrice > 0 ? `₦${Number(rawPrice).toLocaleString()}` : 'Free';
 
   return (
     <motion.div
-      whileHover={{ y: -5, scale: 1.018, transition: { type: 'spring', stiffness: 380, damping: 25 } }}
-      whileTap={{ scale: 0.982, transition: { type: 'spring', stiffness: 450, damping: 28 } }}
+      whileHover={availability.isAvailable ? { y: -4, scale: 1.015 } : undefined}
+      whileTap={availability.isAvailable ? { scale: 0.97 } : undefined}
       onClick={() => onSelect(item)}
-      className="bg-white rounded-3xl p-5 shadow-xs hover:shadow-xl hover:shadow-rose-950/5 border border-rose-100/70 transition-shadow cursor-pointer flex flex-col justify-between relative group select-none overflow-hidden"
+      className={`bg-white rounded-2xl sm:rounded-3xl p-3 sm:p-4 shadow-2xs hover:shadow-lg transition-all cursor-pointer flex flex-col justify-between relative group select-none overflow-hidden border ${
+        availability.isAvailable
+          ? 'border-emerald-100/80 hover:shadow-emerald-950/5'
+          : 'border-slate-200 bg-slate-50/60 opacity-85'
+      }`}
     >
-      {/* Subtle card top glow on hover */}
-      <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-[#D6001C]/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-
-      {/* Top Action Row: Heart & Verification badge */}
-      <div className="flex items-center justify-between z-10 mb-2">
-        {item.verification_status === 'pending' ? (
-          <span className="text-[10px] font-bold text-amber-800 bg-amber-100/80 px-2.5 py-1 rounded-full flex items-center gap-1 shadow-2xs">
-            <ShieldAlert className="w-3 h-3 text-amber-600" />
-            Unverified
+      {/* Top badges & Favorite heart */}
+      <div className="flex items-center justify-between z-10 mb-1.5">
+        {!availability.isAvailable ? (
+          <span className="text-[9px] sm:text-[10px] font-black text-white bg-rose-600 px-2 py-0.5 rounded-full uppercase tracking-wider shadow-xs flex items-center gap-1">
+            <Ban className="w-2.5 h-2.5" />
+            <span>{availability.badgeLabel}</span>
           </span>
         ) : (
-          <span />
+          <span className="text-[9px] sm:text-[10px] font-bold text-slate-600 bg-emerald-50 px-2 py-0.5 rounded-full flex items-center gap-1 border border-emerald-100">
+            <Clock className="w-2.5 h-2.5 text-[#FF7A00]" />
+            <span>15-20m</span>
+          </span>
         )}
 
         <motion.button
           whileHover={{ scale: 1.15 }}
           whileTap={{ scale: 0.85 }}
           onClick={handleFavoriteClick}
-          className="p-2 rounded-full bg-rose-50/90 hover:bg-rose-100/80 transition-colors text-rose-600 shadow-2xs cursor-pointer ml-auto"
+          className="p-1.5 rounded-full bg-slate-50 hover:bg-emerald-50 transition-colors text-slate-400 hover:text-emerald-700 shadow-2xs cursor-pointer ml-auto"
         >
-          <motion.div
-            animate={favorite ? { scale: [1, 1.35, 1] } : { scale: 1 }}
-            transition={{ duration: 0.25 }}
-          >
-            <Heart
-              className={`w-4 h-4 transition-colors ${
-                favorite ? 'fill-[#D6001C] text-[#D6001C]' : 'text-slate-400'
-              }`}
-            />
-          </motion.div>
+          <Heart
+            className={`w-3.5 h-3.5 sm:w-4 sm:h-4 transition-colors ${
+              favorite ? 'fill-[#FF7A00] text-[#FF7A00]' : 'text-slate-400'
+            }`}
+          />
         </motion.button>
       </div>
 
-      {/* Prominent Large Food Photography Image with Lazy Loading */}
-      <div className="my-1 flex items-center justify-center overflow-hidden rounded-2xl bg-rose-50/50">
+      {/* Food Photo Container */}
+      <div className="relative my-1 w-full aspect-4/3 overflow-hidden rounded-xl sm:rounded-2xl bg-emerald-50/40">
         <LazyImage
           src={item.image_url || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&q=80&w=300'}
           alt={item.name}
-          containerClassName="w-full h-40"
-          className="w-full h-full object-cover object-center group-hover:scale-108 transition-transform duration-500 ease-out"
+          containerClassName="w-full h-full"
+          className={`w-full h-full object-cover object-center transition-transform duration-500 ease-out ${
+            availability.isAvailable
+              ? 'group-hover:scale-108'
+              : 'grayscale-40 opacity-75'
+          }`}
         />
+        {item.rating && (
+          <div className="absolute bottom-1.5 left-1.5 bg-black/60 backdrop-blur-xs text-white text-[9px] sm:text-[10px] font-bold px-1.5 py-0.5 rounded-md flex items-center gap-0.5">
+            <Star className="w-2.5 h-2.5 fill-amber-400 text-amber-400" />
+            <span>{item.rating.toFixed(1)}</span>
+          </div>
+        )}
       </div>
 
-      {/* Food Details */}
-      <div className="mt-3 space-y-1">
-        <h3 className="font-extrabold text-slate-900 text-sm tracking-tight truncate group-hover:text-[#D6001C] transition-colors">
+      {/* Details */}
+      <div className="mt-2 space-y-0.5">
+        <h3 className="font-black text-slate-900 text-xs sm:text-sm tracking-tight truncate group-hover:text-[#0D472B] transition-colors">
           {item.name}
         </h3>
-        <p className="text-xs text-slate-400 font-medium capitalize truncate">
-          {item.description ? item.description : 'MTU campus meal'}
+        <p className="text-[10px] sm:text-xs text-slate-400 font-medium truncate">
+          {vendor?.name || item.description || item.category || 'MTU Fresh Special'}
         </p>
       </div>
 
-      {/* Price & Add to Cart Button Row */}
-      <div className="mt-4 flex items-center justify-between pt-2 border-t border-rose-50">
-        <div>
-          <span className="text-[10px] font-bold text-slate-400 block -mb-0.5">Price</span>
-          {displayPrice ? (
-            <span className="text-base font-black text-slate-900">{displayPrice}</span>
-          ) : (
-            <span className="text-[11px] font-extrabold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-md">
-              Price Unknown
-            </span>
-          )}
-        </div>
+      {/* Price & Add to Bag */}
+      <div className="mt-2.5 flex items-center justify-between pt-2 border-t border-slate-100">
+        <span className="text-xs sm:text-sm font-black text-slate-900">
+          {displayPrice}
+        </span>
 
-        <motion.button
-          whileHover={{ scale: 1.08 }}
-          whileTap={{ scale: 0.88 }}
-          onClick={handleAddToCart}
-          className={`h-9 px-3 rounded-2xl flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs ${
-            cartQty > 0
-              ? 'bg-emerald-600 text-white'
-              : 'bg-[#D6001C] hover:bg-red-700 text-white shadow-red-500/20'
-          }`}
-        >
-          {cartQty > 0 ? (
-            <>
-              <Check className="w-3.5 h-3.5 stroke-[3]" />
-              <span className="text-xs font-black">{cartQty}</span>
-            </>
-          ) : (
-            <>
-              <Plus className="w-4 h-4 stroke-[3]" />
-              <span className="text-xs font-bold hidden sm:inline">Add</span>
-            </>
-          )}
-        </motion.button>
+        {!availability.isAvailable ? (
+          <span className="text-[10px] font-black text-rose-700 bg-rose-50 border border-rose-200/80 px-2.5 py-1 rounded-xl cursor-not-allowed uppercase tracking-wider select-none">
+            {availability.badgeLabel}
+          </span>
+        ) : (
+          <motion.button
+            whileHover={{ scale: 1.08 }}
+            whileTap={{ scale: 0.88 }}
+            onClick={handleAddToCart}
+            className={`h-7 sm:h-8 px-2.5 sm:px-3 rounded-xl sm:rounded-2xl flex items-center gap-1 transition-all cursor-pointer shadow-xs ${
+              cartQty > 0
+                ? 'bg-[#0D472B] text-white font-black text-xs'
+                : 'bg-[#FF7A00] hover:bg-[#E65100] text-white shadow-orange-500/20 text-xs font-extrabold'
+            }`}
+          >
+            {cartQty > 0 ? (
+              <>
+                <Check className="w-3 h-3 stroke-[3]" />
+                <span>{cartQty}</span>
+              </>
+            ) : (
+              <>
+                <Plus className="w-3 h-3 sm:w-3.5 sm:h-3.5 stroke-[3]" />
+                <span className="hidden sm:inline">Add</span>
+              </>
+            )}
+          </motion.button>
+        )}
       </div>
     </motion.div>
   );

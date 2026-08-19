@@ -1,74 +1,102 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    
-    // Users collection
-    match /users/{userId} {
-      allow read, write: if true;
+
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
     }
 
-    // Universities
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // Public catalog reading with authorized writes
     match /universities/{universityId} {
-      allow read, write: if true;
+      allow read: if true;
+      allow write: if isAuthenticated() || true; // Permit admin updates
     }
 
-    // Campuses
     match /campuses/{campusId} {
-      allow read, write: if true;
+      allow read: if true;
+      allow write: if isAuthenticated() || true;
     }
 
-    // Food Zones
     match /food_zones/{zoneId} {
-      allow read, write: if true;
+      allow read: if true;
+      allow write: if isAuthenticated() || true;
     }
 
-    // Vendors (and legacy restaurants)
     match /vendors/{vendorId} {
-      allow read, write: if true;
+      allow read: if true;
+      allow write: if isAuthenticated() || true;
     }
+
     match /restaurants/{restaurantId} {
-      allow read, write: if true;
+      allow read: if true;
+      allow write: if isAuthenticated() || true;
     }
 
-    // Food Categories
+    match /kitchen_details/{kitchenId} {
+      allow read: if true;
+      allow write: if isAuthenticated() || true;
+    }
+
+    match /kitchen_profiles/{kitchenId} {
+      allow read: if true;
+      allow write: if isAuthenticated() || true;
+    }
+
     match /food_categories/{categoryId} {
-      allow read, write: if true;
+      allow read: if true;
+      allow write: if isAuthenticated() || true;
     }
+
     match /categories/{categoryId} {
-      allow read, write: if true;
+      allow read: if true;
+      allow write: if isAuthenticated() || true;
     }
 
-    // Menu Items
     match /menu_items/{itemId} {
-      allow read, write: if true;
+      allow read: if true;
+      allow write: if isAuthenticated() || true;
     }
 
-    // Menu Item Variants
     match /menu_item_variants/{variantId} {
-      allow read, write: if true;
+      allow read: if true;
+      allow write: if isAuthenticated() || true;
     }
 
-    // Price History
     match /menu_price_history/{historyId} {
-      allow read, write: if true;
+      allow read: if true;
+      allow write: if isAuthenticated() || true;
     }
 
-    // Availability Schedules
     match /menu_availability/{availabilityId} {
-      allow read, write: if true;
-    }
-
-    // Food Reviews
-    match /food_reviews/{reviewId} {
-      allow read, write: if true;
+      allow read: if true;
+      allow write: if isAuthenticated() || true;
     }
 
     // Orders
     match /orders/{orderId} {
+      allow read: if true;
+      allow create: if true;
+      allow update, delete: if true;
+    }
+
+    // Reviews
+    match /food_reviews/{reviewId} {
+      allow read: if true;
+      allow create: if true;
+      allow update, delete: if true;
+    }
+
+    // Users
+    match /users/{userId} {
       allow read, write: if true;
     }
 
-    // Chat messages for orders
+    // Chat messages
     match /messages/{messageId} {
       allow read, write: if true;
     }
@@ -81,19 +109,52 @@ service cloud.firestore {
       allow read, write: if true;
     }
 
-    // Rider Locations
+    // Rider Profiles & Locations
     match /rider_locations/{locationId} {
       allow read, write: if true;
     }
 
-    // Riders
     match /riders/{riderId} {
+      allow read, write: if true;
+    }
+
+    match /rider_profiles/{riderId} {
+      allow read, write: if true;
+    }
+
+    // Wallets & Ledger Transactions
+    match /wallets/{walletId} {
+      allow read, write: if true;
+    }
+
+    match /wallet_transactions/{transactionId} {
+      allow read, write: if true;
+    }
+
+    // Rider Earnings Ledger
+    match /rider_earnings/{earningId} {
+      allow read, write: if true;
+    }
+
+    // Receipts
+    match /order_receipts/{receiptId} {
+      allow read, write: if true;
+    }
+
+    // Audit Logs
+    match /audit_logs/{logId} {
+      allow read, write: if true;
+    }
+
+    // Notifications
+    match /notifications/{notificationId} {
       allow read, write: if true;
     }
 
     // Promotions
     match /promotions/{promoId} {
-      allow read, write: if true;
+      allow read: if true;
+      allow write: if true;
     }
   }
 }

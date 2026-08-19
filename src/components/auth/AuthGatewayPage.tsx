@@ -287,7 +287,8 @@ export const AuthGatewayPage: React.FC = () => {
     toast.info('Connecting to Google Account...');
 
     try {
-      await loginWithGoogle(selectedRole);
+      const isSignUpFlow = mode === 'register';
+      await loginWithGoogle(selectedRole, isSignUpFlow);
       setAuthStatus('success');
       setSuccessMsg(`Google sign-in successful! Signed in as ${selectedRole.toUpperCase()}.`);
       toast.success('✓ Google sign-in successful!');
@@ -444,14 +445,14 @@ export const AuthGatewayPage: React.FC = () => {
                 </span>
               </div>
 
-              {/* ROLE SWITCHER TABS */}
+              {/* ROLE SWITCHER TABS - 4 PHASES */}
               <div className="mb-5">
-                <div className="grid grid-cols-3 gap-1 bg-[#F4F5F8] p-1 rounded-full border border-slate-200/80">
+                <div className="grid grid-cols-4 gap-1 bg-[#F4F5F8] p-1 rounded-full border border-slate-200/80">
                   <button
                     type="button"
                     disabled={isLoadingState}
                     onClick={() => handleRoleChange('customer')}
-                    className={`py-1.5 px-2 rounded-full text-[11px] font-black transition-all flex items-center justify-center gap-1 cursor-pointer disabled:opacity-50 ${
+                    className={`py-1.5 px-1 rounded-full text-[10px] sm:text-[11px] font-black transition-all flex items-center justify-center gap-1 cursor-pointer disabled:opacity-50 ${
                       selectedRole === 'customer'
                         ? 'bg-[#D6001C] text-white shadow-sm'
                         : 'text-slate-600 hover:text-slate-900'
@@ -464,8 +465,22 @@ export const AuthGatewayPage: React.FC = () => {
                   <button
                     type="button"
                     disabled={isLoadingState}
+                    onClick={() => handleRoleChange('kitchen')}
+                    className={`py-1.5 px-1 rounded-full text-[10px] sm:text-[11px] font-black transition-all flex items-center justify-center gap-1 cursor-pointer disabled:opacity-50 ${
+                      selectedRole === 'kitchen'
+                        ? 'bg-[#D6001C] text-white shadow-sm'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    <Utensils className="w-3 h-3" />
+                    <span>Kitchen</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    disabled={isLoadingState}
                     onClick={() => handleRoleChange('rider')}
-                    className={`py-1.5 px-2 rounded-full text-[11px] font-black transition-all flex items-center justify-center gap-1 cursor-pointer disabled:opacity-50 ${
+                    className={`py-1.5 px-1 rounded-full text-[10px] sm:text-[11px] font-black transition-all flex items-center justify-center gap-1 cursor-pointer disabled:opacity-50 ${
                       selectedRole === 'rider'
                         ? 'bg-[#D6001C] text-white shadow-sm'
                         : 'text-slate-600 hover:text-slate-900'
@@ -479,7 +494,7 @@ export const AuthGatewayPage: React.FC = () => {
                     type="button"
                     disabled={isLoadingState}
                     onClick={() => handleRoleChange('admin')}
-                    className={`py-1.5 px-2 rounded-full text-[11px] font-black transition-all flex items-center justify-center gap-1 cursor-pointer disabled:opacity-50 ${
+                    className={`py-1.5 px-1 rounded-full text-[10px] sm:text-[11px] font-black transition-all flex items-center justify-center gap-1 cursor-pointer disabled:opacity-50 ${
                       selectedRole === 'admin'
                         ? 'bg-slate-900 text-white shadow-sm'
                         : 'text-slate-600 hover:text-slate-900'

@@ -45,16 +45,57 @@ export const MenuView: React.FC<MenuViewProps> = ({
     initialVendorId || 'all'
   );
 
+  React.useEffect(() => {
+    if (initialVendorId) {
+      setSelectedVendorFilter(initialVendorId);
+    }
+  }, [initialVendorId]);
+
+  // Combine all vendors from marketplace store and any found in menu items
+  const allKnownVendors: Vendor[] = React.useMemo(() => {
+    const map = new Map<string, Vendor>();
+    vendors.forEach((v) => map.set(v.id, v));
+
+    menuItems.forEach((item) => {
+      const vId = item.vendor_id || item.restaurant_id;
+      if (vId && !map.has(vId)) {
+        map.set(vId, {
+          id: vId,
+          name: vId.startsWith('vendor_') ? vId.replace('vendor_', '').replace(/_/g, ' ').toUpperCase() : 'Campus Kitchen Stand',
+          description: 'Verified campus kitchen provider',
+          is_open: true,
+          is_active: true,
+          is_verified: true,
+          rating: 4.8,
+          opening_time: '07:30',
+          closing_time: '21:00',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        });
+      }
+    });
+
+    return Array.from(map.values());
+  }, [vendors, menuItems]);
+
   // Filtered menu items
   const filteredFood = menuItems.filter((item) => {
     // Vendor filter
-    if (selectedVendorFilter !== 'all' && item.vendor_id !== selectedVendorFilter) {
-      return false;
+    if (selectedVendorFilter !== 'all') {
+      const matchVendor =
+        item.vendor_id === selectedVendorFilter ||
+        item.restaurant_id === selectedVendorFilter;
+      if (!matchVendor) return false;
     }
 
     // Category filter
-    if (selectedCategoryId !== 'all' && item.category_id !== selectedCategoryId) {
-      return false;
+    if (selectedCategoryId !== 'all') {
+      const itemCat = (item.category_id || '').toLowerCase();
+      const selCat = selectedCategoryId.toLowerCase();
+      const matchCategory =
+        itemCat === selCat ||
+        itemCat.replace(/^cat_/, '') === selCat.replace(/^cat_/, '');
+      if (!matchCategory) return false;
     }
 
     // Quick filters
@@ -73,8 +114,8 @@ export const MenuView: React.FC<MenuViewProps> = ({
       const q = searchQuery.toLowerCase();
       const matchName = item.name.toLowerCase().includes(q);
       const matchDesc = item.description?.toLowerCase().includes(q);
-      const matchVendor = vendors
-        .find((v) => v.id === item.vendor_id)
+      const matchVendor = allKnownVendors
+        .find((v) => v.id === item.vendor_id || v.id === item.restaurant_id)
         ?.name.toLowerCase()
         .includes(q);
       return matchName || matchDesc || matchVendor;
@@ -84,7 +125,7 @@ export const MenuView: React.FC<MenuViewProps> = ({
   });
 
   // Group filtered food items by vendor / stand
-  const vendorsWithDishes = vendors
+  const vendorsWithDishes = allKnownVendors
     .filter((v) => {
       if (selectedVendorFilter !== 'all' && v.id !== selectedVendorFilter) {
         return false;
@@ -92,15 +133,17 @@ export const MenuView: React.FC<MenuViewProps> = ({
       return true;
     })
     .map((vendor) => {
-      const dishes = filteredFood.filter((item) => item.vendor_id === vendor.id);
+      const dishes = filteredFood.filter(
+        (item) => item.vendor_id === vendor.id || item.restaurant_id === vendor.id
+      );
       return {
         vendor,
         dishes,
       };
     })
-    .filter((group) => group.dishes.length > 0 || selectedVendorFilter === group.vendor.id);
+    .filter((group) => group.dishes.length > 0 || (selectedVendorFilter !== 'all' && selectedVendorFilter === group.vendor.id));
 
-  const activeVendorObj = vendors.find((v) => v.id === selectedVendorFilter);
+  const activeVendorObj = allKnownVendors.find((v) => v.id === selectedVendorFilter);
 
   return (
     <motion.div
@@ -216,11 +259,11 @@ export const MenuView: React.FC<MenuViewProps> = ({
                   : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
               }`}
             >
-              All Kitchens ({vendors.length})
+              All Kitchens ({allKnownVendors.length})
             </button>
-            {vendors.map((vend) => {
+            {allKnownVendors.map((vend) => {
               const isSelected = selectedVendorFilter === vend.id;
-              const dishCount = menuItems.filter((i) => i.vendor_id === vend.id).length;
+              const dishCount = menuItems.filter((i) => i.vendor_id === vend.id || i.restaurant_id === vend.id).length;
               return (
                 <button
                   key={vend.id}
@@ -332,13 +375,21 @@ export const MenuView: React.FC<MenuViewProps> = ({
                         <h2 className="text-lg sm:text-xl font-black text-slate-900 tracking-tight">
                           {vendor.name}
                         </h2>
-                        <span className="bg-emerald-100 text-emerald-800 text-[10px] font-black px-2 py-0.5 rounded-md uppercase">
-                          Open
+                        <span className={`text-[10px] font-black px-2 py-0.5 rounded-md uppercase ${
+                          vendor.is_open ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
+                        }`}>
+                          {vendor.is_open ? 'Open' : 'Closed'}
                         </span>
                       </div>
-                      <p className="text-xs text-slate-500 font-medium mt-0.5">
-                        {vendor.description || 'Authentic campus dishes'}
-                      </p>
+                      {vendor.slogan ? (
+                        <p className="text-xs text-[#D6001C] font-semibold italic mt-0.5">
+                          "{vendor.slogan}"
+                        </p>
+                      ) : (
+                        <p className="text-xs text-slate-500 font-medium mt-0.5">
+                          {vendor.description || 'Authentic campus dishes'}
+                        </p>
+                      )}
                     </div>
                   </div>
 

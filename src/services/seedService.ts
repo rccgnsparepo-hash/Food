@@ -542,43 +542,6 @@ export async function initializeDatabaseSeed() {
     // 1. Check if MTU seed already exists (with 3.5s timeout for offline resilience)
     const mtuDoc = await withTimeout(getDoc(doc(db, 'universities', 'uni_mtu')));
     
-    // Purge UNILAG if still present in Firestore
-    try {
-      const unilagDoc = await withTimeout(getDoc(doc(db, 'universities', 'uni_unilag')), 1500);
-      if (unilagDoc.exists()) {
-        console.log('Purging legacy UNILAG seed data from Firestore...');
-        await deleteDoc(doc(db, 'universities', 'uni_unilag')).catch(() => {});
-        await deleteDoc(doc(db, 'campuses', 'campus_akoka')).catch(() => {});
-        
-        const unilagZones = ['zone_new_hall', 'zone_jaja', 'zone_amphi', 'zone_cits'];
-        for (const z of unilagZones) {
-          await deleteDoc(doc(db, 'food_zones', z)).catch(() => {});
-        }
-
-        const unilagVendors = [
-          'vendor_2001_cafeteria', 'vendor_mavise', 'vendor_iya_moria', 'vendor_korede',
-          'vendor_salado', 'vendor_ays_pizza', 'vendor_tek_kitchen', 'vendor_cafe_one',
-          'vendor_seun_yam', 'vendor_ewa_cits', 'vendor_icecream_jaja', 'vendor_milky_popcorn',
-          'vendor_shop_10', 'vendor_ewa_palace'
-        ];
-        for (const v of unilagVendors) {
-          await deleteDoc(doc(db, 'vendors', v)).catch(() => {});
-          await deleteDoc(doc(db, 'restaurants', v)).catch(() => {});
-        }
-
-        const unilagDishes = [
-          'dish_mavise_amala', 'dish_mavise_pounded_yam', 'dish_iya_amala', 'dish_iya_indomie',
-          'dish_korede_spag', 'dish_korede_suya_rice', 'dish_korede_fried_rice', 'dish_korede_jollof',
-          'dish_korede_yam_chips', 'dish_korede_potato_chips', 'dish_korede_white_rice', 'dish_tek_bread_beans'
-        ];
-        for (const d of unilagDishes) {
-          await deleteDoc(doc(db, 'menu_items', d)).catch(() => {});
-        }
-      }
-    } catch {
-      // Ignore UNILAG purge check if offline or timed out
-    }
-
     if (mtuDoc.exists()) {
       console.log('Mountain Top University (MTU) seed data already present in Firestore.');
       return;

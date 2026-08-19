@@ -1,6 +1,17 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Building2, MapPin, Store, UtensilsCrossed, Table, Upload, ShieldAlert, ChevronLeft } from 'lucide-react';
+import {
+  Building2,
+  MapPin,
+  Store,
+  UtensilsCrossed,
+  Table,
+  Upload,
+  ShieldAlert,
+  ChevronLeft,
+  Activity,
+  Users
+} from 'lucide-react';
 import { useMarketplaceStore } from '../../stores/useMarketplaceStore';
 import { UniversityManager } from './UniversityManager';
 import { FoodZoneManager } from './FoodZoneManager';
@@ -9,6 +20,8 @@ import { MenuBuilder } from './MenuBuilder';
 import { ExcelAdminTable } from './ExcelAdminTable';
 import { BulkDataEntry } from './BulkDataEntry';
 import { VerificationManager } from './VerificationManager';
+import { LiveOrdersMonitor } from './LiveOrdersMonitor';
+import { UserManager } from './UserManager';
 import { triggerHaptic } from '../../utils/haptics';
 
 interface AdminDashboardProps {
@@ -17,8 +30,8 @@ interface AdminDashboardProps {
 
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToApp }) => {
   const [activeTab, setActiveTab] = useState<
-    'universities' | 'zones' | 'vendors' | 'menu' | 'excel' | 'csv' | 'verification'
-  >('universities');
+    'orders' | 'users' | 'universities' | 'zones' | 'vendors' | 'menu' | 'excel' | 'csv' | 'verification'
+  >('orders');
 
   const {
     universities,
@@ -32,6 +45,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToApp }) =
   const pendingVerificationCount = menuItems.filter(m => m.verification_status === 'pending').length;
 
   const tabs = [
+    { id: 'orders', label: 'Live Orders Stream', icon: Activity },
+    { id: 'users', label: 'Users & RBAC Roles', icon: Users },
     { id: 'universities', label: 'Universities & Campuses', icon: Building2 },
     { id: 'zones', label: 'Food Zones', icon: MapPin },
     { id: 'vendors', label: 'Vendors & Outlets', icon: Store },
@@ -71,10 +86,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToApp }) =
               <div className="flex items-center gap-2">
                 <span className="text-base font-black tracking-tight text-white">NIGERIAN UNIVERSITY FOOD MARKETPLACE</span>
                 <span className="bg-[#D6001C] text-white text-[10px] font-extrabold px-2 py-0.5 rounded-md uppercase tracking-wider">
-                  ADMIN SYSTEM
+                  ADMIN CONTROL
                 </span>
               </div>
-              <p className="text-[11px] text-slate-400 hidden sm:block">Manage Universities, Campuses, Food Zones, Vendors & Dishes</p>
+              <p className="text-[11px] text-slate-400 hidden sm:block">Centralized Operations, RBAC Roles, Live Deliveries & Catalog</p>
             </div>
           </div>
 
@@ -138,6 +153,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToApp }) =
             exit={{ opacity: 0, y: -8 }}
             transition={{ duration: 0.2 }}
           >
+            {activeTab === 'orders' && (
+              <LiveOrdersMonitor />
+            )}
+
+            {activeTab === 'users' && (
+              <UserManager />
+            )}
+
             {activeTab === 'universities' && (
               <UniversityManager universities={universities} campuses={campuses} />
             )}

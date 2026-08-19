@@ -18,6 +18,7 @@ import {
   ShieldCheck,
   ShoppingBag,
   Bike,
+  Utensils,
   Building2,
   GraduationCap
 } from 'lucide-react';
@@ -332,7 +333,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({ initialMode = 'login', onC
     toast.info('Connecting to Google Account...');
 
     try {
-      await loginWithGoogle(selectedRole);
+      const isSignUpFlow = mode === 'register';
+      await loginWithGoogle(selectedRole, isSignUpFlow);
       setAuthStatus('success');
       setSuccessMsg('Google sign-in successful!');
       toast.success('✓ Google sign-in successful!');
@@ -479,32 +481,46 @@ export const AuthModal: React.FC<AuthModalProps> = ({ initialMode = 'login', onC
               <label className="block text-[10px] font-extrabold text-slate-400 uppercase tracking-wider mb-1.5 text-center">
                 Select Account Role
               </label>
-              <div className="grid grid-cols-3 gap-1 bg-slate-100 p-1.5 rounded-2xl border border-slate-200/80">
+              <div className="grid grid-cols-4 gap-1 bg-slate-100 p-1.5 rounded-2xl border border-slate-200/80">
                 <button
                   type="button"
                   disabled={isLoadingState}
                   onClick={() => handleRoleChange('customer')}
-                  className={`py-2 px-2.5 rounded-xl text-xs font-extrabold transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 ${
+                  className={`py-2 px-1 rounded-xl text-[11px] font-extrabold transition-all flex items-center justify-center gap-1 cursor-pointer disabled:opacity-50 ${
                     selectedRole === 'customer'
                       ? 'bg-[#D6001C] text-white shadow-md shadow-red-500/25'
                       : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
                   }`}
                 >
-                  <ShoppingBag className="w-3.5 h-3.5" />
+                  <ShoppingBag className="w-3 h-3" />
                   <span>Customer</span>
                 </button>
 
                 <button
                   type="button"
                   disabled={isLoadingState}
+                  onClick={() => handleRoleChange('kitchen')}
+                  className={`py-2 px-1 rounded-xl text-[11px] font-extrabold transition-all flex items-center justify-center gap-1 cursor-pointer disabled:opacity-50 ${
+                    selectedRole === 'kitchen'
+                      ? 'bg-[#D6001C] text-white shadow-md shadow-red-500/25'
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+                  }`}
+                >
+                  <Utensils className="w-3 h-3" />
+                  <span>Kitchen</span>
+                </button>
+
+                <button
+                  type="button"
+                  disabled={isLoadingState}
                   onClick={() => handleRoleChange('rider')}
-                  className={`py-2 px-2.5 rounded-xl text-xs font-extrabold transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 ${
+                  className={`py-2 px-1 rounded-xl text-[11px] font-extrabold transition-all flex items-center justify-center gap-1 cursor-pointer disabled:opacity-50 ${
                     selectedRole === 'rider'
                       ? 'bg-[#D6001C] text-white shadow-md shadow-red-500/25'
                       : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
                   }`}
                 >
-                  <Bike className="w-3.5 h-3.5" />
+                  <Bike className="w-3 h-3" />
                   <span>Rider</span>
                 </button>
 
@@ -512,13 +528,13 @@ export const AuthModal: React.FC<AuthModalProps> = ({ initialMode = 'login', onC
                   type="button"
                   disabled={isLoadingState}
                   onClick={() => handleRoleChange('admin')}
-                  className={`py-2 px-2.5 rounded-xl text-xs font-extrabold transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 ${
+                  className={`py-2 px-1 rounded-xl text-[11px] font-extrabold transition-all flex items-center justify-center gap-1 cursor-pointer disabled:opacity-50 ${
                     selectedRole === 'admin'
                       ? 'bg-slate-900 text-white shadow-md'
                       : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
                   }`}
                 >
-                  <ShieldCheck className="w-3.5 h-3.5" />
+                  <ShieldCheck className="w-3 h-3" />
                   <span>Admin</span>
                 </button>
               </div>
