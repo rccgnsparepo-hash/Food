@@ -709,7 +709,7 @@ export const AuthGatewayPage: React.FC = () => {
                         <span className="font-bold text-amber-400 flex items-center gap-1">
                           <KeyRound className="w-3 h-3" /> Admin Passkey
                         </span>
-                        <span className="font-mono text-[9px] text-slate-400">MTU-ADMIN-2026</span>
+                        <span className="font-mono text-[9px] text-slate-400"></span>
                       </div>
                       <input
                         type="password"
