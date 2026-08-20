@@ -335,6 +335,99 @@
         "timestamp": { "type": "string" }
       },
       "required": ["id", "actor_id", "action", "timestamp"]
+    },
+    "device_tokens": {
+      "title": "device_tokens",
+      "description": "FCM device registration tokens for multi-device push notification routing",
+      "type": "object",
+      "properties": {
+        "token_id": { "type": "string" },
+        "user_id": { "type": "string" },
+        "fcm_token": { "type": "string" },
+        "platform": { "type": "string", "enum": ["WEB", "ANDROID", "IOS", "DESKTOP"] },
+        "app_type": { "type": "string", "enum": ["CUSTOMER", "RIDER", "VENDOR", "ADMIN"] },
+        "device_id": { "type": "string" },
+        "permission_status": { "type": "string" },
+        "user_agent": { "type": "string" },
+        "active": { "type": "boolean" },
+        "created_at": { "type": "string" },
+        "updated_at": { "type": "string" },
+        "last_seen_at": { "type": "string" }
+      },
+      "required": ["token_id", "user_id", "fcm_token", "platform", "app_type", "active"]
+    },
+    "notifications": {
+      "title": "notifications",
+      "description": "Authoritative persisted notification records across all 4 BUKKIT apps with idempotency deduplication",
+      "type": "object",
+      "properties": {
+        "notification_id": { "type": "string" },
+        "recipient_user_id": { "type": "string" },
+        "recipient_role": { "type": "string" },
+        "order_id": { "type": "string" },
+        "event_id": { "type": "string" },
+        "notification_key": { "type": "string" },
+        "type": { "type": "string" },
+        "title": { "type": "string" },
+        "body": { "type": "string" },
+        "deep_link": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "sent", "delivered", "failed", "read"] },
+        "severity": { "type": "string" },
+        "metadata": { "type": "object" },
+        "created_at": { "type": "string" },
+        "read_at": { "type": "string" }
+      },
+      "required": ["notification_id", "recipient_user_id", "notification_key", "title", "body", "deep_link", "status"]
+    },
+    "order_events": {
+      "title": "order_events",
+      "description": "Immutable stream of lifecycle and transition order events triggering multi-role notifications",
+      "type": "object",
+      "properties": {
+        "event_id": { "type": "string" },
+        "order_id": { "type": "string" },
+        "actor_id": { "type": "string" },
+        "actor_role": { "type": "string" },
+        "actor_name": { "type": "string" },
+        "event_type": { "type": "string" },
+        "timestamp": { "type": "string" },
+        "metadata": { "type": "object" }
+      },
+      "required": ["event_id", "order_id", "actor_id", "event_type", "timestamp"]
+    },
+    "user_notification_preferences": {
+      "title": "user_notification_preferences",
+      "description": "User notification categories and sound preferences",
+      "type": "object",
+      "properties": {
+        "user_id": { "type": "string" },
+        "order_updates": { "type": "boolean" },
+        "delivery_updates": { "type": "boolean" },
+        "wallet_alerts": { "type": "boolean" },
+        "promotions": { "type": "boolean" },
+        "sound_enabled": { "type": "boolean" },
+        "vibration_enabled": { "type": "boolean" },
+        "critical_alerts": { "type": "boolean" },
+        "updated_at": { "type": "string" }
+      },
+      "required": ["user_id", "critical_alerts"]
+    },
+    "AuditLog": {
+      "title": "AuditLog",
+      "description": "Authoritative audit log collection for critical state transitions and wallet movements",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "actor_id": { "type": "string" },
+        "actor_name": { "type": "string" },
+        "actor_role": { "type": "string" },
+        "action": { "type": "string" },
+        "order_id": { "type": "string" },
+        "previous_state": { "type": "string" },
+        "new_state": { "type": "string" },
+        "timestamp": { "type": "string" }
+      },
+      "required": ["id", "actor_id", "action", "timestamp"]
     }
   }
 }

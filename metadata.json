@@ -1,6 +1,6 @@
 {
   "name": "BUKKIT — Campus Food Marketplace",
-  "description": "A Nigerian University Food Marketplace supporting multi-campus institutions across Nigeria with real-time Firestore synchronization, 4-phase role systems, and instant vendor ordering.",
-  "requestFramePermissions": ["geolocation"],
+  "description": "A Nigerian University Food Marketplace featuring campus GPS navigation, Leaflet routing, multi-platform role portals, and a centralized Firebase push & real-time notification architecture.",
+  "requestFramePermissions": ["geolocation", "notifications"],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

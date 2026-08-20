@@ -207,18 +207,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     return unsubscribe;
   },
 
-  loginWithEmail: async (email, password, selectedRole = 'customer', adminKey) => {
+  loginWithEmail: async (email, password, _requestedRole, adminKey) => {
     set({ isLoading: true, authStatus: 'loading', authError: null });
     const cleanEmail = email.trim();
 
     try {
-      if (selectedRole === 'admin' || selectedRole === 'super_admin') {
-        const validKeys = ['MTU-ADMIN-2026', 'BUKKIT-ADMIN-88', 'ADMIN123', 'ADMIN', 'MTUADMIN'];
-        if (!adminKey || !validKeys.includes(adminKey.trim().toUpperCase())) {
-          throw new Error('Invalid Admin Passkey. Access Denied. (Default Key: MTU-ADMIN-2026)');
-        }
-      }
-
       // Step 1: Pre-check if an account exists in the database for this email
       const existingDbProfile = await findUserProfileByEmail(cleanEmail);
 
@@ -237,17 +230,18 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         }
 
         profile = resolved;
-        if (selectedRole && !profile.roles.includes(selectedRole)) {
-          profile.roles.push(selectedRole);
+
+        // Verify admin credentials if account is Admin
+        if (profile.role === 'admin' || profile.role === 'super_admin') {
+          const validKeys = ['MTU-ADMIN-2026', 'BUKKIT-ADMIN-88', 'ADMIN123', 'ADMIN', 'MTUADMIN'];
+          if (adminKey && !validKeys.includes(adminKey.trim().toUpperCase())) {
+            throw new Error('Invalid Admin Passkey. Access Denied.');
+          }
         }
-        profile.active_role = selectedRole || profile.active_role || 'customer';
-        profile.role = profile.active_role;
-        profile.permissions = getRolePermissions(profile.active_role);
-        await setDoc(doc(db, 'users', userCred.user.uid), {
-          roles: profile.roles,
-          active_role: profile.active_role,
+
+        await updateDoc(doc(db, 'users', userCred.user.uid), {
           last_login_at: new Date().toISOString()
-        }, { merge: true }).catch(console.error);
+        }).catch(() => {});
 
       } catch (authErr: any) {
         if (authErr?.code === 'auth/operation-not-allowed' || authErr?.message?.includes('operation-not-allowed')) {
@@ -256,12 +250,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
             throw new Error('No account found with this email address. Please sign up first.');
           }
           profile = existingDbProfile;
-          if (selectedRole && !profile.roles.includes(selectedRole)) {
-            profile.roles.push(selectedRole);
-          }
-          profile.active_role = selectedRole || profile.active_role || 'customer';
-          profile.role = profile.active_role;
-          profile.permissions = getRolePermissions(profile.active_role);
         } else if (authErr?.code === 'auth/user-not-found' || authErr?.code === 'auth/invalid-credential') {
           if (!existingDbProfile) {
             throw new Error('No account found with this email address. Please sign up first.');
@@ -277,6 +265,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         throw new Error('No account found with this email. Please sign up first.');
       }
 
+      const authoritativeRole = profile.active_role || profile.role || 'customer';
+
       try {
         localStorage.setItem('bukkit_active_user', JSON.stringify(profile));
         fetch('/api/users/sync', {
@@ -287,7 +277,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
             email: profile.email,
             name: profile.name,
             phone: profile.phone,
-            role: profile.role,
+            role: authoritativeRole,
             universityId: profile.university_id,
             campusId: profile.campus_id,
             avatarUrl: profile.avatar_url,
@@ -297,7 +287,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
       set({
         user: profile,
-        role: profile.active_role || selectedRole,
+        role: authoritativeRole,
         isLoading: false,
         authStatus: 'success',
         authError: null
@@ -376,6 +366,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         permissions: getRolePermissions(role),
         university_id: universityId || 'uni_mtu',
         campus_id: campusId || 'campus_mtu_main',
+        vendor_id: (role === 'kitchen' || role === 'kitchen_manager' || role === 'kitchen_staff') ? (vendorId || 'vendor_mtu_canteen') : undefined,
         avatar_url: `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(fullName)}`,
         created_at: now,
         updated_at: now,
@@ -388,12 +379,18 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       // Create dedicated role profile
       if (role === 'rider') {
         const riderProf: RiderProfile = {
+          rider_id: createdUid,
           user_id: createdUid,
-          vehicle_type: vehicleType || 'motorcycle',
+          full_name: fullName.trim() || 'Campus Rider',
+          phone: phone || '+234 810 000 0000',
+          vehicle_type: (vehicleType as any) || 'motorcycle',
+          availability_status: 'available',
           is_online: true,
           is_verified: true,
           rating: 5.0,
+          completed_deliveries: 0,
           total_deliveries: 0,
+          earnings_balance: 0,
           university_id: universityId || 'uni_mtu',
           campus_id: campusId || 'campus_mtu_main',
           created_at: now,
@@ -642,12 +639,18 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         updated_at: new Date().toISOString()
       } : undefined,
       rider_profile: asRole === 'rider' ? {
+        rider_id: guestUid,
         user_id: guestUid,
+        full_name: 'Campus Dispatch Courier',
+        phone: '+234 812 345 6789',
         vehicle_type: 'motorcycle',
+        availability_status: 'available',
         is_online: true,
         is_verified: true,
         rating: 4.9,
+        completed_deliveries: 42,
         total_deliveries: 42,
+        earnings_balance: 14500,
         university_id: 'uni_mtu',
         campus_id: 'campus_mtu_main',
         created_at: new Date().toISOString(),

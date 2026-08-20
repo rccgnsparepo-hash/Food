@@ -137,6 +137,7 @@ export async function resolveAuthoritativeUserProfile(uid: string): Promise<User
       university_id: userData.university_id || 'uni_mtu',
       campus_id: userData.campus_id || 'campus_mtu_main',
       preferred_zone_id: userData.preferred_zone_id,
+      vendor_id: userData.vendor_id || (kitchenSnap?.exists() ? kitchenSnap.data()?.vendor_id : undefined),
       customer_profile: custSnap?.exists() ? custSnap.data() as any : undefined,
       rider_profile: riderSnap?.exists() ? riderSnap.data() as any : undefined,
       kitchen_profile: kitchenSnap?.exists() ? kitchenSnap.data() as any : undefined,
@@ -260,16 +261,25 @@ export function validateOrderStatusTransition(
   }
 
   const currentStatus = order.status;
+  const userVendorId = user.vendor_id || user.kitchen_profile?.vendor_id;
+  const orderVendorId = order.vendor_id || (order as any).restaurant_id;
 
   switch (targetStatus) {
+    case 'payment_confirmed':
+      if (currentStatus !== 'pending') {
+        return { allowed: false, reason: `Cannot confirm payment for order in '${currentStatus}' status.` };
+      }
+      return { allowed: true };
+
+    case 'vendor_accepted':
     case 'accepted':
-      if (role !== 'kitchen' && role !== 'kitchen_manager') {
+      if (role !== 'kitchen' && role !== 'kitchen_manager' && role !== 'kitchen_staff') {
         return { allowed: false, reason: 'Only the kitchen vendor can accept this order.' };
       }
-      if (user.kitchen_profile?.vendor_id && user.kitchen_profile.vendor_id !== order.vendor_id) {
+      if (userVendorId && orderVendorId && userVendorId !== orderVendorId) {
         return { allowed: false, reason: 'Unauthorized: You can only manage orders for your own kitchen stand.' };
       }
-      if (currentStatus !== 'pending') {
+      if (currentStatus !== 'pending' && currentStatus !== 'payment_confirmed') {
         return { allowed: false, reason: `Cannot accept order currently in '${currentStatus}' status.` };
       }
       return { allowed: true };
@@ -278,33 +288,92 @@ export function validateOrderStatusTransition(
       if (role !== 'kitchen' && role !== 'kitchen_manager' && role !== 'kitchen_staff') {
         return { allowed: false, reason: 'Only kitchen staff can mark order as preparing.' };
       }
-      if (currentStatus !== 'accepted' && currentStatus !== 'pending') {
+      if (userVendorId && orderVendorId && userVendorId !== orderVendorId) {
+        return { allowed: false, reason: 'Unauthorized: You can only manage orders for your own kitchen stand.' };
+      }
+      if (
+        currentStatus !== 'accepted' &&
+        currentStatus !== 'vendor_accepted' &&
+        currentStatus !== 'payment_confirmed' &&
+        currentStatus !== 'pending'
+      ) {
         return { allowed: false, reason: `Cannot prepare order currently in '${currentStatus}' status.` };
       }
       return { allowed: true };
 
+    case 'ready_for_pickup':
     case 'ready':
       if (role !== 'kitchen' && role !== 'kitchen_manager' && role !== 'kitchen_staff') {
-        return { allowed: false, reason: 'Only kitchen staff can mark order as ready.' };
+        return { allowed: false, reason: 'Only kitchen staff can mark order as ready for pickup.' };
       }
-      if (currentStatus !== 'preparing' && currentStatus !== 'accepted') {
+      if (userVendorId && orderVendorId && userVendorId !== orderVendorId) {
+        return { allowed: false, reason: 'Unauthorized: You can only manage orders for your own kitchen stand.' };
+      }
+      if (
+        currentStatus !== 'preparing' &&
+        currentStatus !== 'accepted' &&
+        currentStatus !== 'vendor_accepted'
+      ) {
         return { allowed: false, reason: `Cannot mark order ready when status is '${currentStatus}'.` };
       }
       return { allowed: true };
 
-    case 'assigned':
-    case 'picked_up':
-      if (role !== 'rider') {
-        return { allowed: false, reason: 'Only delivery riders can claim and pick up orders.' };
+    case 'vendor_rejected':
+      if (role !== 'kitchen' && role !== 'kitchen_manager' && role !== 'kitchen_staff') {
+        return { allowed: false, reason: 'Only kitchen vendor can reject this order.' };
       }
-      if (currentStatus !== 'ready' && currentStatus !== 'assigned') {
-        return { allowed: false, reason: `Order must be marked 'ready' by kitchen before pickup.` };
+      if (currentStatus !== 'pending' && currentStatus !== 'payment_confirmed') {
+        return { allowed: false, reason: `Cannot reject order that has already progressed beyond initial confirmation.` };
       }
       return { allowed: true };
 
+    case 'rider_assigned':
+    case 'assigned':
+      if (role !== 'rider') {
+        return { allowed: false, reason: 'Only delivery riders can claim orders.' };
+      }
+      if (
+        currentStatus !== 'ready' &&
+        currentStatus !== 'ready_for_pickup' &&
+        currentStatus !== 'preparing' &&
+        currentStatus !== 'vendor_accepted' &&
+        currentStatus !== 'accepted'
+      ) {
+        return { allowed: false, reason: `Cannot claim order with status '${currentStatus}'.` };
+      }
+      return { allowed: true };
+
+    case 'rider_arrived_vendor':
+      if (role !== 'rider') {
+        return { allowed: false, reason: 'Only delivery riders can update arrival at kitchen.' };
+      }
+      if (order.rider_id && order.rider_id !== user.uid) {
+        return { allowed: false, reason: 'Unauthorized: This delivery is assigned to another rider.' };
+      }
+      return { allowed: true };
+
+    case 'picked_up':
+      if (role !== 'rider') {
+        return { allowed: false, reason: 'Only delivery riders can pick up orders.' };
+      }
+      if (order.rider_id && order.rider_id !== user.uid) {
+        return { allowed: false, reason: 'Unauthorized: This delivery is assigned to another rider.' };
+      }
+      return { allowed: true };
+
+    case 'out_for_delivery':
     case 'on_the_way':
       if (role !== 'rider') {
         return { allowed: false, reason: 'Only assigned delivery rider can update transit status.' };
+      }
+      if (order.rider_id && order.rider_id !== user.uid) {
+        return { allowed: false, reason: 'Unauthorized: This delivery is assigned to another rider.' };
+      }
+      return { allowed: true };
+
+    case 'arrived_at_delivery':
+      if (role !== 'rider') {
+        return { allowed: false, reason: 'Only assigned delivery rider can confirm arrival at customer location.' };
       }
       if (order.rider_id && order.rider_id !== user.uid) {
         return { allowed: false, reason: 'Unauthorized: This delivery is assigned to another rider.' };
@@ -321,18 +390,22 @@ export function validateOrderStatusTransition(
       return { allowed: true };
 
     case 'cancelled':
-      // Customer can cancel if pending
+    case 'refunded':
+      // Customer can cancel if order has not yet begun preparation
       if (role === 'customer') {
-        if (order.user_id !== user.uid) {
+        if (order.user_id !== user.uid && order.customer_id !== user.uid) {
           return { allowed: false, reason: 'Unauthorized: You can only cancel your own order.' };
         }
-        if (currentStatus !== 'pending') {
-          return { allowed: false, reason: 'Orders that have already been accepted or prepared cannot be cancelled by customer.' };
+        if (currentStatus !== 'pending' && currentStatus !== 'payment_confirmed') {
+          return { allowed: false, reason: 'Orders that are already accepted or being prepared cannot be cancelled.' };
         }
         return { allowed: true };
       }
-      // Kitchen can cancel / reject
+      // Kitchen can cancel / reject if pending or payment_confirmed
       if (role === 'kitchen' || role === 'kitchen_manager') {
+        if (userVendorId && orderVendorId && userVendorId !== orderVendorId) {
+          return { allowed: false, reason: 'Unauthorized: You can only cancel orders for your own kitchen stand.' };
+        }
         return { allowed: true };
       }
       return { allowed: false, reason: 'Unauthorized to cancel this order.' };

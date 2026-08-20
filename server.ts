@@ -4,7 +4,19 @@ import { createServer as createViteServer } from 'vite';
 import { getOrCreateUser, checkUserExists, getVendorsList, createSqlOrder, getUserOrders } from './src/db/helpers.ts';
 import { requireAuth, requireRole, requirePermission, AuthRequest } from './src/middleware/auth.ts';
 import { getRolePermissions } from './src/services/authService.ts';
-import { UserRole, OrderStatus } from './src/types.ts';
+import { OrderEventType } from './src/types.ts';
+import {
+  registerDeviceToken,
+  unregisterDeviceToken,
+  listAllTokens,
+  dispatchOrderEventPipeline,
+  dispatchWalletEventPipeline,
+  dispatchAdminAlertPipeline,
+  getUserNotificationHistory,
+  markNotificationAsRead,
+  markAllNotificationsAsReadForUser,
+  getNotificationHealth
+} from './src/services/notificationBackendService.ts';
 
 async function startServer() {
   const app = express();
@@ -304,43 +316,277 @@ async function startServer() {
     }
   });
 
-  // --- FIREBASE CLOUD MESSAGING (FCM) NOTIFICATIONS API ---
+  // --- CENTRALIZED FIREBASE PUSH & NOTIFICATION PIPELINE APIS ---
 
-  app.post('/api/fcm/send-status-update', (req, res) => {
-    const { orderId, status, vendorName, userId } = req.body;
+  // 1. Register / Update Device Token (Multi-device support)
+  app.post('/api/notifications/register-token', (req, res) => {
+    try {
+      const { userId, fcmToken, platform, appType, deviceId, permissionStatus, userAgent } = req.body;
+      if (!userId || !fcmToken) {
+        return res.status(400).json({ success: false, message: 'userId and fcmToken are required' });
+      }
+      const tokenRecord = registerDeviceToken({
+        userId,
+        fcmToken,
+        platform,
+        appType,
+        deviceId,
+        permissionStatus,
+        userAgent
+      });
+      return res.json({ success: true, token: tokenRecord });
+    } catch (err: any) {
+      console.error('Failed to register token:', err);
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // 2. Unregister / Deactivate Device Token
+  app.post('/api/notifications/unregister-token', (req, res) => {
+    try {
+      const { token } = req.body;
+      if (!token) {
+        return res.status(400).json({ success: false, message: 'token is required' });
+      }
+      const deactivated = unregisterDeviceToken(token);
+      return res.json({ success: true, deactivated });
+    } catch (err: any) {
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // 3. List Registered Device Tokens (Admin monitoring)
+  app.get('/api/notifications/tokens', (req, res) => {
+    try {
+      const tokens = listAllTokens();
+      return res.json({ success: true, count: tokens.length, tokens });
+    } catch (err: any) {
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // 4. Dispatch Authoritative Order Event (State machine trigger)
+  app.post('/api/notifications/order-event', async (req, res) => {
+    try {
+      const {
+        orderId,
+        eventType,
+        customerId,
+        customerName,
+        vendorId,
+        vendorName,
+        vendorPhone,
+        riderId,
+        riderName,
+        deliveryLocation,
+        deliveryCode,
+        pickupCode,
+        totalPrice,
+        riderFee,
+        estimatedMinutes,
+        cancellationReason,
+        metadata
+      } = req.body;
+
+      if (!orderId || !eventType || !customerId || !vendorId) {
+        return res.status(400).json({
+          success: false,
+          message: 'orderId, eventType, customerId, and vendorId are required'
+        });
+      }
+
+      const result = await dispatchOrderEventPipeline({
+        orderId,
+        eventType,
+        customerId,
+        customerName,
+        vendorId,
+        vendorName,
+        vendorPhone,
+        riderId,
+        riderName,
+        deliveryLocation,
+        deliveryCode,
+        pickupCode,
+        totalPrice,
+        riderFee,
+        estimatedMinutes,
+        cancellationReason,
+        metadata
+      });
+
+      return res.json(result);
+    } catch (err: any) {
+      console.error('Order event dispatch error:', err);
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // 5. Dispatch Authoritative Wallet Event
+  app.post('/api/notifications/wallet-event', async (req, res) => {
+    try {
+      const { userId, eventType, amount, balanceAfter, transactionReference, description } = req.body;
+      if (!userId || !eventType || amount === undefined || balanceAfter === undefined) {
+        return res.status(400).json({
+          success: false,
+          message: 'userId, eventType, amount, and balanceAfter are required'
+        });
+      }
+
+      const result = await dispatchWalletEventPipeline({
+        userId,
+        eventType,
+        amount,
+        balanceAfter,
+        transactionReference: transactionReference || `TX_${Date.now()}`,
+        description
+      });
+
+      return res.json(result);
+    } catch (err: any) {
+      console.error('Wallet event dispatch error:', err);
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // 6. Dispatch Admin Operational Alert
+  app.post('/api/notifications/admin-alert', async (req, res) => {
+    try {
+      const { title, body, severity = 'INFO', alertCategory = 'SYSTEM_HEALTH', metadata } = req.body;
+      if (!title || !body) {
+        return res.status(400).json({ success: false, message: 'title and body are required' });
+      }
+
+      const result = await dispatchAdminAlertPipeline({
+        title,
+        body,
+        severity,
+        alertCategory,
+        metadata
+      });
+
+      return res.json(result);
+    } catch (err: any) {
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // 7. Get User Notification History
+  app.get('/api/notifications/user/:userId', (req, res) => {
+    try {
+      const history = getUserNotificationHistory(req.params.userId);
+      return res.json({ success: true, count: history.length, notifications: history });
+    } catch (err: any) {
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // 8. Mark Single Notification as Read
+  app.patch('/api/notifications/:id/read', (req, res) => {
+    try {
+      const updated = markNotificationAsRead(req.params.id);
+      return res.json({ success: true, updated });
+    } catch (err: any) {
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // 9. Mark All Notifications as Read for User
+  app.patch('/api/notifications/read-all', (req, res) => {
+    try {
+      const { userId } = req.body;
+      if (!userId) {
+        return res.status(400).json({ success: false, message: 'userId is required' });
+      }
+      const markedCount = markAllNotificationsAsReadForUser(userId);
+      return res.json({ success: true, markedCount });
+    } catch (err: any) {
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // 10. Notification Health & Diagnostics Metrics
+  app.get('/api/notifications/health', (req, res) => {
+    try {
+      const stats = getNotificationHealth();
+      return res.json({ success: true, stats });
+    } catch (err: any) {
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // 11. Testing Simulator Endpoint: 1-Click Multi-Role Event Dispatch
+  app.post('/api/notifications/test-dispatch', async (req, res) => {
+    try {
+      const { targetRole = 'customer', eventType = 'ORDER_CREATED', customMessage } = req.body;
+      const testOrderId = `TEST_ORD_${Date.now().toString().slice(-4)}`;
+
+      let result;
+      if (targetRole === 'admin') {
+        result = await dispatchAdminAlertPipeline({
+          title: customMessage || 'High Vendor Volume Surge',
+          body: 'Kitchen queues in Mountain Top University Central Plaza reached peak capacity.',
+          severity: 'WARNING',
+          alertCategory: 'SYSTEM_HEALTH'
+        });
+      } else {
+        const orderEvent: OrderEventType = eventType as OrderEventType;
+        result = await dispatchOrderEventPipeline({
+          orderId: testOrderId,
+          eventType: orderEvent,
+          customerId: 'user_cust_01',
+          customerName: 'Campus Student',
+          vendorId: 'user_vendor_ronalds',
+          vendorName: "Ronald's Food House",
+          riderId: 'user_rider_01',
+          riderName: 'Speedy Rider',
+          deliveryLocation: 'Daniel Hall Room 204',
+          deliveryCode: '4821',
+          pickupCode: '9134',
+          totalPrice: 3200,
+          riderFee: 400
+        });
+      }
+
+      return res.json({ success: true, testOrderId, result });
+    } catch (err: any) {
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // Backward-compatible status update route
+  app.post('/api/fcm/send-status-update', async (req, res) => {
+    const { orderId, status, vendorName, userId, customerId } = req.body;
 
     if (!orderId || !status) {
       return res.status(400).json({ status: false, message: 'orderId and status are required' });
     }
 
-    const messages: Record<string, string> = {
-      pending: 'Your order has been submitted and is awaiting confirmation.',
-      accepted: `Your order from ${vendorName || 'Vendor'} has been accepted!`,
-      preparing: `Your order from ${vendorName || 'Vendor'} is being prepared in the kitchen.`,
-      ready: `Your order from ${vendorName || 'Vendor'} is ready for pickup!`,
-      assigned: `A rider has accepted your delivery from ${vendorName || 'Vendor'}.`,
-      picked_up: `Your order from ${vendorName || 'Vendor'} has been picked up by the rider.`,
-      on_the_way: `Your rider is on the way with your meal from ${vendorName || 'Vendor'}.`,
-      delivered: `Your order from ${vendorName || 'Vendor'} has been delivered! Enjoy your meal.`,
-      cancelled: `Your order from ${vendorName || 'Vendor'} was cancelled.`
+    const statusMap: Record<string, OrderEventType> = {
+      pending: 'ORDER_CREATED',
+      accepted: 'VENDOR_ACCEPTED',
+      preparing: 'ORDER_PREPARING',
+      ready: 'ORDER_READY',
+      assigned: 'RIDER_ASSIGNED',
+      picked_up: 'ORDER_PICKED_UP',
+      on_the_way: 'ORDER_OUT_FOR_DELIVERY',
+      delivered: 'ORDER_DELIVERED',
+      cancelled: 'ORDER_CANCELLED'
     };
 
-    const statusText = messages[status] || `Order ${orderId} status updated to ${status}.`;
+    const mappedEvent: OrderEventType = statusMap[status] || 'ORDER_CREATED';
 
-    console.log(`[FCM Engine] Order ${orderId} status changed to '${status}': "${statusText}"`);
+    await dispatchOrderEventPipeline({
+      orderId,
+      eventType: mappedEvent,
+      customerId: customerId || userId || 'user_cust_01',
+      vendorId: 'vendor_mtu_canteen',
+      vendorName: vendorName || 'Campus Food Stand'
+    });
 
     return res.json({
       status: true,
-      message: 'FCM status update broadcast sent successfully',
-      data: {
-        orderId,
-        status,
-        notification: {
-          title: 'BUKKIT Order Update',
-          body: statusText
-        },
-        timestamp: new Date().toISOString()
-      }
+      message: 'Status update processed via centralized notification engine'
     });
   });
 

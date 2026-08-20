@@ -12,6 +12,7 @@ interface CartState {
   isOpen: boolean;
 
   setCartOpen: (isOpen: boolean) => void;
+  setDeliveryFee: (fee: number) => void;
   addItem: (item: MenuItem, restaurant?: Restaurant, quantity?: number, options?: Record<string, string>) => boolean;
   removeItem: (itemId: string) => void;
   updateQuantity: (itemId: string, quantity: number) => void;
@@ -32,6 +33,7 @@ export const useCartStore = create<CartState>((set, get) => ({
   isOpen: false,
 
   setCartOpen: (isOpen: boolean) => set({ isOpen }),
+  setDeliveryFee: (fee: number) => set({ deliveryFee: fee }),
 
   addItem: (menuItem, restaurant, quantity = 1, options) => {
     const state = get();

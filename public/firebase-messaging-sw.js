@@ -18,14 +18,45 @@ const messaging = firebase.messaging();
 messaging.onBackgroundMessage((payload) => {
   console.log('[firebase-messaging-sw.js] Received background message:', payload);
   const notificationTitle = payload.notification?.title || payload.data?.title || 'BUKKIT Order Status Update';
+  const deepLink = payload.data?.deep_link || payload.data?.deepLink || (payload.data?.orderId ? `/orders/${payload.data.orderId}` : '/');
+  
   const notificationOptions = {
     body: payload.notification?.body || payload.data?.body || 'Your order status has been updated.',
     icon: '/favicon.ico',
     badge: '/favicon.ico',
-    data: payload.data,
+    data: {
+      ...payload.data,
+      deepLink: deepLink
+    },
     vibrate: [200, 100, 200],
-    tag: payload.data?.orderId || 'bukkit-order-update'
+    tag: payload.data?.orderId ? `bukkit-order-${payload.data.orderId}` : 'bukkit-notification',
+    renotify: true,
+    actions: [
+      { action: 'open_order', title: 'Open & View' }
+    ]
   };
 
   self.registration.showNotification(notificationTitle, notificationOptions);
+});
+
+// Handle push notification click and deep link routing
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const deepLink = event.notification.data?.deepLink || '/';
+
+  event.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windowClients) => {
+      // If a window client already exists, focus it and post a message
+      for (const client of windowClients) {
+        if (client.url && 'focus' in client) {
+          client.postMessage({ type: 'BUKKIT_NOTIFICATION_CLICK', deepLink });
+          return client.focus();
+        }
+      }
+      // Otherwise open a new window
+      if (clients.openWindow) {
+        return clients.openWindow(deepLink);
+      }
+    })
+  );
 });

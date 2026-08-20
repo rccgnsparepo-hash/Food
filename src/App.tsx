@@ -28,8 +28,10 @@ import { AuthGatewayPage } from './components/auth/AuthGatewayPage';
 import { ErrorBoundary } from './components/ui/ErrorBoundary';
 import { Toaster } from 'sonner';
 import { User, LogOut, Phone, MapPin, Shield, KeyRound, MailWarning, Bell, CheckCircle } from 'lucide-react';
-import { useOrderNotificationListener } from './services/orderNotificationService';
 import { requestFCMToken, setupForegroundFCMListener } from './lib/fcm';
+import { NetworkStatusBanner } from './components/common/NetworkStatusBanner';
+import { NotificationCenter } from './components/layout/NotificationCenter';
+import { useRealtimeNotifications } from './services/notificationService';
 
 export default function App() {
   const { initAuth, user, role, setRole, logout, isInitLoading, isEmailVerified } = useAuthStore();
@@ -44,9 +46,33 @@ export default function App() {
   const [authInitialMode, setAuthInitialMode] = useState<'login' | 'register'>('login');
   const [trackingOrderId, setTrackingOrderId] = useState<string | null>(null);
   const [fcmPermissionGranted, setFcmPermissionGranted] = useState(false);
+  const [showNotificationCenter, setShowNotificationCenter] = useState<boolean>(false);
 
-  // Real-time Order status change listener for FCM push notifications
-  useOrderNotificationListener();
+  // Deep Link Navigator for Push Notifications and In-App Drawer clicks
+  const handleNavigateToDeepLink = (link: string) => {
+    if (!link) return;
+    if (link.includes('/orders/')) {
+      const parts = link.split('/orders/');
+      const orderId = parts[1]?.split('?')[0];
+      if (orderId) {
+        setTrackingOrderId(orderId);
+        setActiveView('tracking');
+      } else {
+        setActiveView('orders');
+      }
+    } else if (link.includes('/wallet')) {
+      setActiveView('wallet');
+    } else if (link.includes('/menu')) {
+      setActiveView('menu');
+    } else if (link.includes('/vendors')) {
+      setActiveView('vendors');
+    } else if (link.includes('/profile')) {
+      setActiveView('profile');
+    }
+  };
+
+  // Centralized Real-time Notifications Hook
+  const { unreadCount, refetch } = useRealtimeNotifications(handleNavigateToDeepLink);
 
   useEffect(() => {
     const unsub = initAuth();
@@ -64,9 +90,18 @@ export default function App() {
       unsubFcm = unsubFn;
     });
 
+    // Listen for service worker deep link navigation messages
+    const handleServiceWorkerMessage = (event: MessageEvent) => {
+      if (event.data && event.data.type === 'BUKKIT_NOTIFICATION_CLICK' && event.data.deepLink) {
+        handleNavigateToDeepLink(event.data.deepLink);
+      }
+    };
+    navigator.serviceWorker?.addEventListener('message', handleServiceWorkerMessage);
+
     return () => {
       unsub();
       if (unsubFcm) unsubFcm();
+      navigator.serviceWorker?.removeEventListener('message', handleServiceWorkerMessage);
     };
   }, []);
 
@@ -106,7 +141,9 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-[#F9ECEC] text-slate-900 font-sans antialiased selection:bg-[#D6001C] selection:text-white">
-      
+      {/* Real-time Network Connectivity Resilience Banner */}
+      <NetworkStatusBanner />
+
       {/* 1. Splash / Onboarding Screen */}
       {activeView === 'splash' ? (
         <SplashOnboarding onStart={handleStartMealOrder} />
@@ -120,6 +157,8 @@ export default function App() {
               setAuthInitialMode('login');
               setShowAuthModal(true);
             }}
+            onOpenNotifications={() => setShowNotificationCenter(true)}
+            unreadNotificationsCount={unreadCount}
             activeView={activeView}
             setActiveView={setActiveView}
           />
@@ -333,6 +372,13 @@ export default function App() {
 
       {/* App-wide Toast Notifications */}
       <Toaster position="top-center" richColors closeButton />
+
+      {/* Centralized In-App Notification Center Drawer */}
+      <NotificationCenter
+        isOpen={showNotificationCenter}
+        onClose={() => setShowNotificationCenter(false)}
+        onNavigateToDeepLink={handleNavigateToDeepLink}
+      />
 
     </div>
   );

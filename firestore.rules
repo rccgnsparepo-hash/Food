@@ -145,9 +145,24 @@ service cloud.firestore {
     match /audit_logs/{logId} {
       allow read, write: if true;
     }
+    match /AuditLog/{logId} {
+      allow read, write: if true;
+    }
 
-    // Notifications
+    // Notifications & Events Architecture
     match /notifications/{notificationId} {
+      allow read, write: if true;
+    }
+
+    match /device_tokens/{tokenId} {
+      allow read, write: if true;
+    }
+
+    match /order_events/{eventId} {
+      allow read, write: if true;
+    }
+
+    match /user_notification_preferences/{userId} {
       allow read, write: if true;
     }
 

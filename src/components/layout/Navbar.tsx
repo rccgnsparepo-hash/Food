@@ -22,11 +22,20 @@ import { useCartStore } from '../../stores/useCartStore';
 interface NavbarProps {
   onOpenCart: () => void;
   onOpenAuth: () => void;
+  onOpenNotifications?: () => void;
+  unreadNotificationsCount?: number;
   activeView: string;
   setActiveView: (view: string) => void;
 }
 
-export const Navbar: React.FC<NavbarProps> = ({ onOpenCart, onOpenAuth, activeView, setActiveView }) => {
+export const Navbar: React.FC<NavbarProps> = ({
+  onOpenCart,
+  onOpenAuth,
+  onOpenNotifications,
+  unreadNotificationsCount = 0,
+  activeView,
+  setActiveView
+}) => {
   const { user, role, logout } = useAuthStore();
   const { items, setCartOpen } = useCartStore();
   const [showProfileMenu, setShowProfileMenu] = useState(false);
@@ -164,6 +173,29 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenCart, onOpenAuth, activeVi
                 )}
               </motion.button>
             </>
+          )}
+
+          {/* Centralized Notification Bell Drawer Button */}
+          {onOpenNotifications && (
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.92 }}
+              onClick={onOpenNotifications}
+              className="relative p-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 hover:text-slate-900 rounded-2xl transition-colors cursor-pointer border border-slate-200 shadow-2xs"
+              title="Notification Center"
+            >
+              <Bell className="w-5 h-5" />
+              {unreadNotificationsCount > 0 && (
+                <motion.span
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1 }}
+                  transition={{ type: 'spring', stiffness: 500, damping: 20 }}
+                  className="absolute -top-1 -right-1 bg-[#D6001C] text-white text-[10px] font-black w-4 h-4 rounded-full flex items-center justify-center border-2 border-white shadow-xs"
+                >
+                  {unreadNotificationsCount > 9 ? '9+' : unreadNotificationsCount}
+                </motion.span>
+              )}
+            </motion.button>
           )}
 
           {/* User Profile Avatar with Direct Logout Menu */}

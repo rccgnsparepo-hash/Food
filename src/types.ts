@@ -49,6 +49,7 @@ export interface UserIdentity {
   active_role: UserRole;
   permissions: Permission[];
   wallet_balance?: number;
+  vendor_id?: string;
 }
 
 // Sub-Profiles
@@ -99,6 +100,7 @@ export interface RiderProfile {
   current_longitude?: number;
   rating: number;
   completed_deliveries: number;
+  total_deliveries?: number;
   earnings_balance: number;
   university_id?: string;
   campus_id?: string;
@@ -214,18 +216,50 @@ export interface RiderEarningsSummary {
 
 // --- AUDIT SYSTEM ARCHITECTURE ---
 
-export interface AuditLogEntry {
+export interface AuditLogActor {
+  id: string;
+  name: string;
+  role: UserRole | string;
+  email?: string;
+}
+
+export interface AuditLog {
   id: string;
   actor_id: string;
   actor_name: string;
-  actor_role: UserRole;
+  actor_role: UserRole | string;
+  actor?: AuditLogActor;
   action: string;
   order_id?: string;
+  orderId?: string;
   transaction_id?: string;
+  transactionId?: string;
   previous_state?: string;
+  previousState?: string;
   new_state?: string;
+  newState?: string;
   metadata?: Record<string, any>;
   timestamp: string;
+}
+
+export type AuditLogEntry = AuditLog;
+
+export interface CommissionRules {
+  rider_percentage: number;
+  platform_percentage: number;
+  minimum_rider_fee: number;
+  surge_multiplier?: number;
+  late_night_bonus?: number;
+}
+
+export interface RefundResult {
+  success: boolean;
+  orderId: string;
+  amountRefunded: number;
+  refundTransactionId?: string;
+  order?: Order;
+  error?: string;
+  alreadyRefunded?: boolean;
 }
 
 // --- MASTER ORDER DELIVERY DETAILS ---
@@ -254,12 +288,17 @@ export type OrderStatus =
   | 'pending'
   | 'payment_confirmed'
   | 'vendor_accepted'
+  | 'vendor_rejected'
+  | 'accepted'
   | 'preparing'
   | 'ready_for_pickup'
+  | 'ready'
   | 'rider_assigned'
+  | 'assigned'
   | 'rider_arrived_vendor'
   | 'picked_up'
   | 'out_for_delivery'
+  | 'on_the_way'
   | 'arrived_at_delivery'
   | 'delivered'
   | 'cancelled'
@@ -457,6 +496,113 @@ export interface FoodZone {
   is_active: boolean;
   created_at?: string;
   updated_at?: string;
+}
+
+// Campus Locations Database
+export type CampusLocationType =
+  | 'hostel'
+  | 'hall'
+  | 'faculty'
+  | 'department'
+  | 'lecture_hall'
+  | 'cafeteria'
+  | 'vendor'
+  | 'gate'
+  | 'landmark'
+  | 'security'
+  | 'parking'
+  | 'sports'
+  | 'library'
+  | 'medical'
+  | 'admin'
+  | 'other';
+
+export interface CampusLocation {
+  id: string;
+  campus_id: string;
+  university_id?: string;
+  name: string;
+  type: CampusLocationType;
+  latitude: number;
+  longitude: number;
+  description?: string;
+  landmark?: string;
+  building_code?: string;
+  delivery_zone_id?: string;
+  zone_name?: string;
+  popular_for_delivery?: boolean;
+  searchable: boolean;
+  active: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
+// Campus Delivery Zones
+export interface DeliveryZone {
+  id: string;
+  zone_id: string;
+  campus_id: string;
+  university_id?: string;
+  name: string;
+  code: string; // e.g. 'ZONE_A', 'ZONE_B'
+  description?: string;
+  color: string;
+  base_fee: number;
+  per_km_fee: number;
+  estimated_delivery_time: string; // e.g. '8-15 min'
+  estimated_minutes: number;
+  center_lat: number;
+  center_lng: number;
+  radius_meters: number;
+  active: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
+// Campus Boundary Geofencing
+export interface CampusBoundary {
+  campus_id: string;
+  campus_name: string;
+  center_latitude: number;
+  center_longitude: number;
+  radius_meters: number;
+  polygon_coordinates?: [number, number][];
+  is_strict: boolean;
+}
+
+// Routing Service Types
+export interface RouteWaypoint {
+  name?: string;
+  lat: number;
+  lng: number;
+}
+
+export interface RouteResult {
+  coordinates: [number, number][];
+  distanceKm: number;
+  distanceMeters: number;
+  durationMinutes: number;
+  formattedDistance: string;
+  formattedDuration: string;
+  provider: 'osrm' | 'campus_walkway' | 'straight_line_estimate';
+  isEstimated: boolean;
+  waypoints?: RouteWaypoint[];
+  summary?: string;
+}
+
+// Live GPS State
+export interface GPSLocationState {
+  latitude: number | null;
+  longitude: number | null;
+  accuracy: number | null; // in meters (±X m)
+  heading?: number | null;
+  speed?: number | null;
+  timestamp: number | null;
+  status: 'idle' | 'locating' | 'success' | 'low_accuracy' | 'denied' | 'unavailable' | 'timeout';
+  errorMessage?: string | null;
+  isInsideCampus: boolean;
+  nearestLocation?: CampusLocation | null;
+  detectedZone?: DeliveryZone | null;
 }
 
 export type VendorType =
@@ -757,3 +903,119 @@ export interface OrderReceipt {
   verification_url: string;
   qr_code_data_url?: string;
 }
+
+// ============================================================================
+// CENTRALIZED BUKKIT FIREBASE NOTIFICATION & DEVICE TOKEN ARCHITECTURE
+// ============================================================================
+
+export type NotificationPlatform = 'WEB' | 'ANDROID' | 'IOS' | 'DESKTOP';
+export type NotificationAppType = 'CUSTOMER' | 'RIDER' | 'VENDOR' | 'ADMIN';
+export type NotificationPermissionStatus = 'granted' | 'denied' | 'default' | 'unsupported';
+export type NotificationDeliveryStatus = 'pending' | 'sent' | 'delivered' | 'failed' | 'read';
+export type NotificationSeverity = 'INFO' | 'WARNING' | 'CRITICAL';
+
+export type NotificationType =
+  | 'ORDER_STATUS'
+  | 'DELIVERY_ALERT'
+  | 'VENDOR_ALERT'
+  | 'WALLET_ALERT'
+  | 'ADMIN_ALERT'
+  | 'SYSTEM_ANNOUNCEMENT';
+
+export type OrderEventType =
+  | 'ORDER_CREATED'
+  | 'PAYMENT_CONFIRMED'
+  | 'PAYMENT_FAILED'
+  | 'VENDOR_ACCEPTED'
+  | 'ORDER_PREPARING'
+  | 'ORDER_READY'
+  | 'RIDER_ASSIGNED'
+  | 'RIDER_ARRIVED_VENDOR'
+  | 'ORDER_PICKED_UP'
+  | 'ORDER_OUT_FOR_DELIVERY'
+  | 'RIDER_ARRIVED_CUSTOMER'
+  | 'ORDER_DELIVERED'
+  | 'ORDER_CANCELLED'
+  | 'REFUND_COMPLETED';
+
+export type WalletEventType =
+  | 'WALLET_TOPUP_SUCCESS'
+  | 'WALLET_PAYMENT_SUCCESS'
+  | 'WALLET_REFUND_RECEIVED'
+  | 'WALLET_PAYMENT_FAILED'
+  | 'RIDER_EARNINGS_CREDITED'
+  | 'RIDER_WITHDRAWAL_COMPLETED'
+  | 'RIDER_WITHDRAWAL_FAILED'
+  | 'VENDOR_PAYOUT_COMPLETED'
+  | 'VENDOR_PAYOUT_FAILED'
+  | 'VENDOR_SETTLEMENT_AVAILABLE';
+
+export interface DeviceTokenRecord {
+  token_id: string;
+  user_id: string;
+  fcm_token: string;
+  platform: NotificationPlatform;
+  app_type: NotificationAppType;
+  device_id?: string;
+  permission_status: NotificationPermissionStatus;
+  user_agent?: string;
+  active: boolean;
+  created_at: string;
+  updated_at: string;
+  last_seen_at: string;
+}
+
+export interface OrderEventRecord {
+  event_id: string;
+  order_id: string;
+  actor_id: string;
+  actor_role: string;
+  actor_name?: string;
+  event_type: OrderEventType;
+  timestamp: string;
+  metadata?: Record<string, any>;
+}
+
+export interface NotificationRecord {
+  notification_id: string;
+  recipient_user_id: string;
+  recipient_role?: string;
+  order_id?: string;
+  event_id?: string;
+  notification_key: string; // Idempotency deduplication key
+  type: NotificationType;
+  title: string;
+  body: string;
+  deep_link: string;
+  status: NotificationDeliveryStatus;
+  severity?: NotificationSeverity;
+  metadata?: Record<string, any>;
+  created_at: string;
+  read_at?: string | null;
+}
+
+export interface UserNotificationPreferences {
+  user_id: string;
+  order_updates: boolean;
+  delivery_updates: boolean;
+  wallet_alerts: boolean;
+  promotions: boolean;
+  sound_enabled: boolean;
+  vibration_enabled: boolean;
+  critical_alerts: boolean; // Always true
+  updated_at: string;
+}
+
+export interface NotificationHealthStats {
+  totalNotificationsSent: number;
+  totalDelivered: number;
+  totalFailed: number;
+  totalDeduplicated: number;
+  activeDeviceTokens: number;
+  tokensByPlatform: Record<NotificationPlatform, number>;
+  tokensByAppType: Record<NotificationAppType, number>;
+  averageLatencyMs: number;
+  lastDispatchTimestamp: string | null;
+  serviceWorkerStatus: 'active' | 'inactive' | 'unknown';
+}
+

@@ -7,7 +7,7 @@ import { Order } from '../../types';
 import { useAuthStore } from '../../stores/useAuthStore';
 import { OrderDetailModal } from './OrderDetailModal';
 import { OrderReceiptModal } from './OrderReceiptModal';
-import { downloadOrderReceiptPDF } from './OrderTracking';
+import { downloadOrderReceiptPDF } from '../../services/receiptService';
 import { triggerHaptic } from '../../utils/haptics';
 import { staggerContainer, staggerItem } from '../../utils/motion';
 import {

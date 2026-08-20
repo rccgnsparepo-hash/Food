@@ -31,7 +31,8 @@ import {
   updateRiderAvailability,
   verifyOrderPickup,
   verifyOrderDelivery,
-  subscribeToRiderEarnings
+  subscribeToRiderEarnings,
+  updateRiderLiveLocation
 } from '../../services/riderService';
 import { transitionOrderStatus, claimOrderForDelivery } from '../../services/orderLifecycleService';
 
@@ -43,10 +44,52 @@ export const RiderDashboard: React.FC = () => {
   const [completedOrders, setCompletedOrders] = useState<Order[]>([]);
   const [earningsLedger, setEarningsLedger] = useState<DeliveryEarning[]>([]);
 
-  const [riderLat, setRiderLat] = useState(6.784);
-  const [riderLng, setRiderLng] = useState(3.442);
+  // MTU Campus Coordinates Default
+  const [riderLat, setRiderLat] = useState(6.7635);
+  const [riderLng, setRiderLng] = useState(3.3780);
+  const [gpsAccuracy, setGpsAccuracy] = useState<number | null>(null);
   const [showChat, setShowChat] = useState(false);
   const [isOnline, setIsOnline] = useState(true);
+
+  // Continuous GPS watch for online couriers
+  useEffect(() => {
+    if (!user?.uid || !isOnline) return;
+
+    if ('geolocation' in navigator) {
+      let lastSyncTime = 0;
+
+      const watchId = navigator.geolocation.watchPosition(
+        (pos) => {
+          const lat = pos.coords.latitude;
+          const lng = pos.coords.longitude;
+          const accuracy = Math.round(pos.coords.accuracy);
+
+          setRiderLat(lat);
+          setRiderLng(lng);
+          setGpsAccuracy(accuracy);
+
+          const now = Date.now();
+          // Throttle updates to Firestore every 6 seconds to optimize battery and bandwidth
+          if (now - lastSyncTime > 6000) {
+            lastSyncTime = now;
+            updateRiderLiveLocation(user.uid, lat, lng, myActiveOrder?.id || null);
+          }
+        },
+        (err) => {
+          console.warn('Rider GPS watch notice:', err.message);
+        },
+        {
+          enableHighAccuracy: true,
+          maximumAge: 10000,
+          timeout: 15000
+        }
+      );
+
+      return () => {
+        navigator.geolocation.clearWatch(watchId);
+      };
+    }
+  }, [user?.uid, isOnline, myActiveOrder?.id]);
 
   // Verification PIN dialogs state
   const [pickupModalOpen, setPickupModalOpen] = useState(false);
@@ -414,14 +457,31 @@ export const RiderDashboard: React.FC = () => {
               </div>
             </div>
 
-            {/* Right Column: Live Map */}
+            {/* Right Column: Live Campus Navigation Map */}
             <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1.5 text-xs font-extrabold text-slate-900">
+                  <MapPin className="w-4 h-4 text-emerald-600" />
+                  <span>Campus Turn-by-Turn Route</span>
+                </div>
+                {gpsAccuracy !== null && (
+                  <span className="text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-lg">
+                    GPS Accuracy: ±{gpsAccuracy}m
+                  </span>
+                )}
+              </div>
               <MapPicker
-                latitude={myActiveOrder.latitude || 6.783}
-                longitude={myActiveOrder.longitude || 3.441}
+                latitude={myActiveOrder.latitude || 6.7638}
+                longitude={myActiveOrder.longitude || 3.3782}
                 riderLat={riderLat}
                 riderLng={riderLng}
-                height="320px"
+                restaurantLat={6.7628}
+                restaurantLng={3.3768}
+                vendorName={myActiveOrder.vendor_name || 'Kitchen Stand'}
+                customerName={myActiveOrder.customer_name || 'Student Drop-off'}
+                orderStatus={myActiveOrder.status}
+                isTrackingMode={true}
+                height="340px"
               />
             </div>
           </div>

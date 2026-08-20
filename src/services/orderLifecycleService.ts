@@ -12,9 +12,13 @@ import { db } from '../lib/firebase';
 import { doc, getDoc, setDoc, updateDoc, collection, query, where, getDocs, orderBy, onSnapshot } from 'firebase/firestore';
 import { validateOrderStatusTransition } from './authService';
 import { triggerHaptic } from '../utils/haptics';
-import { logAuditEvent } from './auditService';
-import { debitWalletForOrder, processWalletRefund } from './walletService';
+import { recordAuditLog, recordOrderTransition, logAuditEvent } from './auditLogService';
+import { debitWalletForOrder } from './walletService';
+import { processOrderCancellationRefund } from './refundService';
+import { recordRiderEarningsOnDelivery } from './earningsService';
 import { toast } from 'sonner';
+import { emitAuthoritativeOrderEvent } from './notificationService';
+import { OrderEventType } from '../types';
 
 /**
  * Recursively removes undefined fields so that Firestore setDoc/updateDoc never fails.
@@ -286,17 +290,21 @@ export async function createAuthoritativeOrder(
     })
   }).catch((err) => console.warn('Order SQL sync notice:', err));
 
-  // 4. Send notification trigger
-  fetch('/api/fcm/send-status-update', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      orderId,
-      status: initialStatus,
-      vendorName: orderData.vendor_name,
-      userId: currentUser.uid
-    })
-  }).catch(() => {});
+  // 4. Send Authoritative Order Event through Centralized Pipeline
+  emitAuthoritativeOrderEvent({
+    orderId,
+    eventType: isPaidInstantly ? 'PAYMENT_CONFIRMED' : 'ORDER_CREATED',
+    customerId: currentUser.uid,
+    customerName: orderData.user_name,
+    vendorId: orderData.vendor_id,
+    vendorName: orderData.vendor_name,
+    vendorPhone: orderData.vendor_phone,
+    deliveryLocation: orderData.delivery_address,
+    deliveryCode: orderData.delivery_code,
+    pickupCode: orderData.pickup_code,
+    totalPrice: orderData.total_price,
+    riderFee: orderData.delivery_fee
+  }).catch((err) => console.warn('Order event emission warning:', err));
 
   return orderData;
 }
@@ -408,25 +416,35 @@ export async function transitionOrderStatus(
       rawUpdates.arrived_at_delivery_at = now;
     } else if (targetStatus === 'delivered') {
       rawUpdates.delivered_at = now;
-    } else if (targetStatus === 'cancelled') {
+      // If rider is assigned, trigger earnings calculation automatically
+      const assignedRiderId = currentOrder.rider_id || (currentUser.role === 'rider' ? currentUser.uid : null);
+      if (assignedRiderId) {
+        recordRiderEarningsOnDelivery(currentOrder, {
+          uid: assignedRiderId,
+          name: currentOrder.rider_name || currentUser.name || 'Campus Courier',
+          phone: currentOrder.rider_phone || currentUser.phone
+        }).catch((err) => console.warn('[earningsService] Automated delivery earnings recording warning:', err));
+      }
+    } else if (targetStatus === 'cancelled' || targetStatus === 'refunded') {
       rawUpdates.cancelled_at = now;
       if (extraData?.cancellationReason) {
         rawUpdates.cancellation_reason = extraData.cancellationReason;
       }
-      // If order was paid via wallet or online, process automatic refund
+      // If order was paid, execute atomic cancellation & refund
       if (currentOrder.payment_status === 'paid' && currentOrder.total_price > 0) {
-        processWalletRefund({
-          userId: currentOrder.customer_id || currentOrder.user_id,
+        processOrderCancellationRefund({
           orderId: currentOrder.id,
-          amount: currentOrder.total_price,
           reason: extraData?.cancellationReason || 'Order Cancelled',
           actor: {
             id: currentUser.uid,
             name: currentUser.name || 'System',
-            role: currentUser.active_role || 'admin'
+            role: currentUser.active_role || currentUser.role || 'admin',
+            email: currentUser.email
           }
-        }).catch((err) => console.warn('Refund processing notice:', err));
+        }).catch((err) => console.warn('[refundService] Reversal refund notice:', err));
         rawUpdates.payment_status = 'refunded';
+        rawUpdates.status = 'refunded';
+        rawUpdates.order_status = 'refunded';
       }
     }
 
@@ -449,17 +467,42 @@ export async function transitionOrderStatus(
       metadata: { cancellationReason: extraData?.cancellationReason }
     });
 
-    // Broadcast FCM notification
-    fetch('/api/fcm/send-status-update', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        orderId,
-        status: targetStatus,
-        vendorName: mergedOrder.vendor_name || mergedOrder.restaurant_name,
-        userId: mergedOrder.customer_id || mergedOrder.user_id
-      })
-    }).catch(() => {});
+    // Map status to OrderEventType
+    const statusToEventTypeMap: Record<string, OrderEventType> = {
+      accepted: 'VENDOR_ACCEPTED',
+      preparing: 'ORDER_PREPARING',
+      ready_for_pickup: 'ORDER_READY',
+      assigned: 'RIDER_ASSIGNED',
+      rider_arrived_vendor: 'RIDER_ARRIVED_VENDOR',
+      picked_up: 'ORDER_PICKED_UP',
+      on_the_way: 'ORDER_OUT_FOR_DELIVERY',
+      out_for_delivery: 'ORDER_OUT_FOR_DELIVERY',
+      arrived_at_delivery: 'RIDER_ARRIVED_CUSTOMER',
+      delivered: 'ORDER_DELIVERED',
+      cancelled: 'ORDER_CANCELLED',
+      refunded: 'REFUND_COMPLETED'
+    };
+
+    const resolvedEventType = statusToEventTypeMap[targetStatus] || 'ORDER_PREPARING';
+
+    // Broadcast through centralized authoritative notification pipeline
+    emitAuthoritativeOrderEvent({
+      orderId,
+      eventType: resolvedEventType,
+      customerId: mergedOrder.customer_id || mergedOrder.user_id,
+      customerName: mergedOrder.user_name || mergedOrder.customer_name,
+      vendorId: mergedOrder.vendor_id,
+      vendorName: mergedOrder.vendor_name || mergedOrder.restaurant_name,
+      riderId: mergedOrder.rider_id,
+      riderName: mergedOrder.rider_name,
+      deliveryLocation: mergedOrder.delivery_address,
+      deliveryCode: mergedOrder.delivery_code,
+      pickupCode: mergedOrder.pickup_code,
+      totalPrice: mergedOrder.total_price,
+      riderFee: mergedOrder.delivery_fee,
+      estimatedMinutes: extraData?.estimatedMinutes || 15,
+      cancellationReason: extraData?.cancellationReason
+    }).catch((err) => console.warn('Order event emission warning:', err));
 
     triggerHaptic(50);
     return { success: true, order: mergedOrder };

@@ -21,7 +21,8 @@ import { useAuthStore } from '../../stores/useAuthStore';
 import {
   Order,
   PreferredDeliveryOption,
-  CustomerDeliveryInfo
+  CustomerDeliveryInfo,
+  CampusLocation
 } from '../../types';
 import { MapPicker } from '../ui/MapPicker';
 import { PaystackModal } from '../ui/PaystackModal';
@@ -30,6 +31,8 @@ import { toast } from 'sonner';
 import { staggerContainer, staggerItem } from '../../utils/motion';
 import { createAuthoritativeOrder } from '../../services/orderLifecycleService';
 import { subscribeToWallet } from '../../services/walletService';
+import { calculateDeliveryFee } from '../../services/deliveryFeeService';
+import { DEFAULT_MTU_CAMPUS_LOCATIONS, DEFAULT_MTU_BOUNDARY, isWithinCampusBoundary } from '../../services/campusLocationService';
 
 interface CheckoutModalProps {
   onClose: () => void;
@@ -37,7 +40,7 @@ interface CheckoutModalProps {
 }
 
 export const CheckoutModal: React.FC<CheckoutModalProps> = ({ onClose, onOrderCreated }) => {
-  const { items, restaurantId, restaurantName, getSubtotal, getDeliveryFee, getServiceFee, getTotal, clearCart } =
+  const { items, restaurantId, restaurantName, getSubtotal, getDeliveryFee, getServiceFee, getTotal, clearCart, setDeliveryFee } =
     useCartStore();
   const { user } = useAuthStore();
 
@@ -70,9 +73,23 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ onClose, onOrderCr
   const [preferredOption, setPreferredOption] = useState<PreferredDeliveryOption>('room_delivery');
   const [contactless, setContactless] = useState<boolean>(false);
 
-  // Map Coordinates
-  const [lat, setLat] = useState(user?.latitude || 6.783);
-  const [lng, setLng] = useState(user?.longitude || 3.441);
+  // Map Coordinates (Defaults to Mountain Top University Central Campus)
+  const [lat, setLat] = useState(user?.latitude || 6.7638);
+  const [lng, setLng] = useState(user?.longitude || 3.3782);
+  const [detectedZoneInfo, setDetectedZoneInfo] = useState<string>('Zone B — Hostels (10-15 min)');
+
+  // Authoritative Delivery Fee Breakdown
+  useEffect(() => {
+    const breakdown = calculateDeliveryFee({
+      customerLat: lat,
+      customerLng: lng,
+      vendorLat: 6.7628,
+      vendorLng: 3.3768,
+      preferredOption
+    });
+    setDeliveryFee(breakdown.totalDeliveryFee);
+    setDetectedZoneInfo(`${breakdown.zoneName} • ${breakdown.distanceKm} km • ${breakdown.estimatedDeliveryTime}`);
+  }, [lat, lng, preferredOption, setDeliveryFee]);
 
   // Payment Selection State: 'wallet' | 'split_wallet_paystack' | 'paystack' | 'delivery'
   const [paymentMethod, setPaymentMethod] = useState<'wallet' | 'split_wallet_paystack' | 'paystack' | 'delivery'>('wallet');
@@ -260,14 +277,105 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ onClose, onOrderCr
 
         {/* SECTION 2: CAMPUS FOOD DELIVERY INFORMATION */}
         <motion.div variants={staggerItem} className="bg-white rounded-3xl p-5 shadow-xs border border-slate-200 space-y-4">
-          <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
-            <Building className="w-5 h-5 text-emerald-600" />
-            <div>
-              <h2 className="font-extrabold text-slate-900 text-sm">Campus Food Delivery Location</h2>
-              <p className="text-xs text-slate-500">Exact campus building, hostel, room, and drop-off guidance</p>
+          <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+            <div className="flex items-center gap-2">
+              <Building className="w-5 h-5 text-emerald-600" />
+              <div>
+                <h2 className="font-extrabold text-slate-900 text-sm">Campus Food Delivery Location</h2>
+                <p className="text-xs text-slate-500">Live GPS pin, campus hall, room number & drop-off guidance</p>
+              </div>
+            </div>
+            <span className="text-[11px] font-black bg-emerald-50 text-emerald-800 px-2.5 py-1 rounded-xl border border-emerald-200">
+              {detectedZoneInfo.split('•')[0] || 'Zone A'}
+            </span>
+          </div>
+
+          {/* Quick Select Campus Locations */}
+          <div>
+            <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1.5">
+              ⚡ Quick Select Campus Landmark / Hostel
+            </label>
+            <div className="flex flex-wrap gap-1.5">
+              {DEFAULT_MTU_CAMPUS_LOCATIONS.slice(0, 8).map((loc) => (
+                <button
+                  key={loc.id}
+                  type="button"
+                  onClick={() => {
+                    triggerHaptic(20);
+                    setLat(loc.latitude);
+                    setLng(loc.longitude);
+                    setBuilding(loc.name);
+                    if (loc.type === 'hostel') {
+                      setHostelHall(loc.name.split('(')[0].trim());
+                      setExactLocation(`Porter's Lodge Entrance (${loc.building_code || ''})`);
+                    } else {
+                      setExactLocation(`Main Reception / Ground Foyer (${loc.building_code || ''})`);
+                    }
+                    toast.success(`Selected: ${loc.name}`);
+                  }}
+                  className={`text-xs font-semibold px-2.5 py-1.5 rounded-xl border transition-all cursor-pointer ${
+                    Math.abs(lat - loc.latitude) < 0.0003 && Math.abs(lng - loc.longitude) < 0.0003
+                      ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
+                      : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                  }`}
+                >
+                  {loc.name.split('(')[0].trim()}
+                </button>
+              ))}
             </div>
           </div>
 
+          {/* Interactive Campus Map Picker */}
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                <MapPin className="w-3.5 h-3.5 text-emerald-600" />
+                Live Campus GPS Pin & Drop-off Spot
+              </span>
+              <span className="text-[10px] text-slate-500 font-medium">
+                Tap map, drag pin or click GPS button
+              </span>
+            </div>
+            <MapPicker
+              latitude={lat}
+              longitude={lng}
+              height="220px"
+              onLocationSelect={(newLat, newLng, address) => {
+                setLat(newLat);
+                setLng(newLng);
+              }}
+              onCampusLocationPick={(loc) => {
+                setLat(loc.latitude);
+                setLng(loc.longitude);
+                setBuilding(loc.name);
+                if (loc.type === 'hostel') {
+                  setHostelHall(loc.name.split('(')[0].trim());
+                  setExactLocation(`Porter's Lodge Entrance (${loc.building_code || ''})`);
+                } else {
+                  setExactLocation(`Main Foyer / Ground Floor (${loc.building_code || ''})`);
+                }
+              }}
+            />
+          </div>
+
+          {/* Delivery Zone & Fee Summary Pill */}
+          <div className="bg-emerald-50/80 border border-emerald-200/80 rounded-2xl p-3 flex items-center justify-between text-xs text-emerald-950">
+            <div className="space-y-0.5">
+              <p className="font-extrabold flex items-center gap-1.5">
+                <Truck className="w-3.5 h-3.5 text-emerald-700" />
+                {detectedZoneInfo}
+              </p>
+              <p className="text-[10px] text-emerald-700 font-medium">
+                Calculated authoritatively from kitchen coordinates to your campus drop-off
+              </p>
+            </div>
+            <div className="text-right shrink-0">
+              <span className="text-xs text-emerald-700 font-bold block">Delivery Fee</span>
+              <span className="text-sm font-black text-emerald-950">₦{deliveryFee.toLocaleString()}</span>
+            </div>
+          </div>
+
+          {/* Detailed Address Inputs */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="text-xs font-bold text-slate-700 block mb-1">Campus / Institution</label>
@@ -322,12 +430,12 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ onClose, onOrderCr
           </div>
 
           <div>
-            <label className="text-xs font-bold text-slate-700 block mb-1">Delivery Instructions for Rider</label>
+            <label className="text-xs font-bold text-slate-700 block mb-1">Delivery Instructions for Courier</label>
             <textarea
               rows={2}
               value={deliveryInstructions}
               onChange={(e) => setDeliveryInstructions(e.target.value)}
-              placeholder="e.g. Please ring phone on arrival. Don't honk at the gate."
+              placeholder="e.g. Please call when you reach the gate. Meet me at the ground floor foyer."
               className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-medium text-slate-900 focus:ring-2 focus:ring-emerald-600 outline-none resize-none"
             />
           </div>
@@ -337,15 +445,15 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ onClose, onOrderCr
             <label className="text-xs font-bold text-slate-700 block mb-2">Preferred Delivery Option</label>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
               {[
-                { id: 'room_delivery', label: 'Room Delivery', desc: 'Direct to door' },
-                { id: 'hostel_gate_dropoff', label: 'Hostel Gate', desc: 'Pickup at gate' },
-                { id: 'department_foyer', label: 'Faculty Foyer', desc: 'Class / Department' }
+                { id: 'room_delivery', label: 'Room Delivery', desc: 'Direct to room door' },
+                { id: 'hostel_gate_dropoff', label: 'Hostel Gate', desc: 'Pickup at porters/gate' },
+                { id: 'department_foyer', label: 'Faculty Foyer', desc: 'Ground floor lounge' }
               ].map((opt) => (
                 <button
                   key={opt.id}
                   type="button"
                   onClick={() => setPreferredOption(opt.id as PreferredDeliveryOption)}
-                  className={`p-2.5 rounded-xl border text-left transition-all ${
+                  className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
                     preferredOption === opt.id
                       ? 'border-emerald-600 bg-emerald-50 text-emerald-900 font-bold'
                       : 'border-slate-200 bg-slate-50 text-slate-600 hover:border-slate-300'
@@ -369,23 +477,6 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ onClose, onOrderCr
               checked={contactless}
               onChange={(e) => setContactless(e.target.checked)}
               className="w-5 h-5 accent-emerald-600 cursor-pointer rounded"
-            />
-          </div>
-
-          {/* Map Pin Locator */}
-          <div className="pt-2">
-            <div className="flex items-center gap-1.5 mb-2">
-              <MapPin className="w-4 h-4 text-emerald-600" />
-              <span className="text-xs font-bold text-slate-700">Campus GPS Pin Position</span>
-            </div>
-            <MapPicker
-              latitude={lat}
-              longitude={lng}
-              height="180px"
-              onLocationSelect={(newLat, newLng) => {
-                setLat(newLat);
-                setLng(newLng);
-              }}
             />
           </div>
         </motion.div>

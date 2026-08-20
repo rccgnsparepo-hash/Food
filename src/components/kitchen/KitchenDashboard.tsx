@@ -40,18 +40,29 @@ export const KitchenDashboard: React.FC = () => {
   const { user } = useAuthStore();
   const { vendors, menuItems, foodZones } = useMarketplaceStore();
 
-  // Find vendor associated with this kitchen user or use first available vendor as active stand
+  // Authoritative vendor resolution
+  const userVendorId = user?.vendor_id || user?.kitchen_profile?.vendor_id;
+  const isAdmin = user?.role === 'admin' || user?.role === 'super_admin' || user?.active_role === 'admin' || user?.active_role === 'super_admin';
+
+  // Find vendor associated with this kitchen user or use first available vendor
   const [activeVendorId, setActiveVendorId] = useState<string>(() => {
+    if (userVendorId) return userVendorId;
     const matched = vendors.find(v => v.owner_uid === user?.uid || v.email === user?.email);
     return matched ? matched.id : vendors[0]?.id || 'vendor_mama_cass';
   });
+
+  useEffect(() => {
+    if (userVendorId && !isAdmin) {
+      setActiveVendorId(userVendorId);
+    }
+  }, [userVendorId, isAdmin]);
 
   const currentVendor = vendors.find(v => v.id === activeVendorId) || vendors[0];
   const vendorMenu = menuItems.filter(m => m.vendor_id === activeVendorId || m.restaurant_id === activeVendorId);
   const currentZone = foodZones.find(z => z.id === currentVendor?.food_zone_id);
 
   // Active Tab
-  const [activeTab, setActiveTab] = useState<'orders' | 'menu' | 'profile' | 'workers'>('menu');
+  const [activeTab, setActiveTab] = useState<'orders' | 'menu' | 'profile' | 'workers'>('orders');
 
   // Live Orders
   const [liveOrders, setLiveOrders] = useState<Order[]>([]);
@@ -288,17 +299,21 @@ export const KitchenDashboard: React.FC = () => {
   };
 
   // Update Order Status (e.g. Preparing -> Ready for Dispatch)
-  const handleUpdateOrderStatus = async (orderId: string, nextStatus: 'preparing' | 'ready_for_pickup' | 'completed') => {
-    triggerHaptic(30);
+  const handleUpdateOrderStatus = async (orderId: string, nextStatus: 'vendor_accepted' | 'preparing' | 'ready_for_pickup' | 'cancelled', reason?: string) => {
+    if (!user) return;
+    triggerHaptic(40);
     try {
-      await updateDoc(doc(db, 'orders', orderId), {
-        status: nextStatus,
-        updated_at: new Date().toISOString()
+      const res = await transitionOrderStatus(orderId, nextStatus as any, user, {
+        cancellationReason: reason
       });
-      toast.success(`Order updated to: ${nextStatus.toUpperCase()}`);
-    } catch (e) {
+      if (res.success) {
+        toast.success(`✓ Order status transitioned to: ${nextStatus.replace(/_/g, ' ').toUpperCase()}`);
+      } else {
+        toast.error(res.error || 'Failed to update order status');
+      }
+    } catch (e: any) {
       console.error('Error updating order:', e);
-      toast.error('Failed to update order status.');
+      toast.error(e?.message || 'Failed to update order status.');
     }
   };
 
@@ -567,39 +582,95 @@ export const KitchenDashboard: React.FC = () => {
                     <div className="flex items-center justify-between border-b border-slate-100 pb-2">
                       <div>
                         <span className="text-[10px] font-bold text-slate-400 font-mono">ORDER #{ord.id.slice(-6)}</span>
-                        <h4 className="font-extrabold text-sm text-slate-900">{ord.customer_name || 'MTU Student'}</h4>
+                        <h4 className="font-extrabold text-sm text-slate-900">{ord.customer_name || ord.user_name || 'MTU Student'}</h4>
+                        {ord.customer_phone && (
+                          <p className="text-[11px] text-slate-500">{ord.customer_phone}</p>
+                        )}
                       </div>
                       <span className={`text-[10px] font-black px-2.5 py-1 rounded-full uppercase ${
-                        ord.status === 'pending'
+                        ord.status === 'pending' || ord.status === 'payment_confirmed'
                           ? 'bg-amber-100 text-amber-800'
                           : ord.status === 'preparing'
                           ? 'bg-blue-100 text-blue-800'
-                          : 'bg-emerald-100 text-emerald-800'
+                          : ord.status === 'ready' || ord.status === 'ready_for_pickup'
+                          ? 'bg-emerald-100 text-emerald-800'
+                          : 'bg-slate-100 text-slate-800'
                       }`}>
-                        {ord.status}
+                        {ord.status.replace(/_/g, ' ')}
                       </span>
+                    </div>
+
+                    {/* Delivery Destination Snapshot */}
+                    <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-100 text-xs">
+                      <span className="font-bold text-slate-500 block text-[10px] uppercase">Destination:</span>
+                      <p className="font-bold text-slate-800">{ord.delivery_address}</p>
+                      {ord.delivery_room && <p className="text-emerald-700 font-bold">Room: {ord.delivery_room}</p>}
                     </div>
 
                     <div className="space-y-1 text-xs text-slate-700">
                       {ord.items?.map((it, idx) => (
                         <div key={idx} className="flex justify-between">
                           <span>{it.quantity}x {it.name}</span>
-                          <span className="font-mono font-bold">₦{(it.price * it.quantity).toLocaleString()}</span>
+                          <span className="font-mono font-bold">₦{((Number(it.price) || 0) * it.quantity).toLocaleString()}</span>
                         </div>
                       ))}
                     </div>
 
                     <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
-                      <span className="font-bold text-slate-400">Delivery: {ord.delivery_address || 'Campus Room'}</span>
-                      <span className="font-black text-[#D6001C] font-mono text-sm">₦{Number(ord.total || 0).toLocaleString()}</span>
+                      <span className="font-bold text-slate-500">Payment: {ord.payment_status?.toUpperCase() || 'PAID'}</span>
+                      <span className="font-black text-[#D6001C] font-mono text-sm">₦{Number(ord.total_price || ord.total || 0).toLocaleString()}</span>
                     </div>
 
+                    {/* Prominent Pickup PIN Box for Kitchen -> Rider Handover */}
+                    {(ord.status === 'ready' || ord.status === 'ready_for_pickup') && (
+                      <div className="p-3 rounded-2xl bg-emerald-600 text-white text-center shadow-md">
+                        <span className="text-[10px] uppercase font-bold tracking-wider opacity-90 block">
+                          Rider Pickup Verification Code
+                        </span>
+                        <span className="text-2xl font-black tracking-widest block my-0.5">
+                          {ord.pickup_code || '3914'}
+                        </span>
+                        <span className="text-[10px] opacity-80 block">
+                          Rider must enter this code to collect meal
+                        </span>
+                      </div>
+                    )}
+
                     {/* Status Advance Buttons */}
-                    <div className="pt-2 flex gap-2">
-                      {ord.status === 'pending' && (
+                    <div className="pt-2 flex flex-col gap-1.5">
+                      {(ord.status === 'pending' || ord.status === 'payment_confirmed') && (
+                        <div className="space-y-1.5">
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => handleUpdateOrderStatus(ord.id, 'vendor_accepted')}
+                              className="flex-1 bg-slate-900 hover:bg-black text-white font-extrabold py-2 rounded-xl text-xs cursor-pointer"
+                            >
+                              Accept Order
+                            </button>
+                            <button
+                              onClick={() => handleUpdateOrderStatus(ord.id, 'preparing')}
+                              className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-extrabold py-2 rounded-xl text-xs cursor-pointer"
+                            >
+                              Start Cooking
+                            </button>
+                          </div>
+                          <button
+                            onClick={() => {
+                              const reason = window.prompt('Reason for rejecting order (e.g., ingredients out of stock):', 'Items currently unavailable at kitchen stand');
+                              if (reason) {
+                                handleUpdateOrderStatus(ord.id, 'cancelled', reason);
+                              }
+                            }}
+                            className="w-full py-1.5 text-center text-[11px] font-bold text-rose-600 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 rounded-xl transition-colors cursor-pointer border border-rose-200"
+                          >
+                            Decline / Out of Stock (Auto-Refund Customer)
+                          </button>
+                        </div>
+                      )}
+                      {ord.status === 'vendor_accepted' && (
                         <button
                           onClick={() => handleUpdateOrderStatus(ord.id, 'preparing')}
-                          className="w-full bg-blue-600 hover:bg-blue-700 text-white font-extrabold py-2 rounded-xl text-xs cursor-pointer"
+                          className="w-full bg-blue-600 hover:bg-blue-700 text-white font-extrabold py-2.5 rounded-xl text-xs cursor-pointer"
                         >
                           Start Preparing Food
                         </button>
@@ -607,9 +678,9 @@ export const KitchenDashboard: React.FC = () => {
                       {ord.status === 'preparing' && (
                         <button
                           onClick={() => handleUpdateOrderStatus(ord.id, 'ready_for_pickup')}
-                          className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold py-2 rounded-xl text-xs cursor-pointer"
+                          className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-black py-2.5 rounded-xl text-xs cursor-pointer shadow-md shadow-emerald-600/30"
                         >
-                          Ready for Rider Pickup
+                          Ready for Rider Pickup (Generate PIN)
                         </button>
                       )}
                     </div>

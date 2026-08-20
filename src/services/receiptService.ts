@@ -556,3 +556,20 @@ export async function generateBukkitReceiptPDF(receipt: OrderReceipt): Promise<v
     toast.error('Failed to generate PDF receipt.');
   }
 }
+
+/**
+ * Convenience helper to build validated receipt and immediately trigger PDF download
+ */
+export async function downloadOrderReceiptPDF(
+  order: Order,
+  customerProfile?: Partial<UserProfile> | null,
+  vendorProfile?: Partial<Vendor> | null
+): Promise<void> {
+  const { receipt, error } = await buildValidatedOrderReceipt(order, customerProfile, vendorProfile);
+  if (!receipt || error) {
+    toast.error(error || 'Failed to build receipt data.');
+    return;
+  }
+  await generateBukkitReceiptPDF(receipt);
+}
+

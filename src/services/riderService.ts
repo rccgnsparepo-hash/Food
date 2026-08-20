@@ -10,8 +10,21 @@ import {
   UserRole
 } from '../types';
 import { cleanFirestoreData, transitionOrderStatus } from './orderLifecycleService';
-import { logAuditEvent } from './auditService';
+import { recordAuditLog, logAuditEvent } from './auditLogService';
+import {
+  recordRiderEarningsOnDelivery,
+  subscribeToRiderEarnings,
+  getRiderEarningsSummary,
+  calculateRiderEarnings
+} from './earningsService';
 import { toast } from 'sonner';
+
+export {
+  recordRiderEarningsOnDelivery,
+  subscribeToRiderEarnings,
+  getRiderEarningsSummary,
+  calculateRiderEarnings
+};
 
 /**
  * Initializes or fetches a Rider's authoritative profile
@@ -242,39 +255,8 @@ export async function verifyOrderDelivery(params: {
       return transitionResult;
     }
 
-    // Calculate Rider Delivery Earnings (75% of delivery fee, min ₦300)
-    const deliveryFee = Number(order.delivery_fee) || 400;
-    const riderCut = Math.round(deliveryFee * 0.75);
-    const commission = deliveryFee - riderCut;
-
-    const earningId = `EARN_${orderId}_${Date.now()}`;
-    const earningEntry: DeliveryEarning = {
-      delivery_earning_id: earningId,
-      rider_id: rider.uid,
-      order_id: orderId,
-      delivery_fee: deliveryFee,
-      rider_earning: riderCut,
-      platform_commission: commission,
-      status: 'available',
-      created_at: now
-    };
-
-    // Save earning record
-    await setDoc(doc(db, 'rider_earnings', earningId), cleanFirestoreData(earningEntry));
-
-    // Update rider profile stats and available balance
-    const riderRef = doc(db, 'rider_profiles', rider.uid);
-    const riderSnap = await getDoc(riderRef);
-    if (riderSnap.exists()) {
-      const riderData = riderSnap.data() as RiderProfile;
-      await updateDoc(riderRef, {
-        availability_status: 'available',
-        active_order_id: null,
-        completed_deliveries: (riderData.completed_deliveries || 0) + 1,
-        earnings_balance: (riderData.earnings_balance || 0) + riderCut,
-        updated_at: now
-      });
-    }
+    // Automatically calculate and record Rider Delivery Earnings via earningsService
+    const earningResult = await recordRiderEarningsOnDelivery(order, rider);
 
     await logAuditEvent({
       actor_id: rider.uid,
@@ -286,8 +268,8 @@ export async function verifyOrderDelivery(params: {
       new_state: 'delivered',
       metadata: {
         verification_method: method,
-        rider_earning: riderCut,
-        platform_commission: commission
+        rider_earning: earningResult.earning?.rider_earning,
+        platform_commission: earningResult.earning?.platform_commission
       }
     });
 
@@ -298,31 +280,3 @@ export async function verifyOrderDelivery(params: {
   }
 }
 
-/**
- * Subscribes to Rider's earnings ledger
- */
-export function subscribeToRiderEarnings(
-  riderId: string,
-  callback: (earnings: DeliveryEarning[]) => void
-): () => void {
-  if (!riderId) return () => {};
-  const q = query(
-    collection(db, 'rider_earnings'),
-    where('rider_id', '==', riderId),
-    orderBy('created_at', 'desc')
-  );
-
-  return onSnapshot(
-    q,
-    (snapshot) => {
-      const list: DeliveryEarning[] = [];
-      snapshot.forEach((docSnap) => {
-        list.push(docSnap.data() as DeliveryEarning);
-      });
-      callback(list);
-    },
-    (error) => {
-      console.warn('Rider earnings listener warning:', error);
-    }
-  );
-}

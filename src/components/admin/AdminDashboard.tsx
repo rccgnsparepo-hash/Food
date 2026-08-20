@@ -22,7 +22,12 @@ import { BulkDataEntry } from './BulkDataEntry';
 import { VerificationManager } from './VerificationManager';
 import { LiveOrdersMonitor } from './LiveOrdersMonitor';
 import { UserManager } from './UserManager';
+import { FinancialsManager } from './FinancialsManager';
+import { AuditLogsViewer } from './AuditLogsViewer';
+import { CampusMapManager } from './CampusMapManager';
+import { NotificationHub } from './NotificationHub';
 import { triggerHaptic } from '../../utils/haptics';
+import { Bell } from 'lucide-react';
 
 interface AdminDashboardProps {
   onBackToApp?: () => void;
@@ -30,7 +35,7 @@ interface AdminDashboardProps {
 
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToApp }) => {
   const [activeTab, setActiveTab] = useState<
-    'orders' | 'users' | 'universities' | 'zones' | 'vendors' | 'menu' | 'excel' | 'csv' | 'verification'
+    'orders' | 'campus_map' | 'notifications' | 'financials' | 'audit' | 'users' | 'universities' | 'zones' | 'vendors' | 'menu' | 'excel' | 'csv' | 'verification'
   >('orders');
 
   const {
@@ -46,6 +51,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToApp }) =
 
   const tabs = [
     { id: 'orders', label: 'Live Orders Stream', icon: Activity },
+    { id: 'campus_map', label: 'Campus GPS & Zones', icon: MapPin },
+    { id: 'notifications', label: 'Firebase Push & FCM Hub', icon: Bell },
+    { id: 'financials', label: 'Financials & Commissions', icon: Table },
+    { id: 'audit', label: 'Audit Trail', icon: ShieldAlert },
     { id: 'users', label: 'Users & RBAC Roles', icon: Users },
     { id: 'universities', label: 'Universities & Campuses', icon: Building2 },
     { id: 'zones', label: 'Food Zones', icon: MapPin },
@@ -155,6 +164,22 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToApp }) =
           >
             {activeTab === 'orders' && (
               <LiveOrdersMonitor />
+            )}
+
+            {activeTab === 'campus_map' && (
+              <CampusMapManager />
+            )}
+
+            {activeTab === 'notifications' && (
+              <NotificationHub />
+            )}
+
+            {activeTab === 'financials' && (
+              <FinancialsManager />
+            )}
+
+            {activeTab === 'audit' && (
+              <AuditLogsViewer />
             )}
 
             {activeTab === 'users' && (

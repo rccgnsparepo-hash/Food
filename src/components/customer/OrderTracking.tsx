@@ -322,17 +322,28 @@ export const OrderTracking: React.FC<OrderTrackingProps> = ({ orderId, onBack })
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <MapPin className="w-5 h-5 text-emerald-600" />
-              <h3 className="text-sm font-extrabold text-slate-900">Live Campus Delivery Route</h3>
+              <div>
+                <h3 className="text-sm font-extrabold text-slate-900">Live Campus Delivery Navigation</h3>
+                <p className="text-[11px] text-slate-500 font-medium">Real-time courier GPS & campus pathway</p>
+              </div>
             </div>
-            <span className="text-[11px] font-bold text-slate-500">Mountain Top University</span>
+            <span className="text-[11px] font-black px-2.5 py-1 rounded-xl bg-emerald-50 text-emerald-800 border border-emerald-200">
+              MTU Campus
+            </span>
           </div>
 
           <MapPicker
-            latitude={order.latitude || 6.783}
-            longitude={order.longitude || 3.441}
-            riderLat={riderLat}
-            riderLng={riderLng}
-            height="220px"
+            latitude={order.latitude || 6.7638}
+            longitude={order.longitude || 3.3782}
+            riderLat={order.rider_id ? (order.rider_current_latitude || riderLat) : undefined}
+            riderLng={order.rider_id ? (order.rider_current_longitude || riderLng) : undefined}
+            restaurantLat={6.7628}
+            restaurantLng={3.3768}
+            vendorName={order.vendor_name || 'Kitchen Stand'}
+            customerName={order.customer_name || 'Your Drop-off'}
+            orderStatus={order.status}
+            isTrackingMode={true}
+            height="260px"
           />
         </div>
 
