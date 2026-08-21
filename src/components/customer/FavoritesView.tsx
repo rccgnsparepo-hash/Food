@@ -6,6 +6,7 @@ import { db } from '../../lib/firebase';
 import { MenuItem } from '../../types';
 import { useAuthStore } from '../../stores/useAuthStore';
 import { useFavoriteStore } from '../../stores/useFavoriteStore';
+import { useMarketplaceStore } from '../../stores/useMarketplaceStore';
 import { FoodCard } from './FoodCard';
 import { staggerContainer, staggerItem } from '../../utils/motion';
 
@@ -15,28 +16,21 @@ interface FavoritesViewProps {
 
 export const FavoritesView: React.FC<FavoritesViewProps> = ({ onSelectFood }) => {
   const { user } = useAuthStore();
-  const { favorites, fetchFavorites } = useFavoriteStore();
+  const favorites = useFavoriteStore((state) => state.favorites);
+  const fetchFavorites = useFavoriteStore((state) => state.fetchFavorites);
+  const { menuItems } = useMarketplaceStore();
   const [favoriteItems, setFavoriteItems] = useState<MenuItem[]>([]);
 
   useEffect(() => {
     if (user?.uid) {
       fetchFavorites(user.uid);
     }
-  }, [user?.uid]);
+  }, [user?.uid, fetchFavorites]);
 
   useEffect(() => {
-    const unsub = onSnapshot(collection(db, 'menu_items'), (snap) => {
-      const list: MenuItem[] = [];
-      snap.forEach((doc) => {
-        if (favorites.has(doc.id)) {
-          list.push({ id: doc.id, ...doc.data() } as MenuItem);
-        }
-      });
-      setFavoriteItems(list);
-    });
-
-    return () => unsub();
-  }, [favorites]);
+    const list = menuItems.filter((item) => favorites.has(item.id));
+    setFavoriteItems(list);
+  }, [favorites, menuItems]);
 
   return (
     <motion.div

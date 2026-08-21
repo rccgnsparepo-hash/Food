@@ -29,3 +29,26 @@ try {
 }
 
 export { app, auth, db, storage };
+
+/**
+ * Recursively removes all `undefined` properties from an object/array
+ * so that Firestore setDoc, addDoc, and updateDoc operations will never crash.
+ */
+export function cleanFirestoreData<T>(obj: T): T {
+  if (obj === null || obj === undefined) {
+    return null as any;
+  }
+  if (Array.isArray(obj)) {
+    return obj.map((item) => cleanFirestoreData(item)) as any;
+  }
+  if (typeof obj === 'object' && !(obj instanceof Date)) {
+    const cleaned: Record<string, any> = {};
+    for (const [key, value] of Object.entries(obj)) {
+      if (value !== undefined) {
+        cleaned[key] = cleanFirestoreData(value);
+      }
+    }
+    return cleaned as any;
+  }
+  return obj;
+}

@@ -106,7 +106,7 @@ export const KitchenDashboard: React.FC = () => {
       setPrepTime(currentVendor.estimated_delivery_time || '15-25 min');
       if (currentVendor.workers) setWorkers(currentVendor.workers);
     }
-  }, [currentVendor]);
+  }, [currentVendor?.id]);
 
   // Real-time Orders Listener for this Vendor
   useEffect(() => {

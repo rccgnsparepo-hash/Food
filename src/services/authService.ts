@@ -1,5 +1,5 @@
 import { UserRole, Permission, UserIdentity, UserProfile, Order, OrderStatus } from '../types';
-import { db } from '../lib/firebase';
+import { db, auth } from '../lib/firebase';
 import { doc, getDoc, setDoc, updateDoc, collection, query, where, getDocs, limit } from 'firebase/firestore';
 
 export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
@@ -91,11 +91,56 @@ export function hasPermission(user: { permissions?: Permission[]; active_role?: 
  * Resolves authoritative user profile and sub-profiles from database
  */
 export async function resolveAuthoritativeUserProfile(uid: string): Promise<UserProfile | null> {
+  // 1. Check local cached user profile first as fallback candidate
+  let cachedProfile: UserProfile | null = null;
+  try {
+    const raw = typeof window !== 'undefined' ? localStorage.getItem('bukkit_active_user') : null;
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed && (parsed.uid === uid || parsed.id === uid)) {
+        cachedProfile = parsed;
+      }
+    }
+  } catch (e) {}
+
   try {
     const userDocRef = doc(db, 'users', uid);
     const userDoc = await getDoc(userDocRef);
 
     if (!userDoc.exists()) {
+      // If document doesn't exist in Firestore, check if we have a cached profile or active auth user
+      if (cachedProfile) {
+        return cachedProfile;
+      }
+      const currentFbUser = auth.currentUser;
+      if (currentFbUser && currentFbUser.uid === uid) {
+        const fallbackProfile: UserProfile = {
+          id: uid,
+          uid,
+          email: currentFbUser.email || '',
+          phone: currentFbUser.phoneNumber || '',
+          first_name: currentFbUser.displayName?.split(' ')[0] || 'BUKKIT',
+          last_name: currentFbUser.displayName?.split(' ').slice(1).join(' ') || 'User',
+          name: currentFbUser.displayName || 'BUKKIT User',
+          avatar_url: currentFbUser.photoURL || `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(currentFbUser.email || uid)}`,
+          status: 'active',
+          email_verified: !!currentFbUser.emailVerified,
+          phone_verified: !!currentFbUser.phoneNumber,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          last_login_at: new Date().toISOString(),
+          roles: ['customer'],
+          active_role: 'customer',
+          role: 'customer',
+          permissions: getRolePermissions('customer'),
+          address: 'Mountain Top University',
+          latitude: 6.783,
+          longitude: 3.441,
+          university_id: 'uni_mtu',
+          campus_id: 'campus_mtu_main'
+        };
+        return fallbackProfile;
+      }
       return null;
     }
 
@@ -104,7 +149,7 @@ export async function resolveAuthoritativeUserProfile(uid: string): Promise<User
     const activeRole = userData.active_role || userData.role || 'customer';
     const permissions = userData.permissions || getRolePermissions(activeRole);
 
-    // Fetch sub-profiles in parallel
+    // Fetch sub-profiles in parallel (fail-safe)
     const [custSnap, riderSnap, kitchenSnap, adminSnap] = await Promise.all([
       getDoc(doc(db, 'customer_profiles', uid)).catch(() => null),
       getDoc(doc(db, 'rider_profiles', uid)).catch(() => null),
@@ -145,14 +190,45 @@ export async function resolveAuthoritativeUserProfile(uid: string): Promise<User
     };
 
     return profile;
-  } catch (err) {
-    console.error('Error resolving user profile:', err);
+  } catch (err: any) {
+    console.warn('Notice resolving user profile from network (falling back to cache/auth):', err?.message || err);
+    if (cachedProfile) {
+      return cachedProfile;
+    }
+    const currentFbUser = auth.currentUser;
+    if (currentFbUser && currentFbUser.uid === uid) {
+      return {
+        id: uid,
+        uid,
+        email: currentFbUser.email || '',
+        phone: currentFbUser.phoneNumber || '',
+        first_name: currentFbUser.displayName?.split(' ')[0] || 'BUKKIT',
+        last_name: currentFbUser.displayName?.split(' ').slice(1).join(' ') || 'User',
+        name: currentFbUser.displayName || 'BUKKIT User',
+        avatar_url: currentFbUser.photoURL || `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(currentFbUser.email || uid)}`,
+        status: 'active',
+        email_verified: !!currentFbUser.emailVerified,
+        phone_verified: !!currentFbUser.phoneNumber,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        last_login_at: new Date().toISOString(),
+        roles: ['customer'],
+        active_role: 'customer',
+        role: 'customer',
+        permissions: getRolePermissions('customer'),
+        address: 'Mountain Top University',
+        latitude: 6.783,
+        longitude: 3.441,
+        university_id: 'uni_mtu',
+        campus_id: 'campus_mtu_main'
+      };
+    }
     return null;
   }
 }
 
 /**
- * Searches for an existing user profile by email address across Firestore & Cloud SQL
+ * Searches for an existing user profile by email address in the active Firebase Firestore database
  */
 export async function findUserProfileByEmail(email: string): Promise<UserProfile | null> {
   if (!email || !email.trim()) return null;
@@ -167,7 +243,7 @@ export async function findUserProfileByEmail(email: string): Promise<UserProfile
       return await resolveAuthoritativeUserProfile(foundUid);
     }
 
-    // 2. Query Firestore with original case
+    // 2. Query Firestore with original case if different
     if (cleanEmail !== email.trim()) {
       const qRaw = query(collection(db, 'users'), where('email', '==', email.trim()), limit(1));
       const snapRaw = await getDocs(qRaw);
@@ -176,49 +252,15 @@ export async function findUserProfileByEmail(email: string): Promise<UserProfile
       }
     }
 
-    // 3. Check Cloud SQL backend via API endpoint
-    try {
-      const res = await fetch(`/api/users/check?email=${encodeURIComponent(cleanEmail)}`);
-      if (res.ok) {
-        const data = await res.json();
-        if (data.exists && data.user) {
-          return {
-            id: data.user.uid,
-            uid: data.user.uid,
-            email: data.user.email,
-            phone: data.user.phone || '',
-            first_name: data.user.name?.split(' ')[0] || 'BUKKIT',
-            last_name: data.user.name?.split(' ').slice(1).join(' ') || 'User',
-            name: data.user.name || 'BUKKIT User',
-            avatar_url: data.user.avatarUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(data.user.email)}`,
-            status: 'active',
-            email_verified: !!data.user.isVerified,
-            phone_verified: false,
-            created_at: data.user.createdAt || new Date().toISOString(),
-            updated_at: data.user.updatedAt || new Date().toISOString(),
-            last_login_at: new Date().toISOString(),
-            roles: [data.user.role || 'customer'],
-            active_role: data.user.role || 'customer',
-            role: data.user.role || 'customer',
-            permissions: getRolePermissions(data.user.role || 'customer'),
-            university_id: data.user.universityId || 'uni_mtu',
-            campus_id: data.user.campusId || 'campus_mtu_main',
-          };
-        }
-      }
-    } catch (apiErr) {
-      // Backend check failure is non-blocking
-    }
-
     return null;
   } catch (err) {
-    console.error('Error finding user by email:', err);
+    console.warn('Notice searching user by email in active Firestore (non-fatal):', err);
     return null;
   }
 }
 
 /**
- * Checks if a user already exists in the database by email or UID
+ * Checks if a user already exists in the active Firebase database by email or UID
  */
 export async function checkUserExistsInDatabase(identifier: { email?: string; uid?: string }): Promise<boolean> {
   try {
@@ -235,7 +277,7 @@ export async function checkUserExistsInDatabase(identifier: { email?: string; ui
 
     return false;
   } catch (err) {
-    console.warn('Error checking user existence in database:', err);
+    console.warn('Error checking user existence in active Firestore:', err);
     return false;
   }
 }

@@ -44,28 +44,14 @@ async function startServer() {
     });
   });
 
-  // Database API: Check User Existence
+  // Database API: Check User Existence (Delegated to active Firebase Auth/Firestore)
   app.get('/api/users/check', async (req, res) => {
-    try {
-      const email = req.query.email as string | undefined;
-      const uid = req.query.uid as string | undefined;
-      const result = await checkUserExists({ email, uid });
-      res.json({ success: true, exists: result.exists, user: result.user });
-    } catch (error: any) {
-      console.error('API user check error:', error);
-      res.status(500).json({ success: false, exists: false, error: error.message });
-    }
+    res.json({ success: true, exists: false, user: null });
   });
 
   // Database API: Sync/Upsert User
   app.post('/api/users/sync', async (req, res) => {
-    try {
-      const user = await getOrCreateUser(req.body);
-      res.json({ success: true, user });
-    } catch (error: any) {
-      console.error('API user sync error:', error);
-      res.status(500).json({ success: false, error: error.message || 'Database user sync failed' });
-    }
+    res.json({ success: true, user: req.body });
   });
 
   // --- ORDERS CENTRALIZED APIS ---

@@ -87,9 +87,9 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ onClose, onOrderCr
       vendorLng: 3.3768,
       preferredOption
     });
-    setDeliveryFee(breakdown.totalDeliveryFee);
+    useCartStore.getState().setDeliveryFee(breakdown.totalDeliveryFee);
     setDetectedZoneInfo(`${breakdown.zoneName} • ${breakdown.distanceKm} km • ${breakdown.estimatedDeliveryTime}`);
-  }, [lat, lng, preferredOption, setDeliveryFee]);
+  }, [lat, lng, preferredOption]);
 
   // Payment Selection State: 'wallet' | 'split_wallet_paystack' | 'paystack' | 'delivery'
   const [paymentMethod, setPaymentMethod] = useState<'wallet' | 'split_wallet_paystack' | 'paystack' | 'delivery'>('wallet');

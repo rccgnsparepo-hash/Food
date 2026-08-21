@@ -47,17 +47,22 @@ export const AuthModal: React.FC<AuthModalProps> = ({ initialMode = 'login', onC
     resendVerificationEmail,
     reloadUser,
     isEmailVerified,
+    authStatus: globalAuthStatus,
     user
   } = useAuthStore();
 
   const { universities, campuses } = useMarketplaceStore();
 
   const [mode, setMode] = useState<'login' | 'register' | 'forgot_password' | 'verify_email'>(
-    !isEmailVerified && user?.uid && !user.uid.startsWith('guest_') ? 'verify_email' : initialMode
+    globalAuthStatus === 'email-verification-required' || (!isEmailVerified && user?.uid && !user.uid.startsWith('guest_'))
+      ? 'verify_email'
+      : initialMode
   );
 
   const [selectedRole, setSelectedRole] = useState<UserRole>('customer');
-  const [authStatus, setAuthStatus] = useState<AuthStatus>('idle');
+  const [authStatus, setAuthStatus] = useState<AuthStatus>(
+    globalAuthStatus === 'email-verification-required' ? 'email-verification-required' : 'idle'
+  );
   const [loadingText, setLoadingText] = useState('Processing...');
 
   // Form input states
@@ -76,6 +81,15 @@ export const AuthModal: React.FC<AuthModalProps> = ({ initialMode = 'login', onC
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+
+  // Reactive synchronization with global auth store
+  React.useEffect(() => {
+    if (globalAuthStatus === 'email-verification-required' || (!isEmailVerified && user?.uid && !user.uid.startsWith('guest_'))) {
+      setMode('verify_email');
+      setAuthStatus('email-verification-required');
+      setLoadingText('Processing...');
+    }
+  }, [globalAuthStatus, isEmailVerified, user?.uid]);
 
   const availableCampuses = campuses.filter(c => c.university_id === universityId);
 
@@ -221,10 +235,19 @@ export const AuthModal: React.FC<AuthModalProps> = ({ initialMode = 'login', onC
         onClose();
       }, 600);
     } catch (err: any) {
-      setAuthStatus('error');
-      const humanError = translateFirebaseAuthError(err);
-      setErrorMsg(humanError);
-      toast.error(humanError);
+      const isUnverified = err?.message?.toLowerCase().includes('not verified') || err?.code === 'auth/email-not-verified';
+      if (isUnverified) {
+        setAuthStatus('email-verification-required');
+        setMode('verify_email');
+        const msg = 'Your email is not verified yet. Please check your email inbox and click the verification link.';
+        setErrorMsg(msg);
+        toast.warning(msg);
+      } else {
+        setAuthStatus('error');
+        const humanError = translateFirebaseAuthError(err);
+        setErrorMsg(humanError);
+        toast.error(humanError);
+      }
     }
   };
 

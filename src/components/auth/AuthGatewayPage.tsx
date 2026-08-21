@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   Mail,
@@ -25,7 +25,9 @@ import {
   HelpCircle,
   Compass,
   MessageCircle,
-  Globe
+  Globe,
+  LogIn,
+  Check
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuthStore } from '../../stores/useAuthStore';
@@ -45,14 +47,22 @@ export const AuthGatewayPage: React.FC = () => {
     resetPassword,
     resendVerificationEmail,
     reloadUser,
+    isEmailVerified,
+    authStatus: globalAuthStatus,
     user
   } = useAuthStore();
 
   const { universities, campuses } = useMarketplaceStore();
 
   const [selectedRole, setSelectedRole] = useState<UserRole>('customer');
-  const [mode, setMode] = useState<'login' | 'register' | 'forgot_password' | 'verify_email'>('login');
-  const [authStatus, setAuthStatus] = useState<AuthStatus>('idle');
+  const [mode, setMode] = useState<'login' | 'register' | 'forgot_password' | 'verify_email'>(
+    globalAuthStatus === 'email-verification-required' || (!isEmailVerified && user?.uid && !user.uid.startsWith('guest_'))
+      ? 'verify_email'
+      : 'login'
+  );
+  const [authStatus, setAuthStatus] = useState<AuthStatus>(
+    globalAuthStatus === 'email-verification-required' ? 'email-verification-required' : 'idle'
+  );
 
   // Form input states
   const [email, setEmail] = useState('');
@@ -71,6 +81,18 @@ export const AuthGatewayPage: React.FC = () => {
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [loadingText, setLoadingText] = useState('Processing...');
+
+  // Track manual mode changes so the user isn't stuck on verify_email
+  const [hasManuallySwitched, setHasManuallySwitched] = useState(false);
+
+  // Reactive synchronization with global auth store
+  useEffect(() => {
+    if (!hasManuallySwitched && (globalAuthStatus === 'email-verification-required' || (!isEmailVerified && user?.uid && !user.uid.startsWith('guest_')))) {
+      setMode('verify_email');
+      setAuthStatus('email-verification-required');
+      setLoadingText('Processing...');
+    }
+  }, [globalAuthStatus, isEmailVerified, user?.uid, hasManuallySwitched]);
 
   const availableCampuses = campuses.filter(c => c.university_id === universityId);
 
@@ -212,10 +234,19 @@ export const AuthGatewayPage: React.FC = () => {
       setSuccessMsg(`Login successful! Welcome back to BUKKIT.`);
       toast.success('✓ Login successful! Welcome back.');
     } catch (err: any) {
-      setAuthStatus('error');
-      const humanError = translateFirebaseAuthError(err);
-      setErrorMsg(humanError);
-      toast.error(humanError);
+      const isUnverified = err?.message?.toLowerCase().includes('not verified') || err?.code === 'auth/email-not-verified';
+      if (isUnverified) {
+        setAuthStatus('email-verification-required');
+        setMode('verify_email');
+        const msg = 'Your email address is not verified yet. Please check your email inbox and click the verification link.';
+        setErrorMsg(msg);
+        toast.warning(msg);
+      } else {
+        setAuthStatus('error');
+        const humanError = translateFirebaseAuthError(err);
+        setErrorMsg(humanError);
+        toast.error(humanError);
+      }
     }
   };
 

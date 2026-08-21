@@ -10,7 +10,8 @@ export function translateFirebaseAuthError(err: any): string {
   // Check code mappings
   switch (code) {
     case 'auth/invalid-credential':
-      return 'Invalid email or password. Please check your details and try again.';
+    case 'auth/invalid-login-credentials':
+      return 'Invalid email or password. Please verify your credentials and try again.';
     case 'auth/user-not-found':
       return 'No BUKKIT account was found with this email address.';
     case 'auth/wrong-password':
@@ -36,7 +37,7 @@ export function translateFirebaseAuthError(err: any): string {
     case 'auth/popup-blocked':
       return 'Google sign-in popup was blocked. Please enable popups and try again.';
     case 'auth/operation-not-allowed':
-      return 'Email/Password authentication is disabled in your Firebase console. We have authenticated your session locally so you can continue testing.';
+      return 'Email/Password sign-in is not enabled in your Firebase project. Please enable Email/Password in the Firebase Authentication Console or sign in with Google.';
     case 'auth/requires-recent-login':
       return 'This operation is sensitive. Please re-authenticate before continuing.';
     default:

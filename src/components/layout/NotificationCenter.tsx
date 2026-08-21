@@ -16,7 +16,7 @@ import {
   Play
 } from 'lucide-react';
 import { NotificationRecord } from '../../types';
-import { useRealtimeNotifications } from '../../services/notificationService';
+import { useNotificationStore } from '../../services/notificationService';
 import { triggerHaptic } from '../../utils/haptics';
 
 interface NotificationCenterProps {
@@ -31,7 +31,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
   onNavigateToDeepLink
 }) => {
   const { notifications, unreadCount, isLoading, markAsRead, markAllAsRead, refetch } =
-    useRealtimeNotifications(onNavigateToDeepLink);
+    useNotificationStore();
 
   const [activeFilter, setActiveFilter] = useState<'all' | 'orders' | 'wallet' | 'admin'>('all');
   const [soundEnabled, setSoundEnabled] = useState<boolean>(true);

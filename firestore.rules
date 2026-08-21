@@ -22,7 +22,17 @@ service cloud.firestore {
       allow write: if isAuthenticated() || true;
     }
 
+    match /campus_locations/{locationId} {
+      allow read: if true;
+      allow write: if isAuthenticated() || true;
+    }
+
     match /food_zones/{zoneId} {
+      allow read: if true;
+      allow write: if isAuthenticated() || true;
+    }
+
+    match /delivery_zones/{zoneId} {
       allow read: if true;
       allow write: if isAuthenticated() || true;
     }

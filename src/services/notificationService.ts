@@ -1,30 +1,25 @@
-import { useState, useEffect, useRef } from 'react';
+import { create } from 'zustand';
 import {
   collection,
   query,
   where,
   onSnapshot,
-  orderBy,
   doc,
-  updateDoc,
-  setDoc
+  updateDoc
 } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import {
   NotificationRecord,
   NotificationPlatform,
   NotificationAppType,
-  OrderEventType,
-  WalletEventType,
-  UserNotificationPreferences
+  OrderEventType
 } from '../types';
-import { useAuthStore } from '../stores/useAuthStore';
-import { requestFCMToken, setupForegroundFCMListener } from '../lib/fcm';
+import { requestFCMToken } from '../lib/fcm';
 import { triggerHaptic } from '../utils/haptics';
 import { toast } from 'sonner';
 
 /**
- * Clean Web Audio synthesis for campus order notification chime (no external mp3 dependency required)
+ * Web Audio synthesis for campus order notification chime (no external audio file required)
  */
 export function playNotificationChime(severity: 'info' | 'warning' | 'critical' = 'info') {
   try {
@@ -37,23 +32,22 @@ export function playNotificationChime(severity: 'info' | 'warning' | 'critical' 
     const gain = ctx.createGain();
 
     osc.type = severity === 'critical' ? 'sawtooth' : 'sine';
-    
+
     if (severity === 'critical') {
-      osc.frequency.setValueAtTime(880, now); // A5
-      osc.frequency.setValueAtTime(659, now + 0.1); // E5
-      osc.frequency.setValueAtTime(880, now + 0.2); // A5
+      osc.frequency.setValueAtTime(880, now);
+      osc.frequency.setValueAtTime(659, now + 0.1);
+      osc.frequency.setValueAtTime(880, now + 0.2);
       gain.gain.setValueAtTime(0.3, now);
       gain.gain.exponentialRampToValueAtTime(0.001, now + 0.45);
     } else if (severity === 'warning') {
-      osc.frequency.setValueAtTime(587.33, now); // D5
-      osc.frequency.setValueAtTime(880, now + 0.12); // A5
+      osc.frequency.setValueAtTime(587.33, now);
+      osc.frequency.setValueAtTime(880, now + 0.12);
       gain.gain.setValueAtTime(0.2, now);
       gain.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
     } else {
-      // Gentle cheerful 2-tone chime
-      osc.frequency.setValueAtTime(523.25, now); // C5
-      osc.frequency.setValueAtTime(659.25, now + 0.08); // E5
-      osc.frequency.setValueAtTime(783.99, now + 0.16); // G5
+      osc.frequency.setValueAtTime(523.25, now);
+      osc.frequency.setValueAtTime(659.25, now + 0.08);
+      osc.frequency.setValueAtTime(783.99, now + 0.16);
       gain.gain.setValueAtTime(0.15, now);
       gain.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
     }
@@ -64,8 +58,16 @@ export function playNotificationChime(severity: 'info' | 'warning' | 'critical' 
     osc.start(now);
     osc.stop(now + 0.5);
   } catch (err) {
-    // AudioContext autoplay restrictions or unsupported
+    // Autoplay policy or unsupported audio context
   }
+}
+
+/**
+ * Global deep link navigator callback registry
+ */
+let globalDeepLinkHandler: ((link: string) => void) | null = null;
+export function setGlobalDeepLinkHandler(handler: (link: string) => void) {
+  globalDeepLinkHandler = handler;
 }
 
 /**
@@ -102,137 +104,156 @@ export async function syncDeviceTokenWithBackend(
   }
 }
 
-/**
- * Centralized Hook for real-time notifications, badge count, and audio alerts
- */
-export function useRealtimeNotifications(onNavigateToDeepLink?: (link: string) => void) {
-  const { user, role } = useAuthStore();
-  const [notifications, setNotifications] = useState<NotificationRecord[]>([]);
-  const [unreadCount, setUnreadCount] = useState<number>(0);
-  const [isLoading, setIsLoading] = useState<boolean>(true);
-  const seenNotificationIdsRef = useRef<Set<string>>(new Set());
-  const initialLoadDoneRef = useRef<boolean>(false);
+interface NotificationStoreState {
+  notifications: NotificationRecord[];
+  unreadCount: number;
+  isLoading: boolean;
+  activeUserId: string | null;
 
-  // App type mapping from role
-  const appType: NotificationAppType =
-    role === 'rider'
-      ? 'RIDER'
-      : role === 'kitchen' || role === 'kitchen_manager' || role === 'kitchen_staff'
-      ? 'VENDOR'
-      : role === 'admin' || role === 'super_admin'
-      ? 'ADMIN'
-      : 'CUSTOMER';
+  initNotifications: (userId: string | undefined, appType: NotificationAppType) => () => void;
+  markAsRead: (notificationId: string) => Promise<void>;
+  markAllAsRead: () => Promise<void>;
+  refetch: () => Promise<void>;
+}
 
-  // 1. Register Token and Device with Backend on Login
-  useEffect(() => {
-    if (!user?.uid) return;
+const seenNotificationIds = new Set<string>();
+let isInitialLoadDone = false;
+let currentActiveUserId: string | null = null;
+let activeFirestoreUnsubscribe: (() => void) | null = null;
 
-    requestFCMToken(user.uid).then((token) => {
-      if (token) {
-        syncDeviceTokenWithBackend(user.uid, token, appType);
+export const useNotificationStore = create<NotificationStoreState>((set, get) => ({
+  notifications: [],
+  unreadCount: 0,
+  isLoading: false,
+  activeUserId: null,
+
+  initNotifications: (userId, appType) => {
+    if (!userId) {
+      if (activeFirestoreUnsubscribe) {
+        activeFirestoreUnsubscribe();
+        activeFirestoreUnsubscribe = null;
       }
-    });
-  }, [user?.uid, appType]);
-
-  // 2. Fetch User Notifications from Backend & Firestore listener
-  useEffect(() => {
-    if (!user?.uid) {
-      setNotifications([]);
-      setUnreadCount(0);
-      setIsLoading(false);
-      return;
+      currentActiveUserId = null;
+      set({ notifications: [], unreadCount: 0, isLoading: false, activeUserId: null });
+      return () => {};
     }
 
-    // Initial fetch from backend API
-    fetch(`/api/notifications/user/${user.uid}`)
+    if (currentActiveUserId === userId) {
+      // Already subscribed to this user session
+      return () => {};
+    }
+
+    if (activeFirestoreUnsubscribe) {
+      activeFirestoreUnsubscribe();
+      activeFirestoreUnsubscribe = null;
+    }
+
+    currentActiveUserId = userId;
+    set({ isLoading: true, activeUserId: userId });
+
+    // 1. Sync FCM token with backend
+    requestFCMToken(userId).then((token) => {
+      if (token) {
+        syncDeviceTokenWithBackend(userId, token, appType);
+      }
+    });
+
+    // 2. Fetch initial notification history from server API
+    fetch(`/api/notifications/user/${userId}`)
       .then((res) => res.json())
       .then((data) => {
         if (data.success && Array.isArray(data.notifications)) {
-          setNotifications(data.notifications);
-          const unread = data.notifications.filter((n: NotificationRecord) => !n.read_at).length;
-          setUnreadCount(unread);
-          for (const n of data.notifications) {
-            seenNotificationIdsRef.current.add(n.notification_id);
+          const list: NotificationRecord[] = data.notifications;
+          const unread = list.filter((n) => !n.read_at && n.status !== 'read').length;
+          for (const n of list) {
+            seenNotificationIds.add(n.notification_id);
           }
+          set({ notifications: list, unreadCount: unread, isLoading: false });
+        } else {
+          set({ isLoading: false });
         }
-        setIsLoading(false);
-        initialLoadDoneRef.current = true;
+        isInitialLoadDone = true;
       })
       .catch(() => {
-        setIsLoading(false);
-        initialLoadDoneRef.current = true;
+        set({ isLoading: false });
+        isInitialLoadDone = true;
       });
 
-    // Also listen to Firestore real-time collection for immediate live synchronization
-    const q = query(
-      collection(db, 'notifications'),
-      where('recipient_user_id', 'in', [user.uid, 'broadcast_riders', 'admin_broadcast_channel'])
-    );
+    // 3. Setup live Firestore subscription
+    try {
+      const q = query(
+        collection(db, 'notifications'),
+        where('recipient_user_id', 'in', [userId, 'broadcast_riders', 'admin_broadcast_channel'])
+      );
 
-    const unsubscribe = onSnapshot(
-      q,
-      (snapshot) => {
-        snapshot.docChanges().forEach((change) => {
-          const item = { notification_id: change.doc.id, ...change.doc.data() } as NotificationRecord;
+      activeFirestoreUnsubscribe = onSnapshot(
+        q,
+        (snapshot) => {
+          snapshot.docChanges().forEach((change) => {
+            const item = { notification_id: change.doc.id, ...change.doc.data() } as NotificationRecord;
 
-          if (change.type === 'added' || change.type === 'modified') {
-            setNotifications((prev) => {
-              const filtered = prev.filter((n) => n.notification_id !== item.notification_id);
-              return [item, ...filtered].sort(
-                (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-              );
-            });
+            if (change.type === 'added' || change.type === 'modified') {
+              set((state) => {
+                const filtered = state.notifications.filter((n) => n.notification_id !== item.notification_id);
+                const updatedList = [item, ...filtered].sort(
+                  (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+                );
+                const unread = updatedList.filter((n) => !n.read_at && n.status !== 'read').length;
+                return { notifications: updatedList, unreadCount: unread };
+              });
 
-            // If new live notification arrived during active session
-            if (initialLoadDoneRef.current && !seenNotificationIdsRef.current.has(item.notification_id)) {
-              seenNotificationIdsRef.current.add(item.notification_id);
+              // If a new live notification arrives during active user session
+              if (isInitialLoadDone && !seenNotificationIds.has(item.notification_id)) {
+                seenNotificationIds.add(item.notification_id);
 
-              // Sound & Haptics
-              playNotificationChime(
-                item.severity === 'CRITICAL' ? 'critical' : item.severity === 'WARNING' ? 'warning' : 'info'
-              );
-              triggerHaptic(item.severity === 'CRITICAL' ? [150, 50, 150] : 60);
+                playNotificationChime(
+                  item.severity === 'CRITICAL' ? 'critical' : item.severity === 'WARNING' ? 'warning' : 'info'
+                );
+                triggerHaptic(item.severity === 'CRITICAL' ? [150, 50, 150] : 60);
 
-              // In-app interactive Toast
-              toast.info(`🔔 ${item.title}`, {
-                description: item.body,
-                duration: 6000,
-                action: item.deep_link
-                  ? {
-                      label: 'View',
-                      onClick: () => {
-                        if (onNavigateToDeepLink) {
-                          onNavigateToDeepLink(item.deep_link);
+                toast.info(`🔔 ${item.title}`, {
+                  description: item.body,
+                  duration: 6000,
+                  action: item.deep_link
+                    ? {
+                        label: 'View',
+                        onClick: () => {
+                          if (globalDeepLinkHandler && item.deep_link) {
+                            globalDeepLinkHandler(item.deep_link);
+                          }
                         }
                       }
-                    }
-                  : undefined
-              });
+                    : undefined
+                });
+              }
             }
-          }
-        });
-      },
-      (err) => {
-        console.warn('[Notification Service] Firestore subscription fallback active:', err);
-      }
-    );
+          });
+        },
+        (err) => {
+          console.warn('[Notification Service] Firestore subscription fallback:', err);
+        }
+      );
+    } catch (err) {
+      console.warn('[Notification Service] Query initialization notice:', err);
+    }
 
     return () => {
-      unsubscribe();
+      if (activeFirestoreUnsubscribe) {
+        activeFirestoreUnsubscribe();
+        activeFirestoreUnsubscribe = null;
+      }
+      currentActiveUserId = null;
     };
-  }, [user?.uid, onNavigateToDeepLink]);
+  },
 
-  // Recalculate unread count whenever notifications list changes
-  useEffect(() => {
-    const unread = notifications.filter((n) => !n.read_at && n.status !== 'read').length;
-    setUnreadCount(unread);
-  }, [notifications]);
-
-  // Mark single as read
-  const markAsRead = async (notificationId: string) => {
-    setNotifications((prev) =>
-      prev.map((n) => (n.notification_id === notificationId ? { ...n, read_at: new Date().toISOString(), status: 'read' } : n))
-    );
+  markAsRead: async (notificationId: string) => {
+    set((state) => {
+      const updatedList = state.notifications.map((n) =>
+        n.notification_id === notificationId ? { ...n, read_at: new Date().toISOString(), status: 'read' as const } : n
+      );
+      const unread = updatedList.filter((n) => !n.read_at && n.status !== 'read').length;
+      return { notifications: updatedList, unreadCount: unread };
+    });
 
     try {
       await fetch(`/api/notifications/${notificationId}/read`, { method: 'PATCH' });
@@ -241,41 +262,41 @@ export function useRealtimeNotifications(onNavigateToDeepLink?: (link: string) =
         read_at: new Date().toISOString()
       }).catch(() => {});
     } catch (e) {}
-  };
+  },
 
-  // Mark all as read
-  const markAllAsRead = async () => {
+  markAllAsRead: async () => {
+    const activeUid = get().activeUserId;
     const now = new Date().toISOString();
-    setNotifications((prev) => prev.map((n) => ({ ...n, read_at: now, status: 'read' })));
-    setUnreadCount(0);
 
-    if (!user?.uid) return;
+    set((state) => ({
+      notifications: state.notifications.map((n) => ({ ...n, read_at: now, status: 'read' as const })),
+      unreadCount: 0
+    }));
+
+    if (!activeUid) return;
     try {
       await fetch('/api/notifications/read-all', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: user.uid })
+        body: JSON.stringify({ userId: activeUid })
       });
     } catch (e) {}
-  };
+  },
 
-  return {
-    notifications,
-    unreadCount,
-    isLoading,
-    markAsRead,
-    markAllAsRead,
-    refetch: () => {
-      if (user?.uid) {
-        fetch(`/api/notifications/user/${user.uid}`)
-          .then((r) => r.json())
-          .then((d) => {
-            if (d.success) setNotifications(d.notifications);
-          });
+  refetch: async () => {
+    const activeUid = get().activeUserId;
+    if (!activeUid) return;
+    try {
+      const res = await fetch(`/api/notifications/user/${activeUid}`);
+      const data = await res.json();
+      if (data.success && Array.isArray(data.notifications)) {
+        const list: NotificationRecord[] = data.notifications;
+        const unread = list.filter((n) => !n.read_at && n.status !== 'read').length;
+        set({ notifications: list, unreadCount: unread });
       }
-    }
-  };
-}
+    } catch (e) {}
+  }
+}));
 
 /**
  * Dispatch Authoritative Order Event to Centralized Backend Pipeline
@@ -305,7 +326,23 @@ export async function emitAuthoritativeOrderEvent(params: {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(params)
     });
-    return await response.json();
+    const result = await response.json();
+
+    // Sync generated notifications to Firestore for multi-device live listener
+    if (result.success && Array.isArray(result.dispatchedNotifications)) {
+      for (const notif of result.dispatchedNotifications) {
+        try {
+          await updateDoc(doc(db, 'notifications', notif.notification_id), notif).catch(async () => {
+            const { setDoc } = await import('firebase/firestore');
+            await setDoc(doc(db, 'notifications', notif.notification_id), notif);
+          });
+        } catch (fErr) {
+          // Non-blocking Firestore sync
+        }
+      }
+    }
+
+    return result;
   } catch (err) {
     console.warn('[Notification Service] Order event emission notice:', err);
     return { success: false };

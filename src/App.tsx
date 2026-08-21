@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useAuthStore } from './stores/useAuthStore';
 import { useCartStore } from './stores/useCartStore';
 import { useMarketplaceStore } from './stores/useMarketplaceStore';
@@ -31,12 +31,17 @@ import { User, LogOut, Phone, MapPin, Shield, KeyRound, MailWarning, Bell, Check
 import { requestFCMToken, setupForegroundFCMListener } from './lib/fcm';
 import { NetworkStatusBanner } from './components/common/NetworkStatusBanner';
 import { NotificationCenter } from './components/layout/NotificationCenter';
-import { useRealtimeNotifications } from './services/notificationService';
+import { useNotificationStore, setGlobalDeepLinkHandler } from './services/notificationService';
+import { useOrderNotificationListener } from './services/orderNotificationService';
 
 export default function App() {
   const { initAuth, user, role, setRole, logout, isInitLoading, isEmailVerified } = useAuthStore();
   const { isOpen: isCartOpen, setCartOpen } = useCartStore();
   const { initMarketplace } = useMarketplaceStore();
+  const unreadCount = useNotificationStore((state) => state.unreadCount);
+
+  // Real-time Push & Order Notification listener
+  useOrderNotificationListener();
 
   const [activeView, setActiveView] = useState<string>('home');
   const [targetVendorId, setTargetVendorId] = useState<string | undefined>(undefined);
@@ -49,7 +54,7 @@ export default function App() {
   const [showNotificationCenter, setShowNotificationCenter] = useState<boolean>(false);
 
   // Deep Link Navigator for Push Notifications and In-App Drawer clicks
-  const handleNavigateToDeepLink = (link: string) => {
+  const handleNavigateToDeepLink = useCallback((link: string) => {
     if (!link) return;
     if (link.includes('/orders/')) {
       const parts = link.split('/orders/');
@@ -69,10 +74,30 @@ export default function App() {
     } else if (link.includes('/profile')) {
       setActiveView('profile');
     }
-  };
+  }, []);
 
-  // Centralized Real-time Notifications Hook
-  const { unreadCount, refetch } = useRealtimeNotifications(handleNavigateToDeepLink);
+  // Register deep link handler
+  useEffect(() => {
+    setGlobalDeepLinkHandler(handleNavigateToDeepLink);
+  }, [handleNavigateToDeepLink]);
+
+  // Subscribe user to real-time notification pipeline
+  useEffect(() => {
+    if (!user?.uid) return;
+    const appType =
+      role === 'rider'
+        ? 'RIDER'
+        : role === 'kitchen' || role === 'kitchen_manager' || role === 'kitchen_staff'
+        ? 'VENDOR'
+        : role === 'admin' || role === 'super_admin'
+        ? 'ADMIN'
+        : 'CUSTOMER';
+
+    const unsubNotifications = useNotificationStore.getState().initNotifications(user.uid, appType);
+    return () => {
+      unsubNotifications();
+    };
+  }, [user?.uid, role]);
 
   useEffect(() => {
     const unsub = initAuth();
@@ -132,8 +157,8 @@ export default function App() {
     );
   }
 
-  // 2. HARD GATE ACCESS: User MUST log in before doing or seeing anything in the app
-  if (!user) {
+  // 2. HARD GATE ACCESS: User MUST log in AND have a verified email before doing or seeing anything in the app
+  if (!user || (!isEmailVerified && !user.uid.startsWith('guest_'))) {
     return <AuthGatewayPage />;
   }
 

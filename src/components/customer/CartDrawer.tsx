@@ -27,20 +27,15 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ onCheckout }) => {
 
   const { vendors } = useMarketplaceStore();
 
-  // Scroll lock when drawer is open and auto-purge unavailable items on open
+  // Scroll lock when drawer is open
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = 'hidden';
-      // Clean up stale or now-unavailable items
-      const purged = removeUnavailableItems();
-      if (purged > 0) {
-        toast.error(`Removed ${purged} unavailable item(s) from your cart.`);
-      }
       return () => {
         document.body.style.overflow = '';
       };
     }
-  }, [isOpen, removeUnavailableItems]);
+  }, [isOpen]);
 
   // Compute status for all cart items
   const itemsWithStatus = useMemo(() => {

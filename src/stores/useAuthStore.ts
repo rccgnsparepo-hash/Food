@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { UserProfile, UserRole, Permission, CustomerProfile, RiderProfile, KitchenStaffProfile, AdminProfile } from '../types';
-import { auth, db } from '../lib/firebase';
+import { auth, db, cleanFirestoreData } from '../lib/firebase';
 import { doc, getDoc, setDoc, updateDoc, onSnapshot } from 'firebase/firestore';
 import {
   onAuthStateChanged,
@@ -124,45 +124,43 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   initAuth: () => {
     set({ isInitLoading: true, authError: null });
 
-    // Check local session first
-    try {
-      const savedUserStr = localStorage.getItem('bukkit_active_user');
-      if (savedUserStr) {
-        const parsed = JSON.parse(savedUserStr);
-        if (parsed && parsed.uid) {
-          set({
-            user: parsed,
-            role: parsed.active_role || parsed.role || 'customer',
-            isInitLoading: false,
-            isLoading: false,
-            authStatus: 'success',
-            authError: null
-          });
-        }
-      }
-    } catch (e) {
-      console.warn('Could not restore local user session:', e);
-    }
-
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
         const isVerified = firebaseUser.emailVerified;
         set({ isEmailVerified: isVerified });
+
+        // HARD ENFORCEMENT: If email is not verified, block app entry
+        if (!isVerified) {
+          try {
+            localStorage.removeItem('bukkit_active_user');
+          } catch (e) {}
+          set({
+            user: null,
+            role: 'customer',
+            isInitLoading: false,
+            isLoading: false,
+            isEmailVerified: false,
+            authStatus: 'email-verification-required',
+            authError: 'Your email address is not verified yet. Please check your inbox and verify your email to log in.'
+          });
+          return;
+        }
+
         try {
-          // Resolve from database
+          // Resolve from database with cache resilience
           let profile = await resolveAuthoritativeUserProfile(firebaseUser.uid) || await findUserProfileByEmail(firebaseUser.email || '');
-          
+
           if (!profile) {
-            // Check if we have a locally stored session that matches
-            const saved = localStorage.getItem('bukkit_active_user');
-            if (saved) {
-              try {
-                const parsed = JSON.parse(saved);
-                if (parsed && (parsed.uid === firebaseUser.uid || parsed.email === firebaseUser.email)) {
+            // Check local cached profile
+            try {
+              const raw = localStorage.getItem('bukkit_active_user');
+              if (raw) {
+                const parsed = JSON.parse(raw);
+                if (parsed && (parsed.uid === firebaseUser.uid || parsed.id === firebaseUser.uid)) {
                   profile = parsed;
                 }
-              } catch (e) {}
-            }
+              }
+            } catch (e) {}
           }
 
           if (profile) {
@@ -175,11 +173,14 @@ export const useAuthStore = create<AuthState>((set, get) => ({
               role: profile.active_role || profile.role || 'customer',
               isInitLoading: false,
               isLoading: false,
-              authStatus: isVerified ? 'success' : 'email-verification-required',
+              authStatus: 'success',
               authError: null
             });
           } else {
-            // User does not exist in database (no auto-creation)
+            // User authenticated in Firebase but has no profile in Firestore
+            try {
+              localStorage.removeItem('bukkit_active_user');
+            } catch (e) {}
             set({
               user: null,
               role: 'customer',
@@ -190,17 +191,35 @@ export const useAuthStore = create<AuthState>((set, get) => ({
             });
           }
         } catch (e: any) {
-          console.error('Failed to load user profile from database:', e);
+          console.warn('Notice loading user profile (non-blocking offline handling):', e);
+          // Check local storage before erroring out
+          try {
+            const raw = localStorage.getItem('bukkit_active_user');
+            if (raw) {
+              const parsed = JSON.parse(raw);
+              if (parsed && (parsed.uid === firebaseUser.uid || parsed.id === firebaseUser.uid)) {
+                set({
+                  user: parsed,
+                  role: parsed.active_role || parsed.role || 'customer',
+                  isInitLoading: false,
+                  isLoading: false,
+                  authStatus: 'success',
+                  authError: null
+                });
+                return;
+              }
+            }
+          } catch (storageErr) {}
+
           const msg = translateFirebaseAuthError(e);
-          set({ isInitLoading: false, isLoading: false, authStatus: 'error', authError: msg });
+          set({ isInitLoading: false, isLoading: false, authStatus: 'idle', authError: null });
         }
       } else {
-        const saved = localStorage.getItem('bukkit_active_user');
-        if (!saved) {
-          set({ user: null, isInitLoading: false, isLoading: false, authStatus: 'idle', authError: null });
-        } else {
-          set({ isInitLoading: false, isLoading: false });
-        }
+        // Explicitly clear local session if Firebase Auth has no active user
+        try {
+          localStorage.removeItem('bukkit_active_user');
+        } catch (e) {}
+        set({ user: null, isInitLoading: false, isLoading: false, authStatus: 'idle', authError: null });
       }
     });
 
@@ -212,77 +231,49 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     const cleanEmail = email.trim();
 
     try {
-      // Step 1: Pre-check if an account exists in the database for this email
-      const existingDbProfile = await findUserProfileByEmail(cleanEmail);
+      // 1. Strict authentication with Firebase Authentication
+      const userCred = await signInWithEmailAndPassword(auth, cleanEmail, password);
+      const isVerified = userCred.user.emailVerified;
+      set({ isEmailVerified: isVerified });
 
-      let profile: UserProfile | null = null;
-
-      try {
-        const userCred = await signInWithEmailAndPassword(auth, cleanEmail, password);
-        const isVerified = userCred.user.emailVerified;
-        set({ isEmailVerified: isVerified });
-
-        const resolved = await resolveAuthoritativeUserProfile(userCred.user.uid) || existingDbProfile;
-        if (!resolved) {
-          // User authenticated in Firebase but NOT registered in BUKKIT database
-          await signOut(auth).catch(() => {});
-          throw new Error('No BUKKIT account found with this email. Please sign up first.');
-        }
-
-        profile = resolved;
-
-        // Verify admin credentials if account is Admin
-        if (profile.role === 'admin' || profile.role === 'super_admin') {
-          const validKeys = ['MTU-ADMIN-2026', 'BUKKIT-ADMIN-88', 'ADMIN123', 'ADMIN', 'MTUADMIN'];
-          if (adminKey && !validKeys.includes(adminKey.trim().toUpperCase())) {
-            throw new Error('Invalid Admin Passkey. Access Denied.');
-          }
-        }
-
-        await updateDoc(doc(db, 'users', userCred.user.uid), {
-          last_login_at: new Date().toISOString()
-        }).catch(() => {});
-
-      } catch (authErr: any) {
-        if (authErr?.code === 'auth/operation-not-allowed' || authErr?.message?.includes('operation-not-allowed')) {
-          // If Firebase Email/Password provider is not active, check if the account was registered in the database
-          if (!existingDbProfile) {
-            throw new Error('No account found with this email address. Please sign up first.');
-          }
-          profile = existingDbProfile;
-        } else if (authErr?.code === 'auth/user-not-found' || authErr?.code === 'auth/invalid-credential') {
-          if (!existingDbProfile) {
-            throw new Error('No account found with this email address. Please sign up first.');
-          } else {
-            throw new Error('Incorrect password. Please verify your password and try again.');
-          }
-        } else {
-          throw authErr;
-        }
+      // HARD BLOCK: If email is NOT verified, refuse login and require verification
+      if (!isVerified) {
+        set({
+          user: null,
+          isLoading: false,
+          authStatus: 'email-verification-required',
+          authError: 'Your email address is not verified yet. Please check your inbox and click the verification link before logging in.'
+        });
+        const err: any = new Error('Email not verified. Please verify your email before accessing BUKKIT.');
+        err.code = 'auth/email-not-verified';
+        throw err;
       }
 
+      // 2. Fetch authoritative user profile from database
+      const profile = await resolveAuthoritativeUserProfile(userCred.user.uid) || await findUserProfileByEmail(cleanEmail);
       if (!profile) {
-        throw new Error('No account found with this email. Please sign up first.');
+        // User exists in Firebase Auth but has no registered profile in the database
+        await signOut(auth).catch(() => {});
+        throw new Error('No BUKKIT account found with this email. Please sign up first.');
       }
+
+      // 3. Verify admin credentials if account has Admin privileges
+      if (profile.role === 'admin' || profile.role === 'super_admin') {
+        const validKeys = ['MTU-ADMIN-2026', 'BUKKIT-ADMIN-88', 'ADMIN123', 'ADMIN', 'MTUADMIN'];
+        if (adminKey && !validKeys.includes(adminKey.trim().toUpperCase())) {
+          await signOut(auth).catch(() => {});
+          throw new Error('Invalid Admin Passkey. Access Denied.');
+        }
+      }
+
+      await updateDoc(doc(db, 'users', userCred.user.uid), {
+        last_login_at: new Date().toISOString()
+      }).catch(() => {});
 
       const authoritativeRole = profile.active_role || profile.role || 'customer';
 
       try {
         localStorage.setItem('bukkit_active_user', JSON.stringify(profile));
-        fetch('/api/users/sync', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            uid: profile.uid,
-            email: profile.email,
-            name: profile.name,
-            phone: profile.phone,
-            role: authoritativeRole,
-            universityId: profile.university_id,
-            campusId: profile.campus_id,
-            avatarUrl: profile.avatar_url,
-          }),
-        }).catch(err => console.warn('Cloud SQL user sync warning:', err));
       } catch (e) {}
 
       set({
@@ -295,8 +286,13 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
       return profile;
     } catch (err: any) {
+      try {
+        localStorage.removeItem('bukkit_active_user');
+      } catch (e) {}
       const msg = translateFirebaseAuthError(err);
-      set({ isLoading: false, authStatus: 'error', authError: msg });
+      if (err.code !== 'auth/email-not-verified') {
+        set({ user: null, isLoading: false, authStatus: 'error', authError: msg });
+      }
       throw new Error(msg);
     }
   },
@@ -313,40 +309,20 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         }
       }
 
-      // Step 1: Check if an account already exists in database with this email
-      const existingInDb = await findUserProfileByEmail(cleanEmail);
-      if (existingInDb) {
-        throw new Error('An account already exists with this email address. Please switch to Log In.');
-      }
+      // Register user directly in active Firebase Authentication
+      const userCred = await createUserWithEmailAndPassword(auth, cleanEmail, password);
+      const createdUid = userCred.user.uid;
+      const isEmailVerified = userCred.user.emailVerified;
 
-      let createdUid = `user_${Date.now()}`;
-      let isEmailVerified = false;
-
-      try {
-        const userCred = await createUserWithEmailAndPassword(auth, cleanEmail, password);
-        createdUid = userCred.user.uid;
-        isEmailVerified = userCred.user.emailVerified;
-
-        if (userCred.user) {
-          try {
-            await sendEmailVerification(userCred.user);
-            set({ isEmailVerified: userCred.user.emailVerified });
-          } catch (verErr) {
-            console.warn('Email verification send notice:', verErr);
-          }
-        }
-      } catch (authErr: any) {
-        if (authErr?.code === 'auth/email-already-in-use') {
-          throw new Error('An account already exists with this email address. Please switch to Log In.');
-        }
-        if (authErr?.code === 'auth/operation-not-allowed' || authErr?.message?.includes('operation-not-allowed')) {
-          console.warn('Firebase Auth fallback active.');
-          createdUid = `user_${btoa(cleanEmail).replace(/[^a-zA-Z0-9]/g, '').slice(0, 16) || Date.now()}`;
-          isEmailVerified = true;
-        } else {
-          throw authErr;
+      // Dispatch email verification link immediately
+      if (userCred.user) {
+        try {
+          await sendEmailVerification(userCred.user);
+        } catch (verErr) {
+          console.warn('Email verification send notice:', verErr);
         }
       }
+      set({ isEmailVerified: userCred.user.emailVerified });
 
       const now = new Date().toISOString();
       const newProfile: UserProfile = {
@@ -373,10 +349,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         last_login_at: now
       };
 
-      // Create main user document in Firestore
-      await setDoc(doc(db, 'users', createdUid), newProfile);
-
-      // Create dedicated role profile
+      // Prepare sub-profile based on role
+      let subProfilePromise: Promise<any> = Promise.resolve();
       if (role === 'rider') {
         const riderProf: RiderProfile = {
           rider_id: createdUid,
@@ -396,8 +370,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           created_at: now,
           updated_at: now
         };
-        await setDoc(doc(db, 'rider_profiles', createdUid), riderProf);
         newProfile.rider_profile = riderProf;
+        subProfilePromise = setDoc(doc(db, 'rider_profiles', createdUid), cleanFirestoreData(riderProf)).catch(e => console.warn('Rider profile sync:', e));
       } else if (role === 'kitchen' || role === 'kitchen_manager' || role === 'kitchen_staff') {
         const kitchenProf: KitchenStaffProfile = {
           user_id: createdUid,
@@ -409,8 +383,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           created_at: now,
           updated_at: now
         };
-        await setDoc(doc(db, 'kitchen_staff_profiles', createdUid), kitchenProf);
         newProfile.kitchen_profile = kitchenProf;
+        subProfilePromise = setDoc(doc(db, 'kitchen_staff_profiles', createdUid), cleanFirestoreData(kitchenProf)).catch(e => console.warn('Kitchen profile sync:', e));
       } else if (role === 'admin' || role === 'super_admin') {
         const adminProf: AdminProfile = {
           user_id: createdUid,
@@ -420,8 +394,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           created_at: now,
           updated_at: now
         };
-        await setDoc(doc(db, 'admin_profiles', createdUid), adminProf);
         newProfile.admin_profile = adminProf;
+        subProfilePromise = setDoc(doc(db, 'admin_profiles', createdUid), cleanFirestoreData(adminProf)).catch(e => console.warn('Admin profile sync:', e));
       } else {
         const custProf: CustomerProfile = {
           user_id: createdUid,
@@ -433,33 +407,42 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           created_at: now,
           updated_at: now
         };
-        await setDoc(doc(db, 'customer_profiles', createdUid), custProf);
         newProfile.customer_profile = custProf;
+        subProfilePromise = setDoc(doc(db, 'customer_profiles', createdUid), cleanFirestoreData(custProf)).catch(e => console.warn('Customer profile sync:', e));
+      }
+
+      // Save main document & role document with safe timeout/catch
+      await Promise.all([
+        setDoc(doc(db, 'users', createdUid), cleanFirestoreData(newProfile)).catch(e => console.warn('User doc sync:', e)),
+        subProfilePromise
+      ]);
+
+      // If user is unverified, DO NOT persist into local storage or set as active logged in user
+      if (!isEmailVerified) {
+        try {
+          localStorage.removeItem('bukkit_active_user');
+        } catch (e) {}
+        set({
+          user: null,
+          role,
+          isLoading: false,
+          isEmailVerified: false,
+          authStatus: 'email-verification-required',
+          authError: null
+        });
+        return newProfile;
       }
 
       try {
         localStorage.setItem('bukkit_active_user', JSON.stringify(newProfile));
-        fetch('/api/users/sync', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            uid: newProfile.uid,
-            email: newProfile.email,
-            name: newProfile.name,
-            phone: newProfile.phone,
-            role: newProfile.role,
-            universityId: newProfile.university_id,
-            campusId: newProfile.campus_id,
-            avatarUrl: newProfile.avatar_url,
-          }),
-        }).catch(err => console.warn('Cloud SQL sync notice:', err));
       } catch (e) {}
 
       set({
         user: newProfile,
         role,
         isLoading: false,
-        authStatus: isEmailVerified ? 'success' : 'email-verification-required',
+        isEmailVerified: true,
+        authStatus: 'success',
         authError: null
       });
 
@@ -513,10 +496,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
             updated_at: now,
             last_login_at: now
           };
-          await setDoc(doc(db, 'users', result.user.uid), profile);
+          await setDoc(doc(db, 'users', result.user.uid), cleanFirestoreData(profile));
 
           if (targetRole === 'customer') {
-            await setDoc(doc(db, 'customer_profiles', result.user.uid), {
+            await setDoc(doc(db, 'customer_profiles', result.user.uid), cleanFirestoreData({
               user_id: result.user.uid,
               default_address: 'Mountain Top University',
               university_id: 'uni_mtu',
@@ -525,27 +508,13 @@ export const useAuthStore = create<AuthState>((set, get) => ({
               favorite_vendor_ids: [],
               created_at: now,
               updated_at: now
-            });
+            }));
           }
         }
       }
 
       try {
         localStorage.setItem('bukkit_active_user', JSON.stringify(profile));
-        fetch('/api/users/sync', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            uid: profile.uid,
-            email: profile.email,
-            name: profile.name,
-            phone: profile.phone,
-            role: profile.role,
-            universityId: profile.university_id,
-            campusId: profile.campus_id,
-            avatarUrl: profile.avatar_url,
-          }),
-        }).catch(err => console.warn('Cloud SQL user sync warning:', err));
       } catch (e) {}
 
       set({
@@ -580,12 +549,79 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   reloadUser: async () => {
     if (auth.currentUser) {
-      await auth.currentUser.reload();
+      try {
+        await auth.currentUser.reload();
+      } catch (rErr) {
+        console.warn('Firebase user reload error:', rErr);
+      }
+
       const isVerified = auth.currentUser.emailVerified;
       set({ isEmailVerified: isVerified });
+
+      if (isVerified) {
+        try {
+          // Update Firestore user document status
+          const { doc, updateDoc, setDoc } = await import('firebase/firestore');
+          try {
+            await updateDoc(doc(db, 'users', auth.currentUser.uid), {
+              email_verified: true,
+              status: 'active',
+              updated_at: new Date().toISOString()
+            });
+          } catch (uErr) {
+            // Ignore if doc doesn't exist yet
+          }
+
+          let profile = await resolveAuthoritativeUserProfile(auth.currentUser.uid) || await findUserProfileByEmail(auth.currentUser.email || '');
+          if (!profile) {
+            const now = new Date().toISOString();
+            const emailVal = auth.currentUser.email || '';
+            profile = {
+              id: auth.currentUser.uid,
+              uid: auth.currentUser.uid,
+              email: emailVal,
+              phone: auth.currentUser.phoneNumber || '',
+              first_name: auth.currentUser.displayName?.split(' ')[0] || 'BUKKIT',
+              last_name: auth.currentUser.displayName?.split(' ').slice(1).join(' ') || 'User',
+              name: auth.currentUser.displayName || 'BUKKIT User',
+              avatar_url: `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(emailVal)}`,
+              status: 'active',
+              email_verified: true,
+              phone_verified: false,
+              created_at: now,
+              updated_at: now,
+              last_login_at: now,
+              roles: ['customer'],
+              active_role: 'customer',
+              role: 'customer',
+              permissions: getRolePermissions('customer'),
+              university_id: 'uni_mtu',
+              campus_id: 'campus_mtu_main'
+            };
+            await setDoc(doc(db, 'users', auth.currentUser.uid), cleanFirestoreData(profile));
+          } else {
+            profile.email_verified = true;
+          }
+
+          try {
+            localStorage.setItem('bukkit_active_user', JSON.stringify(profile));
+          } catch (e) {}
+
+          set({
+            user: profile,
+            role: profile.active_role || profile.role || 'customer',
+            isEmailVerified: true,
+            authStatus: 'success',
+            authError: null
+          });
+        } catch (e) {
+          console.warn('Profile resolution after verification:', e);
+        }
+      }
+
       return isVerified;
     }
-    return true;
+    return false;
   },
 
   logout: async () => {
@@ -668,7 +704,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
     try {
       localStorage.setItem('bukkit_active_user', JSON.stringify(guestProfile));
-      await setDoc(doc(db, 'users', guestUid), guestProfile);
+      await setDoc(doc(db, 'users', guestUid), cleanFirestoreData(guestProfile));
     } catch (e) {}
 
     set({
@@ -689,7 +725,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     const updated = { ...user, ...updates, updated_at: new Date().toISOString() };
     try {
       localStorage.setItem('bukkit_active_user', JSON.stringify(updated));
-      await updateDoc(doc(db, 'users', user.uid), updates);
+      await updateDoc(doc(db, 'users', user.uid), cleanFirestoreData(updates));
       set({ user: updated });
     } catch (e) {
       console.error('Failed to update profile:', e);
@@ -706,8 +742,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     set({ user: updated });
     try {
       localStorage.setItem('bukkit_active_user', JSON.stringify(updated));
-      await updateDoc(doc(db, 'users', user.uid), { is_online: isOnline });
-      await setDoc(doc(db, 'rider_profiles', user.uid), { is_online: isOnline }, { merge: true });
+      await updateDoc(doc(db, 'users', user.uid), cleanFirestoreData({ is_online: isOnline }));
+      await setDoc(doc(db, 'rider_profiles', user.uid), cleanFirestoreData({ is_online: isOnline }), { merge: true });
     } catch (e) {}
   },
 
@@ -723,10 +759,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
     try {
       localStorage.setItem('bukkit_active_user', JSON.stringify(updatedUser));
-      await updateDoc(doc(db, 'users', user.uid), { wallet_balance: newBal });
+      await updateDoc(doc(db, 'users', user.uid), cleanFirestoreData({ wallet_balance: newBal }));
 
       const txId = `tx_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
-      await setDoc(doc(db, 'wallet_transactions', txId), {
+      await setDoc(doc(db, 'wallet_transactions', txId), cleanFirestoreData({
         id: txId,
         user_id: user.uid,
         type: 'credit',
@@ -735,7 +771,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         reference: reference || `TOPUP_${Date.now()}`,
         status: 'successful',
         created_at: new Date().toISOString()
-      });
+      }));
     } catch (err) {
       console.warn('Wallet top-up firestore sync notice:', err);
     }

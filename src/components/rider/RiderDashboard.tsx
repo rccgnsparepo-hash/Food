@@ -102,7 +102,7 @@ export const RiderDashboard: React.FC = () => {
 
   // Initialize or fetch authoritative Rider Profile
   useEffect(() => {
-    if (!user) return;
+    if (!user?.uid) return;
     getOrCreateRiderProfile(user).then((profile) => {
       setRiderProfile(profile);
       setIsOnline(profile.is_online);
@@ -110,7 +110,7 @@ export const RiderDashboard: React.FC = () => {
 
     const unsubEarnings = subscribeToRiderEarnings(user.uid, setEarningsLedger);
     return () => unsubEarnings();
-  }, [user]);
+  }, [user?.uid]);
 
   // Real-time Firestore sync for available & active orders
   useEffect(() => {
