@@ -17,6 +17,7 @@ import {
   markAllNotificationsAsReadForUser,
   getNotificationHealth
 } from './src/services/notificationBackendService.ts';
+import { startDispatcherLoop } from './src/services/notificationDispatcher.ts';
 
 async function startServer() {
   const app = express();
@@ -593,6 +594,12 @@ async function startServer() {
 
   app.listen(PORT, '0.0.0.0', () => {
     console.log(`BUKKIT Centralized Backend Engine running at http://0.0.0.0:${PORT}`);
+    try {
+      startDispatcherLoop(5000);
+      console.log('[server] notification dispatcher started');
+    } catch (err) {
+      console.warn('[server] failed to start notification dispatcher', err);
+    }
   });
 }
 
