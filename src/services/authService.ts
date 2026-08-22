@@ -2,6 +2,10 @@ import { UserRole, Permission, UserIdentity, UserProfile, Order, OrderStatus } f
 import { db, auth } from '../lib/firebase';
 import { doc, getDoc, setDoc, updateDoc, collection, query, where, getDocs, limit } from 'firebase/firestore';
 
+const cleanFirestoreData = (data: any): any => {
+  return JSON.parse(JSON.stringify(data));
+};
+
 export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
   customer: [
     'orders.read',
@@ -108,10 +112,43 @@ export async function resolveAuthoritativeUserProfile(uid: string): Promise<User
     const userDoc = await getDoc(userDocRef);
 
     if (!userDoc.exists()) {
-      // If document doesn't exist in Firestore, check if we have a cached profile or active auth user
-      if (cachedProfile) {
+      // Fetch sub-profiles in parallel to check if user has a specific role sub-document
+      const [custSnap, riderSnap, kitchenSnap, adminSnap] = await Promise.all([
+        getDoc(doc(db, 'customer_profiles', uid)).catch(() => null),
+        getDoc(doc(db, 'rider_profiles', uid)).catch(() => null),
+        getDoc(doc(db, 'kitchen_staff_profiles', uid)).catch(() => null),
+        getDoc(doc(db, 'admin_profiles', uid)).catch(() => null)
+      ]);
+
+      let detectedRole: UserRole = 'customer';
+      if (adminSnap?.exists()) {
+        detectedRole = 'admin';
+      } else if (kitchenSnap?.exists()) {
+        const kRole = kitchenSnap.data()?.role;
+        detectedRole = (kRole === 'kitchen_manager' || kRole === 'kitchen_staff') ? kRole : 'kitchen';
+      } else if (riderSnap?.exists()) {
+        detectedRole = 'rider';
+      } else {
+        // Check temporary registration role stored during sign-up
+        try {
+          const pendingRole =
+            localStorage.getItem(`bukkit_pending_role_${uid}`) ||
+            sessionStorage.getItem(`bukkit_pending_role_${uid}`) ||
+            (auth.currentUser?.email ? localStorage.getItem(`bukkit_pending_email_role_${auth.currentUser.email.toLowerCase()}`) : null) ||
+            localStorage.getItem('bukkit_pending_google_role') ||
+            sessionStorage.getItem('bukkit_pending_google_role') ||
+            localStorage.getItem('bukkit_pending_registration_role') ||
+            sessionStorage.getItem('bukkit_pending_registration_role');
+          if (pendingRole && ['customer', 'rider', 'kitchen', 'admin', 'kitchen_manager', 'kitchen_staff', 'super_admin'].includes(pendingRole)) {
+            detectedRole = pendingRole as UserRole;
+          }
+        } catch (e) {}
+      }
+
+      if (cachedProfile && cachedProfile.role) {
         return cachedProfile;
       }
+
       const currentFbUser = auth.currentUser;
       if (currentFbUser && currentFbUser.uid === uid) {
         const fallbackProfile: UserProfile = {
@@ -129,16 +166,23 @@ export async function resolveAuthoritativeUserProfile(uid: string): Promise<User
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
           last_login_at: new Date().toISOString(),
-          roles: ['customer'],
-          active_role: 'customer',
-          role: 'customer',
-          permissions: getRolePermissions('customer'),
+          roles: [detectedRole],
+          active_role: detectedRole,
+          role: detectedRole,
+          permissions: getRolePermissions(detectedRole),
           address: 'Mountain Top University',
           latitude: 6.783,
           longitude: 3.441,
           university_id: 'uni_mtu',
-          campus_id: 'campus_mtu_main'
+          campus_id: 'campus_mtu_main',
+          customer_profile: custSnap?.exists() ? custSnap.data() as any : undefined,
+          rider_profile: riderSnap?.exists() ? riderSnap.data() as any : undefined,
+          kitchen_profile: kitchenSnap?.exists() ? kitchenSnap.data() as any : undefined,
+          admin_profile: adminSnap?.exists() ? adminSnap.data() as any : undefined
         };
+
+        // Persist reconstructed profile into Firestore
+        setDoc(doc(db, 'users', uid), cleanFirestoreData(fallbackProfile)).catch(() => {});
         return fallbackProfile;
       }
       return null;
@@ -197,6 +241,21 @@ export async function resolveAuthoritativeUserProfile(uid: string): Promise<User
     }
     const currentFbUser = auth.currentUser;
     if (currentFbUser && currentFbUser.uid === uid) {
+      let detectedRole: UserRole = 'customer';
+      try {
+        const pendingRole =
+          localStorage.getItem(`bukkit_pending_role_${uid}`) ||
+          sessionStorage.getItem(`bukkit_pending_role_${uid}`) ||
+          (currentFbUser.email ? localStorage.getItem(`bukkit_pending_email_role_${currentFbUser.email.toLowerCase()}`) : null) ||
+          localStorage.getItem('bukkit_pending_google_role') ||
+          sessionStorage.getItem('bukkit_pending_google_role') ||
+          localStorage.getItem('bukkit_pending_registration_role') ||
+          sessionStorage.getItem('bukkit_pending_registration_role');
+        if (pendingRole && ['customer', 'rider', 'kitchen', 'admin', 'kitchen_manager', 'kitchen_staff', 'super_admin'].includes(pendingRole)) {
+          detectedRole = pendingRole as UserRole;
+        }
+      } catch (e) {}
+
       return {
         id: uid,
         uid,
@@ -212,10 +271,10 @@ export async function resolveAuthoritativeUserProfile(uid: string): Promise<User
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
         last_login_at: new Date().toISOString(),
-        roles: ['customer'],
-        active_role: 'customer',
-        role: 'customer',
-        permissions: getRolePermissions('customer'),
+        roles: [detectedRole],
+        active_role: detectedRole,
+        role: detectedRole,
+        permissions: getRolePermissions(detectedRole),
         address: 'Mountain Top University',
         latitude: 6.783,
         longitude: 3.441,

@@ -84,7 +84,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
             animate={{ x: 0 }}
             exit={{ x: '100%' }}
             transition={{ type: 'spring', damping: 28, stiffness: 300 }}
-            className="fixed inset-y-0 right-0 max-w-md w-full bg-white shadow-2xl z-50 flex flex-col border-l border-rose-100"
+            className="fixed inset-y-0 right-0 max-w-md w-full bg-white dark:bg-slate-900 shadow-2xl z-50 flex flex-col border-l border-rose-100 dark:border-slate-800"
           >
             {/* Header */}
             <div className="p-5 bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 text-white flex items-center justify-between border-b border-slate-700">
@@ -123,7 +123,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
             </div>
 
             {/* Filter Tabs */}
-            <div className="bg-slate-50 border-b border-slate-200 px-4 py-2 flex items-center justify-between gap-2 overflow-x-auto scrollbar-none">
+            <div className="bg-slate-50 dark:bg-slate-800/80 border-b border-slate-200 dark:border-slate-800 px-4 py-2 flex items-center justify-between gap-2 overflow-x-auto scrollbar-none">
               <div className="flex items-center gap-1">
                 {[
                   { id: 'all', label: 'All' },
@@ -137,7 +137,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
                     className={`px-3 py-1.5 rounded-full text-xs font-bold transition-colors cursor-pointer ${
                       activeFilter === tab.id
                         ? 'bg-[#D6001C] text-white shadow-xs'
-                        : 'text-slate-600 hover:bg-slate-200/60'
+                        : 'text-slate-600 dark:text-slate-300 hover:bg-slate-200/60 dark:hover:bg-slate-700'
                     }`}
                   >
                     {tab.label}
@@ -148,7 +148,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
               {unreadCount > 0 && (
                 <button
                   onClick={markAllAsRead}
-                  className="text-[11px] font-black text-[#D6001C] hover:underline flex items-center gap-1 cursor-pointer shrink-0"
+                  className="text-[11px] font-black text-[#D6001C] dark:text-red-400 hover:underline flex items-center gap-1 cursor-pointer shrink-0"
                 >
                   <Check className="w-3 h-3" />
                   <span>Mark all read</span>
@@ -164,9 +164,9 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
                 </div>
               ) : filteredNotifications.length === 0 ? (
                 <div className="py-16 text-center text-slate-400 space-y-2">
-                  <Bell className="w-10 h-10 mx-auto text-slate-300 stroke-1" />
-                  <p className="text-sm font-extrabold text-slate-600">No notifications yet</p>
-                  <p className="text-xs max-w-xs mx-auto">
+                  <Bell className="w-10 h-10 mx-auto text-slate-300 dark:text-slate-600 stroke-1" />
+                  <p className="text-sm font-extrabold text-slate-600 dark:text-slate-300">No notifications yet</p>
+                  <p className="text-xs max-w-xs mx-auto text-slate-400 dark:text-slate-500">
                     Live updates for kitchen preparation, rider arrival, and wallet transactions will appear here.
                   </p>
                 </div>
@@ -191,9 +191,9 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
                       className={`p-4 rounded-2xl border transition-all relative ${
                         isUnread
                           ? isCritical
-                            ? 'bg-red-50/90 border-red-200 shadow-sm'
-                            : 'bg-rose-50/60 border-rose-200 shadow-sm'
-                          : 'bg-white border-slate-200 hover:border-slate-300'
+                            ? 'bg-red-50/90 dark:bg-red-950/40 border-red-200 dark:border-red-800 shadow-sm'
+                            : 'bg-rose-50/60 dark:bg-slate-800/80 border-rose-200 dark:border-slate-700 shadow-sm'
+                          : 'bg-white dark:bg-slate-800/40 border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'
                       }`}
                     >
                       <div className="flex items-start gap-3">
@@ -213,15 +213,15 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
 
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center justify-between gap-1">
-                            <h4 className={`text-xs font-black truncate ${isUnread ? 'text-slate-950' : 'text-slate-700'}`}>
+                            <h4 className={`text-xs font-black truncate ${isUnread ? 'text-slate-950 dark:text-slate-100' : 'text-slate-700 dark:text-slate-300'}`}>
                               {notif.title}
                             </h4>
-                            <span className="text-[10px] text-slate-400 font-medium shrink-0">
+                            <span className="text-[10px] text-slate-400 dark:text-slate-500 font-medium shrink-0">
                               {new Date(notif.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                             </span>
                           </div>
 
-                          <p className="text-xs text-slate-600 mt-1 leading-relaxed">{notif.body}</p>
+                          <p className="text-xs text-slate-600 dark:text-slate-300 mt-1 leading-relaxed">{notif.body}</p>
 
                           <div className="mt-3 flex items-center justify-between">
                             {notif.deep_link ? (
@@ -233,7 +233,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
                                     onNavigateToDeepLink(notif.deep_link);
                                   }
                                 }}
-                                className="text-[11px] font-black text-[#D6001C] hover:text-red-700 flex items-center gap-1 cursor-pointer"
+                                className="text-[11px] font-black text-[#D6001C] dark:text-red-400 hover:text-red-700 flex items-center gap-1 cursor-pointer"
                               >
                                 <span>View Details</span>
                                 <ExternalLink className="w-3 h-3" />
@@ -243,7 +243,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
                             {isUnread && (
                               <button
                                 onClick={() => markAsRead(notif.notification_id)}
-                                className="text-[10px] font-bold text-slate-400 hover:text-slate-600 flex items-center gap-1 cursor-pointer"
+                                className="text-[10px] font-bold text-slate-400 dark:text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 flex items-center gap-1 cursor-pointer"
                               >
                                 <Check className="w-3 h-3" />
                                 <span>Mark read</span>

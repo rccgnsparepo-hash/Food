@@ -453,13 +453,13 @@ export const KitchenDashboard: React.FC = () => {
             exit={{ opacity: 0, y: -6 }}
             className="space-y-6"
           >
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white p-5 rounded-3xl border border-rose-100 shadow-xs">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white dark:bg-slate-900 p-5 rounded-3xl border border-rose-100 dark:border-slate-800 shadow-xs">
               <div>
-                <h2 className="text-lg font-black text-slate-900 flex items-center gap-2">
+                <h2 className="text-lg font-black text-slate-900 dark:text-slate-100 flex items-center gap-2">
                   <UtensilsCrossed className="w-5 h-5 text-[#D6001C]" />
                   <span>Live Menu & Food Stock Controls</span>
                 </h2>
-                <p className="text-xs text-slate-500 mt-0.5">
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
                   Toggle items in or out of stock instantly. Out-of-stock items will not appear for ordering.
                 </p>
               </div>
@@ -475,15 +475,15 @@ export const KitchenDashboard: React.FC = () => {
 
             {/* Menu Items Grid */}
             {vendorMenu.length === 0 ? (
-              <div className="bg-white p-12 rounded-3xl border border-rose-100 text-center space-y-3">
-                <ChefHat className="w-12 h-12 text-slate-300 mx-auto" />
-                <h3 className="font-extrabold text-base text-slate-700">No dishes uploaded yet for this stand</h3>
-                <p className="text-xs text-slate-400 max-w-sm mx-auto">
+              <div className="bg-white dark:bg-slate-900 p-12 rounded-3xl border border-rose-100 dark:border-slate-800 text-center space-y-3">
+                <ChefHat className="w-12 h-12 text-slate-300 dark:text-slate-600 mx-auto" />
+                <h3 className="font-extrabold text-base text-slate-700 dark:text-slate-300">No dishes uploaded yet for this stand</h3>
+                <p className="text-xs text-slate-400 dark:text-slate-500 max-w-sm mx-auto">
                   Click "Add New Food Item" above or use the Admin Bulk CSV importer to populate your food catalog.
                 </p>
                 <button
                   onClick={() => setShowAddDish(true)}
-                  className="bg-slate-900 text-white font-bold px-4 py-2 rounded-xl text-xs cursor-pointer"
+                  className="bg-slate-900 dark:bg-slate-800 text-white font-bold px-4 py-2 rounded-xl text-xs cursor-pointer hover:bg-slate-800 dark:hover:bg-slate-700"
                 >
                   Create First Dish
                 </button>
@@ -493,12 +493,12 @@ export const KitchenDashboard: React.FC = () => {
                 {vendorMenu.map((item) => (
                   <div
                     key={item.id}
-                    className={`bg-white rounded-3xl p-4 border transition-all shadow-xs flex flex-col justify-between ${
-                      item.available ? 'border-slate-200/90' : 'border-rose-200 bg-rose-50/20 opacity-80'
+                    className={`bg-white dark:bg-slate-900 rounded-3xl p-4 border transition-all shadow-xs flex flex-col justify-between ${
+                      item.available ? 'border-slate-200/90 dark:border-slate-800' : 'border-rose-200 dark:border-rose-900/50 bg-rose-50/20 dark:bg-rose-950/10 opacity-80'
                     }`}
                   >
                     <div className="space-y-3">
-                      <div className="relative h-36 rounded-2xl overflow-hidden bg-slate-100">
+                      <div className="relative h-36 rounded-2xl overflow-hidden bg-slate-100 dark:bg-slate-800">
                         <img
                           src={item.image_url || 'https://images.unsplash.com/photo-1512058564366-18510be2db19?w=500&auto=format&fit=crop'}
                           alt={item.name}
@@ -514,9 +514,9 @@ export const KitchenDashboard: React.FC = () => {
                       </div>
 
                       <div>
-                        <h3 className="font-black text-sm text-slate-900">{item.name}</h3>
+                        <h3 className="font-black text-sm text-slate-900 dark:text-slate-100">{item.name}</h3>
                         {item.description && (
-                          <p className="text-xs text-slate-500 line-clamp-2 mt-0.5">{item.description}</p>
+                          <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-2 mt-0.5">{item.description}</p>
                         )}
                         <div className="mt-2 flex items-center justify-between">
                           <span className="text-base font-black text-[#D6001C] font-mono">
@@ -527,13 +527,13 @@ export const KitchenDashboard: React.FC = () => {
                     </div>
 
                     {/* Action Controls */}
-                    <div className="pt-3 mt-3 border-t border-slate-100 flex items-center justify-between gap-2">
+                    <div className="pt-3 mt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between gap-2">
                       <button
                         onClick={() => handleToggleItemAvailability(item)}
                         className={`flex-1 py-2 px-3 rounded-xl text-xs font-extrabold flex items-center justify-center gap-1.5 transition-colors cursor-pointer ${
                           item.available
-                            ? 'bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200'
-                            : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200'
+                            ? 'bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-900/60 border border-rose-200 dark:border-rose-900/50'
+                            : 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 border border-emerald-200 dark:border-emerald-900/50'
                         }`}
                       >
                         {item.available ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
@@ -556,58 +556,58 @@ export const KitchenDashboard: React.FC = () => {
             exit={{ opacity: 0, y: -6 }}
             className="space-y-4"
           >
-            <div className="bg-white p-5 rounded-3xl border border-rose-100 shadow-xs flex items-center justify-between">
+            <div className="bg-white dark:bg-slate-900 p-5 rounded-3xl border border-rose-100 dark:border-slate-800 shadow-xs flex items-center justify-between">
               <div>
-                <h2 className="text-lg font-black text-slate-900 flex items-center gap-2">
+                <h2 className="text-lg font-black text-slate-900 dark:text-slate-100 flex items-center gap-2">
                   <ShoppingBag className="w-5 h-5 text-[#D6001C]" />
                   <span>Active Kitchen Orders Queue</span>
                 </h2>
-                <p className="text-xs text-slate-500">Live order flow synchronized with student apps and campus riders.</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400">Live order flow synchronized with student apps and campus riders.</p>
               </div>
-              <span className="bg-rose-50 text-[#D6001C] font-black text-xs px-3 py-1 rounded-full border border-rose-100">
+              <span className="bg-rose-50 dark:bg-rose-950/60 text-[#D6001C] dark:text-rose-400 font-black text-xs px-3 py-1 rounded-full border border-rose-100 dark:border-rose-900/50">
                 {liveOrders.length} Orders
               </span>
             </div>
 
             {liveOrders.length === 0 ? (
-              <div className="bg-white p-12 rounded-3xl border border-rose-100 text-center space-y-2">
-                <Bell className="w-10 h-10 text-slate-300 mx-auto" />
-                <h3 className="font-extrabold text-slate-700 text-sm">No active incoming orders right now</h3>
-                <p className="text-xs text-slate-400">When customers place meal orders for your stand, they will appear here in realtime.</p>
+              <div className="bg-white dark:bg-slate-900 p-12 rounded-3xl border border-rose-100 dark:border-slate-800 text-center space-y-2">
+                <Bell className="w-10 h-10 text-slate-300 dark:text-slate-600 mx-auto" />
+                <h3 className="font-extrabold text-slate-700 dark:text-slate-300 text-sm">No active incoming orders right now</h3>
+                <p className="text-xs text-slate-400 dark:text-slate-500">When customers place meal orders for your stand, they will appear here in realtime.</p>
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {liveOrders.map((ord) => (
-                  <div key={ord.id} className="bg-white p-5 rounded-3xl border border-slate-200 shadow-xs space-y-3">
-                    <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                  <div key={ord.id} className="bg-white dark:bg-slate-900 p-5 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-xs space-y-3">
+                    <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-2">
                       <div>
-                        <span className="text-[10px] font-bold text-slate-400 font-mono">ORDER #{ord.id.slice(-6)}</span>
-                        <h4 className="font-extrabold text-sm text-slate-900">{ord.customer_name || ord.user_name || 'MTU Student'}</h4>
+                        <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 font-mono">ORDER #{ord.id.slice(-6)}</span>
+                        <h4 className="font-extrabold text-sm text-slate-900 dark:text-slate-100">{ord.customer_name || ord.user_name || 'MTU Student'}</h4>
                         {ord.customer_phone && (
-                          <p className="text-[11px] text-slate-500">{ord.customer_phone}</p>
+                          <p className="text-[11px] text-slate-500 dark:text-slate-400">{ord.customer_phone}</p>
                         )}
                       </div>
                       <span className={`text-[10px] font-black px-2.5 py-1 rounded-full uppercase ${
                         ord.status === 'pending' || ord.status === 'payment_confirmed'
-                          ? 'bg-amber-100 text-amber-800'
+                          ? 'bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300'
                           : ord.status === 'preparing'
-                          ? 'bg-blue-100 text-blue-800'
+                          ? 'bg-blue-100 dark:bg-blue-950/60 text-blue-800 dark:text-blue-300'
                           : ord.status === 'ready' || ord.status === 'ready_for_pickup'
-                          ? 'bg-emerald-100 text-emerald-800'
-                          : 'bg-slate-100 text-slate-800'
+                          ? 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300'
+                          : 'bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-300'
                       }`}>
                         {ord.status.replace(/_/g, ' ')}
                       </span>
                     </div>
 
                     {/* Delivery Destination Snapshot */}
-                    <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-100 text-xs">
-                      <span className="font-bold text-slate-500 block text-[10px] uppercase">Destination:</span>
-                      <p className="font-bold text-slate-800">{ord.delivery_address}</p>
-                      {ord.delivery_room && <p className="text-emerald-700 font-bold">Room: {ord.delivery_room}</p>}
+                    <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-100 dark:border-slate-700 text-xs">
+                      <span className="font-bold text-slate-500 dark:text-slate-400 block text-[10px] uppercase">Destination:</span>
+                      <p className="font-bold text-slate-800 dark:text-slate-200">{ord.delivery_address}</p>
+                      {ord.delivery_room && <p className="text-emerald-700 dark:text-emerald-400 font-bold">Room: {ord.delivery_room}</p>}
                     </div>
 
-                    <div className="space-y-1 text-xs text-slate-700">
+                    <div className="space-y-1 text-xs text-slate-700 dark:text-slate-300">
                       {ord.items?.map((it, idx) => (
                         <div key={idx} className="flex justify-between">
                           <span>{it.quantity}x {it.name}</span>
@@ -616,8 +616,8 @@ export const KitchenDashboard: React.FC = () => {
                       ))}
                     </div>
 
-                    <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
-                      <span className="font-bold text-slate-500">Payment: {ord.payment_status?.toUpperCase() || 'PAID'}</span>
+                    <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs">
+                      <span className="font-bold text-slate-500 dark:text-slate-400">Payment: {ord.payment_status?.toUpperCase() || 'PAID'}</span>
                       <span className="font-black text-[#D6001C] font-mono text-sm">₦{Number(ord.total_price || ord.total || 0).toLocaleString()}</span>
                     </div>
 
@@ -643,7 +643,7 @@ export const KitchenDashboard: React.FC = () => {
                           <div className="flex gap-2">
                             <button
                               onClick={() => handleUpdateOrderStatus(ord.id, 'vendor_accepted')}
-                              className="flex-1 bg-slate-900 hover:bg-black text-white font-extrabold py-2 rounded-xl text-xs cursor-pointer"
+                              className="flex-1 bg-slate-900 dark:bg-slate-800 hover:bg-black dark:hover:bg-slate-700 text-white font-extrabold py-2 rounded-xl text-xs cursor-pointer"
                             >
                               Accept Order
                             </button>
@@ -661,7 +661,7 @@ export const KitchenDashboard: React.FC = () => {
                                 handleUpdateOrderStatus(ord.id, 'cancelled', reason);
                               }
                             }}
-                            className="w-full py-1.5 text-center text-[11px] font-bold text-rose-600 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 rounded-xl transition-colors cursor-pointer border border-rose-200"
+                            className="w-full py-1.5 text-center text-[11px] font-bold text-rose-600 dark:text-rose-400 hover:text-rose-700 dark:hover:text-rose-300 bg-rose-50 dark:bg-rose-950/40 hover:bg-rose-100 dark:hover:bg-rose-900/60 rounded-xl transition-colors cursor-pointer border border-rose-200 dark:border-rose-900/50"
                           >
                             Decline / Out of Stock (Auto-Refund Customer)
                           </button>
@@ -698,15 +698,15 @@ export const KitchenDashboard: React.FC = () => {
             initial={{ opacity: 0, y: 6 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -6 }}
-            className="bg-white p-6 sm:p-8 rounded-3xl border border-rose-100 shadow-xs max-w-3xl space-y-6"
+            className="bg-white dark:bg-slate-900 p-6 sm:p-8 rounded-3xl border border-rose-100 dark:border-slate-800 shadow-xs max-w-3xl space-y-6"
           >
-            <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-4">
               <div>
-                <h2 className="text-lg font-black text-slate-900 flex items-center gap-2">
+                <h2 className="text-lg font-black text-slate-900 dark:text-slate-100 flex items-center gap-2">
                   <Store className="w-5 h-5 text-[#D6001C]" />
                   <span>Stand Identity, Cover Photo & Slogan</span>
                 </h2>
-                <p className="text-xs text-slate-500 mt-0.5">
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
                   Customize how your food stand appears to campus students across the platform.
                 </p>
               </div>
@@ -716,7 +716,7 @@ export const KitchenDashboard: React.FC = () => {
               
               {/* Slogan Field */}
               <div>
-                <label className="block text-xs font-extrabold text-slate-700 mb-1">
+                <label className="block text-xs font-extrabold text-slate-700 dark:text-slate-300 mb-1">
                   Stand Slogan / Motto
                 </label>
                 <input
@@ -724,9 +724,9 @@ export const KitchenDashboard: React.FC = () => {
                   value={slogan}
                   onChange={(e) => setSlogan(e.target.value)}
                   placeholder="e.g. Best Spicy Jollof & Asun in MTU"
-                  className="w-full p-3 rounded-2xl border border-slate-300 text-xs font-semibold focus:ring-2 focus:ring-[#D6001C] outline-none"
+                  className="w-full p-3 rounded-2xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs font-semibold focus:ring-2 focus:ring-[#D6001C] outline-none"
                 />
-                <p className="text-[11px] text-slate-400 mt-1">Displayed directly under your stand name on the customer home page.</p>
+                <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-1">Displayed directly under your stand name on the customer home page.</p>
               </div>
 
               {/* Click to Upload Cover & Logo */}
@@ -752,29 +752,29 @@ export const KitchenDashboard: React.FC = () => {
               {/* Operating Hours & Prep Time */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
-                  <label className="block text-xs font-extrabold text-slate-700 mb-1">
+                  <label className="block text-xs font-extrabold text-slate-700 dark:text-slate-300 mb-1">
                     Opening Time
                   </label>
                   <input
                     type="time"
                     value={openingTime}
                     onChange={(e) => setOpeningTime(e.target.value)}
-                    className="w-full p-2.5 rounded-2xl border border-slate-300 text-xs font-mono font-bold"
+                    className="w-full p-2.5 rounded-2xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs font-mono font-bold"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-extrabold text-slate-700 mb-1">
+                  <label className="block text-xs font-extrabold text-slate-700 dark:text-slate-300 mb-1">
                     Closing Time
                   </label>
                   <input
                     type="time"
                     value={closingTime}
                     onChange={(e) => setClosingTime(e.target.value)}
-                    className="w-full p-2.5 rounded-2xl border border-slate-300 text-xs font-mono font-bold"
+                    className="w-full p-2.5 rounded-2xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs font-mono font-bold"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-extrabold text-slate-700 mb-1">
+                  <label className="block text-xs font-extrabold text-slate-700 dark:text-slate-300 mb-1">
                     Prep & Delivery Time
                   </label>
                   <input
@@ -782,7 +782,7 @@ export const KitchenDashboard: React.FC = () => {
                     value={prepTime}
                     onChange={(e) => setPrepTime(e.target.value)}
                     placeholder="15-25 min"
-                    className="w-full p-2.5 rounded-2xl border border-slate-300 text-xs font-bold"
+                    className="w-full p-2.5 rounded-2xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs font-bold"
                   />
                 </div>
               </div>
@@ -807,13 +807,13 @@ export const KitchenDashboard: React.FC = () => {
             exit={{ opacity: 0, y: -6 }}
             className="space-y-6"
           >
-            <div className="flex items-center justify-between bg-white p-5 rounded-3xl border border-rose-100 shadow-xs">
+            <div className="flex items-center justify-between bg-white dark:bg-slate-900 p-5 rounded-3xl border border-rose-100 dark:border-slate-800 shadow-xs">
               <div>
-                <h2 className="text-lg font-black text-slate-900 flex items-center gap-2">
+                <h2 className="text-lg font-black text-slate-900 dark:text-slate-100 flex items-center gap-2">
                   <Users className="w-5 h-5 text-[#D6001C]" />
                   <span>Kitchen Staff & Worker Roster</span>
                 </h2>
-                <p className="text-xs text-slate-500 mt-0.5">
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
                   Manage chefs, kitchen hands, and cashiers assigned to this stand.
                 </p>
               </div>
@@ -830,19 +830,19 @@ export const KitchenDashboard: React.FC = () => {
             {/* Workers Cards */}
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
               {workers.map((w) => (
-                <div key={w.id} className="bg-white p-5 rounded-3xl border border-slate-200 shadow-xs flex items-center justify-between gap-3">
+                <div key={w.id} className="bg-white dark:bg-slate-900 p-5 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-xs flex items-center justify-between gap-3">
                   <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-2xl bg-rose-50 text-[#D6001C] flex items-center justify-center font-black text-sm shrink-0 border border-rose-100">
+                    <div className="w-12 h-12 rounded-2xl bg-rose-50 dark:bg-rose-950/60 text-[#D6001C] dark:text-rose-400 flex items-center justify-center font-black text-sm shrink-0 border border-rose-100 dark:border-rose-900/50">
                       <ChefHat className="w-6 h-6" />
                     </div>
                     <div>
-                      <h4 className="font-extrabold text-sm text-slate-900">{w.name}</h4>
-                      <span className="text-[11px] font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-md inline-block mt-0.5">
+                      <h4 className="font-extrabold text-sm text-slate-900 dark:text-slate-100">{w.name}</h4>
+                      <span className="text-[11px] font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/60 px-2 py-0.5 rounded-md inline-block mt-0.5">
                         {w.role}
                       </span>
                       {w.phone && (
-                        <p className="text-[11px] text-slate-400 mt-1 flex items-center gap-1">
-                          <Phone className="w-3 h-3 text-slate-400" /> {w.phone}
+                        <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-1 flex items-center gap-1">
+                          <Phone className="w-3 h-3 text-slate-400 dark:text-slate-500" /> {w.phone}
                         </p>
                       )}
                     </div>
@@ -850,7 +850,7 @@ export const KitchenDashboard: React.FC = () => {
 
                   <button
                     onClick={() => handleRemoveWorker(w.id)}
-                    className="p-2 rounded-xl text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                    className="p-2 rounded-xl text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/50 transition-colors cursor-pointer"
                     title="Remove worker"
                   >
                     <Trash2 className="w-4 h-4" />
@@ -869,16 +869,16 @@ export const KitchenDashboard: React.FC = () => {
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="bg-white rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl border border-slate-100 space-y-4"
+            className="bg-white dark:bg-slate-900 rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl border border-slate-100 dark:border-slate-800 space-y-4"
           >
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <h3 className="font-black text-base text-slate-900 flex items-center gap-2">
+            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
+              <h3 className="font-black text-base text-slate-900 dark:text-slate-100 flex items-center gap-2">
                 <UtensilsCrossed className="w-5 h-5 text-[#D6001C]" />
                 <span>Add Dish to Stand</span>
               </h3>
               <button
                 onClick={() => setShowAddDish(false)}
-                className="text-slate-400 hover:text-slate-700 text-xs font-bold"
+                className="text-slate-400 hover:text-slate-700 dark:hover:text-slate-300 text-xs font-bold cursor-pointer"
               >
                 ✕
               </button>
@@ -886,23 +886,23 @@ export const KitchenDashboard: React.FC = () => {
 
             <form onSubmit={handleCreateDish} className="space-y-3">
               <div>
-                <label className="block text-xs font-extrabold text-slate-700 mb-1">Dish Name *</label>
+                <label className="block text-xs font-extrabold text-slate-700 dark:text-slate-300 mb-1">Dish Name *</label>
                 <input
                   type="text"
                   required
                   placeholder="e.g. Special Jollof Rice + Turkey"
                   value={dishName}
                   onChange={(e) => setDishName(e.target.value)}
-                  className="w-full p-2.5 rounded-2xl border border-slate-300 text-xs font-semibold"
+                  className="w-full p-2.5 rounded-2xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs font-semibold"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-extrabold text-slate-700 mb-1">Category</label>
+                <label className="block text-xs font-extrabold text-slate-700 dark:text-slate-300 mb-1">Category</label>
                 <select
                   value={dishCategory}
                   onChange={(e) => setDishCategory(e.target.value)}
-                  className="w-full p-2.5 rounded-2xl border border-slate-300 text-xs font-semibold"
+                  className="w-full p-2.5 rounded-2xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs font-semibold"
                 >
                   <option value="Rice & Grains">Rice & Grains</option>
                   <option value="Swallow & Soups">Swallow & Soups</option>
@@ -914,7 +914,7 @@ export const KitchenDashboard: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-xs font-extrabold text-slate-700 mb-1">Price (₦) *</label>
+                <label className="block text-xs font-extrabold text-slate-700 dark:text-slate-300 mb-1">Price (₦) *</label>
                 <input
                   type="number"
                   required
@@ -922,18 +922,18 @@ export const KitchenDashboard: React.FC = () => {
                   placeholder="1800"
                   value={dishPrice}
                   onChange={(e) => setDishPrice(e.target.value)}
-                  className="w-full p-2.5 rounded-2xl border border-slate-300 text-xs font-mono font-bold"
+                  className="w-full p-2.5 rounded-2xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs font-mono font-bold"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-extrabold text-slate-700 mb-1">Description</label>
+                <label className="block text-xs font-extrabold text-slate-700 dark:text-slate-300 mb-1">Description</label>
                 <input
                   type="text"
                   placeholder="Served piping hot with fried plantains"
                   value={dishDesc}
                   onChange={(e) => setDishDesc(e.target.value)}
-                  className="w-full p-2.5 rounded-2xl border border-slate-300 text-xs"
+                  className="w-full p-2.5 rounded-2xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs"
                 />
               </div>
 
@@ -952,13 +952,13 @@ export const KitchenDashboard: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setShowAddDish(false)}
-                  className="w-1/2 bg-slate-100 text-slate-700 font-bold py-2.5 rounded-2xl text-xs"
+                  className="w-1/2 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 font-bold py-2.5 rounded-2xl text-xs cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="w-1/2 bg-[#D6001C] hover:bg-red-700 text-white font-extrabold py-2.5 rounded-2xl text-xs shadow-md"
+                  className="w-1/2 bg-[#D6001C] hover:bg-red-700 text-white font-extrabold py-2.5 rounded-2xl text-xs shadow-md cursor-pointer"
                 >
                   Save Dish
                 </button>
@@ -974,32 +974,32 @@ export const KitchenDashboard: React.FC = () => {
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="bg-white rounded-3xl p-6 max-w-sm w-full shadow-2xl border border-slate-100 space-y-4"
+            className="bg-white dark:bg-slate-900 rounded-3xl p-6 max-w-sm w-full shadow-2xl border border-slate-100 dark:border-slate-800 space-y-4"
           >
-            <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-              <h3 className="font-black text-sm text-slate-900">Add Staff Member</h3>
-              <button onClick={() => setShowAddWorker(false)} className="text-slate-400 text-xs font-bold">✕</button>
+            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-2">
+              <h3 className="font-black text-sm text-slate-900 dark:text-slate-100">Add Staff Member</h3>
+              <button onClick={() => setShowAddWorker(false)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-xs font-bold cursor-pointer">✕</button>
             </div>
 
             <form onSubmit={handleAddWorker} className="space-y-3">
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">Full Name</label>
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Full Name</label>
                 <input
                   type="text"
                   required
                   placeholder="e.g. John Doe"
                   value={newWorkerName}
                   onChange={(e) => setNewWorkerName(e.target.value)}
-                  className="w-full p-2.5 rounded-2xl border border-slate-300 text-xs"
+                  className="w-full p-2.5 rounded-2xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">Role</label>
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Role</label>
                 <select
                   value={newWorkerRole}
                   onChange={(e) => setNewWorkerRole(e.target.value)}
-                  className="w-full p-2.5 rounded-2xl border border-slate-300 text-xs font-semibold"
+                  className="w-full p-2.5 rounded-2xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs font-semibold"
                 >
                   <option value="Head Chef">Head Chef</option>
                   <option value="Cook / Griller">Cook / Griller</option>
@@ -1010,19 +1010,19 @@ export const KitchenDashboard: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">Phone Number</label>
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Phone Number</label>
                 <input
                   type="tel"
                   placeholder="+234 800 000 0000"
                   value={newWorkerPhone}
                   onChange={(e) => setNewWorkerPhone(e.target.value)}
-                  className="w-full p-2.5 rounded-2xl border border-slate-300 text-xs"
+                  className="w-full p-2.5 rounded-2xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs"
                 />
               </div>
 
               <button
                 type="submit"
-                className="w-full bg-[#D6001C] hover:bg-red-700 text-white font-extrabold py-2.5 rounded-2xl text-xs shadow-md mt-2"
+                className="w-full bg-[#D6001C] hover:bg-red-700 text-white font-extrabold py-2.5 rounded-2xl text-xs shadow-md mt-2 cursor-pointer"
               >
                 Add Staff Member
               </button>

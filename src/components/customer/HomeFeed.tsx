@@ -21,7 +21,9 @@ import {
   Zap,
   X,
   Ban,
-  AlertTriangle
+  AlertTriangle,
+  History,
+  Trash2
 } from 'lucide-react';
 import { useMarketplaceStore } from '../../stores/useMarketplaceStore';
 import { useCartStore } from '../../stores/useCartStore';
@@ -79,6 +81,47 @@ export const HomeFeed: React.FC<HomeFeedProps> = ({
   // Search & Category Filters
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
+  const [searchHistory, setSearchHistory] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem('bukkit_recent_searches');
+      return saved ? JSON.parse(saved) : ['Jollof Rice', 'Shawarma', 'Suya', 'Cold Drinks'];
+    } catch {
+      return ['Jollof Rice', 'Shawarma', 'Suya', 'Cold Drinks'];
+    }
+  });
+
+  const saveSearchTerm = (term: string) => {
+    const cleaned = term.trim();
+    if (!cleaned) return;
+    setSearchHistory((prev) => {
+      const filtered = prev.filter((item) => item.toLowerCase() !== cleaned.toLowerCase());
+      const next = [cleaned, ...filtered].slice(0, 6);
+      try {
+        localStorage.setItem('bukkit_recent_searches', JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+  };
+
+  const handleRemoveHistoryItem = (termToRemove: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    triggerHaptic(20);
+    setSearchHistory((prev) => {
+      const next = prev.filter((item) => item !== termToRemove);
+      try {
+        localStorage.setItem('bukkit_recent_searches', JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+  };
+
+  const handleClearHistory = () => {
+    triggerHaptic(30);
+    setSearchHistory([]);
+    try {
+      localStorage.removeItem('bukkit_recent_searches');
+    } catch {}
+  };
 
   // Featured Today Dish Showcase state (Inspired by Inspiration 3 & 4)
   const [showcaseIndex, setShowcaseIndex] = useState(0);
@@ -174,6 +217,73 @@ export const HomeFeed: React.FC<HomeFeedProps> = ({
     });
   }, [menuItems, searchQuery, selectedCategory]);
 
+  // Full Screen Skeleton Loading state for high perceived performance
+  if (isLoading) {
+    return (
+      <div className="space-y-6 sm:space-y-8 pb-32 max-w-7xl mx-auto px-1 sm:px-2 animate-pulse">
+        {/* Location & Search Header Skeleton */}
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-2xl bg-slate-200/80 dark:bg-slate-800" />
+              <div className="space-y-1.5">
+                <div className="w-24 h-2.5 bg-slate-200/80 dark:bg-slate-800 rounded" />
+                <div className="w-44 h-4 bg-slate-200/80 dark:bg-slate-800 rounded-md" />
+              </div>
+            </div>
+            <div className="w-36 h-7 bg-slate-200/80 dark:bg-slate-800 rounded-full" />
+          </div>
+
+          {/* Search Bar Skeleton */}
+          <div className="h-12 bg-slate-200/70 dark:bg-slate-800 rounded-2xl w-full" />
+
+          {/* Category Chips Skeleton */}
+          <div className="flex gap-2 overflow-hidden pt-1">
+            {[1, 2, 3, 4, 5, 6, 7].map((i) => (
+              <div key={i} className="h-8 w-24 bg-slate-200/70 dark:bg-slate-800 rounded-full shrink-0" />
+            ))}
+          </div>
+        </div>
+
+        {/* Featured Showcase Skeleton */}
+        <div className="h-72 sm:h-80 bg-gradient-to-r from-slate-200/90 to-slate-200/60 dark:from-slate-800 dark:to-slate-900 rounded-3xl w-full shadow-xs" />
+
+        {/* Kitchen Stands Rail Skeleton */}
+        <div className="space-y-3">
+          <div className="flex justify-between items-center px-1">
+            <div className="w-40 h-5 bg-slate-200/80 dark:bg-slate-800 rounded" />
+            <div className="w-16 h-4 bg-slate-200/80 dark:bg-slate-800 rounded" />
+          </div>
+          <div className="flex gap-3 overflow-hidden">
+            {[1, 2, 3, 4].map((i) => (
+              <div key={i} className="w-44 h-28 bg-slate-200/70 dark:bg-slate-800 rounded-3xl shrink-0" />
+            ))}
+          </div>
+        </div>
+
+        {/* Popular Meals Grid Skeleton */}
+        <div className="space-y-3">
+          <div className="w-48 h-5 bg-slate-200/80 dark:bg-slate-800 rounded px-1" />
+          <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4.5">
+            {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
+              <div key={i} className="bg-white dark:bg-slate-900 rounded-3xl p-3 border border-slate-100 dark:border-slate-800 shadow-2xs space-y-3">
+                <div className="aspect-square bg-slate-200/80 dark:bg-slate-800 rounded-2xl w-full" />
+                <div className="space-y-1.5">
+                  <div className="w-2/3 h-4 bg-slate-200/80 dark:bg-slate-800 rounded" />
+                  <div className="w-1/2 h-3 bg-slate-200/60 dark:bg-slate-800/60 rounded" />
+                </div>
+                <div className="flex items-center justify-between pt-1">
+                  <div className="w-16 h-5 bg-slate-200/80 dark:bg-slate-800 rounded-full" />
+                  <div className="w-7 h-7 bg-slate-200/80 dark:bg-slate-800 rounded-full" />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <motion.div
       variants={pageVariants}
@@ -186,21 +296,21 @@ export const HomeFeed: React.FC<HomeFeedProps> = ({
       <div className="space-y-3">
         {/* Delivery Location Indicator */}
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2 text-xs text-slate-600">
-            <div className="p-2 rounded-2xl bg-emerald-50 text-[#0D472B] border border-emerald-100/80 shadow-2xs">
+          <div className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-400">
+            <div className="p-2 rounded-2xl bg-emerald-50 dark:bg-slate-800 text-[#0D472B] dark:text-emerald-400 border border-emerald-100/80 dark:border-slate-700 shadow-2xs">
               <MapPin className="w-4 h-4 text-[#FF7A00]" />
             </div>
             <div>
-              <span className="text-[10px] font-extrabold text-slate-400 block uppercase tracking-wider leading-tight">
+              <span className="text-[10px] font-extrabold text-slate-400 dark:text-slate-500 block uppercase tracking-wider leading-tight">
                 DELIVERING TO CAMPUS SPOT
               </span>
-              <span className="font-black text-slate-900 truncate max-w-[220px] sm:max-w-none text-sm">
+              <span className="font-black text-slate-900 dark:text-slate-100 truncate max-w-[220px] sm:max-w-none text-sm">
                 {user?.address || 'Mountain Top University Campus'}
               </span>
             </div>
           </div>
 
-          <div className="flex items-center gap-1.5 bg-[#0D472B]/10 text-[#0D472B] text-[11px] font-black px-3 py-1.5 rounded-full border border-[#0D472B]/20 shadow-2xs">
+          <div className="flex items-center gap-1.5 bg-[#0D472B]/10 dark:bg-emerald-950/40 text-[#0D472B] dark:text-emerald-400 text-[11px] font-black px-3 py-1.5 rounded-full border border-[#0D472B]/20 dark:border-emerald-800/40 shadow-2xs">
             <span className="w-2 h-2 rounded-full bg-[#FF7A00] animate-ping" />
             <span>Campus Express: ~15-20 mins</span>
           </div>
@@ -208,23 +318,68 @@ export const HomeFeed: React.FC<HomeFeedProps> = ({
 
         {/* Live Search Input */}
         <div className="relative flex items-center">
-          <Search className="w-4 h-4 text-[#0D472B] absolute left-3.5 pointer-events-none" />
+          <Search className="w-4 h-4 text-[#0D472B] dark:text-emerald-400 absolute left-3.5 pointer-events-none" />
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && searchQuery.trim()) {
+                saveSearchTerm(searchQuery);
+              }
+            }}
             placeholder="Search party jollof, amala, suya chicken, shawarma, cold drinks..."
-            className="w-full bg-white border border-emerald-100/90 rounded-2xl pl-10 pr-10 py-3 text-xs sm:text-sm font-semibold text-slate-900 placeholder:text-slate-400 shadow-xs focus:outline-none focus:border-[#0D472B] focus:ring-2 focus:ring-[#0D472B]/10 transition-all"
+            className="w-full bg-white dark:bg-slate-900 border border-emerald-100/90 dark:border-slate-800 rounded-2xl pl-10 pr-10 py-3 text-xs sm:text-sm font-semibold text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 shadow-xs focus:outline-none focus:border-[#0D472B] dark:focus:border-emerald-500 focus:ring-2 focus:ring-[#0D472B]/10 transition-all"
           />
           {searchQuery && (
             <button
               onClick={() => setSearchQuery('')}
-              className="absolute right-3.5 text-slate-400 hover:text-slate-600 p-0.5 rounded-full cursor-pointer"
+              className="absolute right-3.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-0.5 rounded-full cursor-pointer"
             >
               <X className="w-4 h-4" />
             </button>
           )}
         </div>
+
+        {/* Recent Search History Chips */}
+        {searchHistory.length > 0 && (
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 pt-0.5 scrollbar-none">
+            <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider flex items-center gap-1 shrink-0 pl-1">
+              <History className="w-3 h-3 text-slate-400" />
+              <span>Recent:</span>
+            </span>
+            {searchHistory.map((item) => (
+              <button
+                key={item}
+                onClick={() => {
+                  triggerHaptic(20);
+                  setSearchQuery(item);
+                  saveSearchTerm(item);
+                }}
+                className={`text-[11px] font-bold px-2.5 py-1 rounded-full border transition-all flex items-center gap-1.5 shrink-0 cursor-pointer ${
+                  searchQuery.toLowerCase() === item.toLowerCase()
+                    ? 'bg-[#0D472B] dark:bg-emerald-700 text-white border-emerald-800 shadow-xs'
+                    : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-800 hover:bg-emerald-50 dark:hover:bg-slate-800 hover:text-[#0D472B] dark:hover:text-emerald-400'
+                }`}
+              >
+                <span>{item}</span>
+                <span
+                  onClick={(e) => handleRemoveHistoryItem(item, e)}
+                  className="text-slate-400 hover:text-red-500 rounded-full p-0.5"
+                  title="Remove"
+                >
+                  <X className="w-2.5 h-2.5" />
+                </span>
+              </button>
+            ))}
+            <button
+              onClick={handleClearHistory}
+              className="text-[10px] font-bold text-slate-400 hover:text-red-500 shrink-0 px-2 py-0.5 rounded-full hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors"
+            >
+              Clear
+            </button>
+          </div>
+        )}
 
         {/* Category Filter Chips Carousel */}
         <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none pt-1">
@@ -239,8 +394,8 @@ export const HomeFeed: React.FC<HomeFeedProps> = ({
                 }}
                 className={`whitespace-nowrap px-4 py-2 rounded-full text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer border shadow-2xs ${
                   isSelected
-                    ? 'bg-[#0D472B] text-white border-emerald-800 shadow-xs shadow-emerald-900/20'
-                    : 'bg-white text-slate-700 hover:bg-emerald-50/60 border-slate-200'
+                    ? 'bg-[#0D472B] dark:bg-emerald-700 text-white border-emerald-800 dark:border-emerald-600 shadow-xs shadow-emerald-900/20'
+                    : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 hover:bg-emerald-50/60 dark:hover:bg-slate-800 border-slate-200 dark:border-slate-800'
                 }`}
               >
                 <span>{cat.emoji}</span>
@@ -318,7 +473,7 @@ export const HomeFeed: React.FC<HomeFeedProps> = ({
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#FF7A00] opacity-75" />
                 <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-[#FF7A00]" />
               </span>
-              <h2 className="text-sm sm:text-base font-black text-slate-900 tracking-tight">
+              <h2 className="text-sm sm:text-base font-black text-slate-900 dark:text-slate-100 tracking-tight">
                 Chef's Daily Spotlight Meals
               </h2>
             </div>
@@ -327,14 +482,14 @@ export const HomeFeed: React.FC<HomeFeedProps> = ({
               <button
                 onClick={handlePrevSlide}
                 aria-label="Previous special"
-                className="w-8 h-8 rounded-full bg-white border border-slate-200 hover:bg-emerald-50 text-[#0D472B] flex items-center justify-center transition-colors cursor-pointer shadow-2xs font-bold"
+                className="w-8 h-8 rounded-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-emerald-50 dark:hover:bg-slate-700 text-[#0D472B] dark:text-emerald-400 flex items-center justify-center transition-colors cursor-pointer shadow-2xs font-bold"
               >
                 <ChevronLeft className="w-4 h-4" />
               </button>
               <button
                 onClick={handleNextSlide}
                 aria-label="Next special"
-                className="w-8 h-8 rounded-full bg-white border border-slate-200 hover:bg-emerald-50 text-[#0D472B] flex items-center justify-center transition-colors cursor-pointer shadow-2xs font-bold"
+                className="w-8 h-8 rounded-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-emerald-50 dark:hover:bg-slate-700 text-[#0D472B] dark:text-emerald-400 flex items-center justify-center transition-colors cursor-pointer shadow-2xs font-bold"
               >
                 <ChevronRight className="w-4 h-4" />
               </button>
@@ -342,12 +497,12 @@ export const HomeFeed: React.FC<HomeFeedProps> = ({
           </div>
 
           {/* Interactive Showcase Card Layout (Inspiration 3 format) */}
-          <div className="bg-gradient-to-br from-white via-emerald-50/30 to-orange-50/20 rounded-3xl border border-emerald-100/90 shadow-lg p-4 sm:p-6 md:p-8">
+          <div className="bg-gradient-to-br from-white via-emerald-50/30 to-orange-50/20 dark:from-slate-900 dark:via-slate-900 dark:to-slate-800/90 rounded-3xl border border-emerald-100/90 dark:border-slate-800 shadow-lg p-4 sm:p-6 md:p-8">
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
               
               {/* Left Column: Quick Dish Selectors Column (Inspiration 3 Circular Thumbnails) */}
               <div className="lg:col-span-2 flex lg:flex-col items-center gap-3 overflow-x-auto lg:overflow-visible pb-2 lg:pb-0 scrollbar-none">
-                <span className="hidden lg:block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">
+                <span className="hidden lg:block text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1">
                   Picks ({showcaseMeals.length})
                 </span>
                 {showcaseMeals.map((dish, idx) => {
@@ -364,10 +519,10 @@ export const HomeFeed: React.FC<HomeFeedProps> = ({
                       className={`relative rounded-2xl p-1 transition-all cursor-pointer shrink-0 flex items-center gap-2 ${
                         isActive
                           ? 'ring-2 ring-[#FF7A00] bg-[#FF7A00]/10 shadow-md shadow-orange-500/10'
-                          : 'opacity-70 hover:opacity-100 bg-white border border-slate-200'
+                          : 'opacity-70 hover:opacity-100 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700'
                       }`}
                     >
-                      <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-xl overflow-hidden bg-slate-100 shrink-0">
+                      <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-xl overflow-hidden bg-slate-100 dark:bg-slate-700 shrink-0">
                         <img
                           src={dish.image_url || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=150'}
                           alt={dish.name}
@@ -375,7 +530,7 @@ export const HomeFeed: React.FC<HomeFeedProps> = ({
                         />
                       </div>
                       <div className="hidden xl:block text-left pr-2">
-                        <p className={`text-xs font-black truncate max-w-[90px] ${isActive ? 'text-[#0D472B]' : 'text-slate-700'}`}>
+                        <p className={`text-xs font-black truncate max-w-[90px] ${isActive ? 'text-[#0D472B] dark:text-emerald-400' : 'text-slate-700 dark:text-slate-300'}`}>
                           {dish.name}
                         </p>
                         <p className="text-[10px] font-bold text-[#FF7A00]">
@@ -402,7 +557,7 @@ export const HomeFeed: React.FC<HomeFeedProps> = ({
                       {/* Big Plate Shadow & Frame */}
                       <div
                         onClick={() => onSelectFood(currentMeal)}
-                        className="relative w-52 h-52 sm:w-64 sm:h-64 rounded-full p-2 bg-white shadow-2xl shadow-emerald-950/15 border-4 border-white cursor-pointer group"
+                        className="relative w-52 h-52 sm:w-64 sm:h-64 rounded-full p-2 bg-white dark:bg-slate-800 shadow-2xl shadow-emerald-950/15 border-4 border-white dark:border-slate-700 cursor-pointer group"
                       >
                         <div className="w-full h-full rounded-full overflow-hidden">
                           <img
@@ -415,7 +570,7 @@ export const HomeFeed: React.FC<HomeFeedProps> = ({
                           />
                         </div>
                         {/* Rating floating pill */}
-                        <div className="absolute top-2 right-2 bg-white/95 backdrop-blur-md px-2.5 py-1 rounded-full text-xs font-black text-slate-800 shadow-md border border-slate-100 flex items-center gap-1">
+                        <div className="absolute top-2 right-2 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md px-2.5 py-1 rounded-full text-xs font-black text-slate-800 dark:text-slate-200 shadow-md border border-slate-100 dark:border-slate-700 flex items-center gap-1">
                           <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
                           <span>4.9</span>
                         </div>
@@ -424,7 +579,7 @@ export const HomeFeed: React.FC<HomeFeedProps> = ({
                       {/* Tap to inspect badge */}
                       <button
                         onClick={() => onSelectFood(currentMeal)}
-                        className="mt-3 text-[11px] font-black text-[#0D472B] hover:text-[#FF7A00] flex items-center gap-1 transition-colors cursor-pointer"
+                        className="mt-3 text-[11px] font-black text-[#0D472B] dark:text-emerald-400 hover:text-[#FF7A00] flex items-center gap-1 transition-colors cursor-pointer"
                       >
                         <span>View Nutritional Facts & Recipe Details</span>
                         <ChevronRight className="w-3 h-3" />
@@ -438,10 +593,10 @@ export const HomeFeed: React.FC<HomeFeedProps> = ({
               <div className="lg:col-span-5 space-y-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-1.5">
-                    <span className="bg-[#0D472B] text-white text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider">
+                    <span className="bg-[#0D472B] dark:bg-emerald-700 text-white text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider">
                       TOP SPECIAL
                     </span>
-                    <span className="bg-emerald-100 text-[#0D472B] text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
+                    <span className="bg-emerald-100 dark:bg-slate-800 text-[#0D472B] dark:text-emerald-400 text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 border border-transparent dark:border-slate-700">
                       <Store className="w-3 h-3 text-[#FF7A00]" />
                       <span>{currentMeal.restaurant_name || 'MTU Campus Stand'}</span>
                     </span>
@@ -454,21 +609,21 @@ export const HomeFeed: React.FC<HomeFeedProps> = ({
                         toggleFavorite(user.uid, currentMeal.id, 'menu_item');
                       }
                     }}
-                    className="p-2 rounded-full bg-white hover:bg-rose-50 border border-slate-200 text-slate-400 hover:text-rose-600 transition-colors shadow-2xs cursor-pointer"
+                    className="p-2 rounded-full bg-white dark:bg-slate-800 hover:bg-rose-50 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 text-slate-400 dark:text-slate-500 hover:text-rose-600 transition-colors shadow-2xs cursor-pointer"
                   >
                     <Heart
                       className={`w-4 h-4 ${
-                        isMealFavorite ? 'fill-[#FF7A00] text-[#FF7A00]' : 'text-slate-400'
+                        isMealFavorite ? 'fill-[#FF7A00] text-[#FF7A00]' : 'text-slate-400 dark:text-slate-500'
                       }`}
                     />
                   </button>
                 </div>
 
                 <div>
-                  <h3 className="text-xl sm:text-2xl lg:text-3xl font-black text-slate-900 tracking-tight leading-tight">
+                  <h3 className="text-xl sm:text-2xl lg:text-3xl font-black text-slate-900 dark:text-slate-100 tracking-tight leading-tight">
                     {currentMeal.name}
                   </h3>
-                  <p className="text-xs text-slate-600 font-medium mt-1 leading-relaxed line-clamp-2">
+                  <p className="text-xs text-slate-600 dark:text-slate-300 font-medium mt-1 leading-relaxed line-clamp-2">
                     {currentMeal.description ||
                       'Authentic Nigerian campus delicacy prepared fresh in MTU kitchens with rich spices.'}
                   </p>
@@ -476,7 +631,7 @@ export const HomeFeed: React.FC<HomeFeedProps> = ({
 
                 {/* Extras & Toppings Selector */}
                 <div className="space-y-1.5">
-                  <span className="text-[11px] font-extrabold text-slate-700 flex items-center gap-1">
+                  <span className="text-[11px] font-extrabold text-slate-700 dark:text-slate-300 flex items-center gap-1">
                     <Sparkles className="w-3 h-3 text-[#FF7A00]" />
                     <span>Select Portions & Extras:</span>
                   </span>
@@ -489,8 +644,8 @@ export const HomeFeed: React.FC<HomeFeedProps> = ({
                           onClick={() => handleToggleTopping(top)}
                           className={`px-3 py-1.5 rounded-xl text-[11px] font-bold transition-all flex items-center gap-1.5 cursor-pointer border ${
                             isSelected
-                              ? 'bg-[#0D472B] text-white border-emerald-900 shadow-xs'
-                              : 'bg-white hover:bg-slate-50 text-slate-700 border-slate-200'
+                              ? 'bg-[#0D472B] dark:bg-emerald-700 text-white border-emerald-900 shadow-xs'
+                              : 'bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700'
                           }`}
                         >
                           <span>{top.emoji}</span>
@@ -503,18 +658,18 @@ export const HomeFeed: React.FC<HomeFeedProps> = ({
                 </div>
 
                 {/* Stepper, Grand Price & Add to Bag (Inspiration 3 Style) */}
-                <div className="flex items-center gap-3 pt-3 border-t border-slate-200">
-                  <div className="flex items-center gap-1.5 bg-slate-100 px-2.5 py-1.5 rounded-2xl border border-slate-200">
+                <div className="flex items-center gap-3 pt-3 border-t border-slate-200 dark:border-slate-800">
+                  <div className="flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800 px-2.5 py-1.5 rounded-2xl border border-slate-200 dark:border-slate-700">
                     <button
                       onClick={() => {
                         triggerHaptic(20);
                         setPortionQty(Math.max(1, portionQty - 1));
                       }}
-                      className="w-7 h-7 rounded-xl bg-white hover:bg-slate-200 text-slate-800 flex items-center justify-center font-black shadow-2xs"
+                      className="w-7 h-7 rounded-xl bg-white dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-800 dark:text-slate-100 flex items-center justify-center font-black shadow-2xs"
                     >
                       <Minus className="w-3.5 h-3.5" />
                     </button>
-                    <span className="w-6 text-center font-black text-sm text-slate-900">
+                    <span className="w-6 text-center font-black text-sm text-slate-900 dark:text-slate-100">
                       {portionQty}
                     </span>
                     <button
@@ -522,23 +677,23 @@ export const HomeFeed: React.FC<HomeFeedProps> = ({
                         triggerHaptic(20);
                         setPortionQty(portionQty + 1);
                       }}
-                      className="w-7 h-7 rounded-xl bg-white hover:bg-slate-200 text-slate-800 flex items-center justify-center font-black shadow-2xs"
+                      className="w-7 h-7 rounded-xl bg-white dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-800 dark:text-slate-100 flex items-center justify-center font-black shadow-2xs"
                     >
                       <Plus className="w-3.5 h-3.5" />
                     </button>
                   </div>
 
                   <div>
-                    <span className="text-[10px] text-slate-400 block font-black uppercase tracking-wider">
+                    <span className="text-[10px] text-slate-400 dark:text-slate-500 block font-black uppercase tracking-wider">
                       TOTAL
                     </span>
-                    <span className="text-xl sm:text-2xl font-black text-slate-900">
+                    <span className="text-xl sm:text-2xl font-black text-slate-900 dark:text-slate-100">
                       ₦{grandTotal.toLocaleString()}
                     </span>
                   </div>
 
                   {!showcaseAvailability.isAvailable ? (
-                    <div className="flex-1 bg-slate-100 border border-slate-200 text-slate-400 font-extrabold py-3 px-4 rounded-2xl flex items-center justify-center gap-2 text-xs uppercase tracking-wider cursor-not-allowed ml-auto select-none">
+                    <div className="flex-1 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-400 dark:text-slate-500 font-extrabold py-3 px-4 rounded-2xl flex items-center justify-center gap-2 text-xs uppercase tracking-wider cursor-not-allowed ml-auto select-none">
                       <Ban className="w-3.5 h-3.5 text-rose-500" />
                       <span>{showcaseAvailability.badgeLabel}</span>
                     </div>
@@ -565,14 +720,14 @@ export const HomeFeed: React.FC<HomeFeedProps> = ({
         <section className="space-y-3">
           <div className="flex items-center justify-between px-1">
             <div>
-              <h2 className="text-sm sm:text-base font-black text-slate-900 tracking-tight">
+              <h2 className="text-sm sm:text-base font-black text-slate-900 dark:text-slate-100 tracking-tight">
                 MTU Registered Food Kitchens & Stands
               </h2>
-              <p className="text-[11px] text-slate-500 font-medium">Order from certified on-campus cafeteria partners</p>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">Order from certified on-campus cafeteria partners</p>
             </div>
             <button
               onClick={() => onNavigateToMenu && onNavigateToMenu()}
-              className="text-xs font-extrabold text-[#0D472B] hover:underline flex items-center gap-0.5 cursor-pointer"
+              className="text-xs font-extrabold text-[#0D472B] dark:text-emerald-400 hover:underline flex items-center gap-0.5 cursor-pointer"
             >
               <span>See All Stands</span>
               <ChevronRight className="w-3.5 h-3.5" />
@@ -591,9 +746,9 @@ export const HomeFeed: React.FC<HomeFeedProps> = ({
                     if (onNavigateToMenu) onNavigateToMenu(vendor.id);
                     else onSelectRestaurant(vendor);
                   }}
-                  className="min-w-[210px] sm:min-w-[230px] bg-white rounded-2xl p-3.5 border border-emerald-100/90 shadow-2xs hover:shadow-md transition-all cursor-pointer flex items-center gap-3 shrink-0"
+                  className="min-w-[210px] sm:min-w-[230px] bg-white dark:bg-slate-900 rounded-2xl p-3.5 border border-emerald-100/90 dark:border-slate-800 shadow-2xs hover:shadow-md transition-all cursor-pointer flex items-center gap-3 shrink-0"
                 >
-                  <div className="w-12 h-12 rounded-xl overflow-hidden bg-emerald-50 border border-emerald-100 shrink-0">
+                  <div className="w-12 h-12 rounded-xl overflow-hidden bg-emerald-50 dark:bg-slate-800 border border-emerald-100 dark:border-slate-700 shrink-0">
                     <img
                       src={vendor.logo_url || vendor.cover_image_url || 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=100'}
                       alt={vendor.name}
@@ -601,17 +756,17 @@ export const HomeFeed: React.FC<HomeFeedProps> = ({
                     />
                   </div>
                   <div className="min-w-0 flex-1">
-                    <h4 className="font-extrabold text-xs text-slate-900 truncate">
+                    <h4 className="font-extrabold text-xs text-slate-900 dark:text-slate-100 truncate">
                       {vendor.name}
                     </h4>
-                    <div className="flex items-center gap-1 text-[10px] text-slate-500 mt-0.5">
+                    <div className="flex items-center gap-1 text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">
                       <Star className="w-3 h-3 text-amber-500 fill-amber-500" />
                       <span className="font-bold">{vendor.rating ? vendor.rating.toFixed(1) : '4.8'}</span>
                       <span>•</span>
                       {isVendorOpen ? (
-                        <span className="text-emerald-700 font-bold">Open Now</span>
+                        <span className="text-emerald-700 dark:text-emerald-400 font-bold">Open Now</span>
                       ) : (
-                        <span className="text-rose-700 font-bold">Closed</span>
+                        <span className="text-rose-700 dark:text-rose-400 font-bold">Closed</span>
                       )}
                     </div>
                     <span className="text-[9px] text-[#FF7A00] font-black block mt-0.5 truncate uppercase">
@@ -629,19 +784,19 @@ export const HomeFeed: React.FC<HomeFeedProps> = ({
       <section className="space-y-3">
         <div className="flex items-center justify-between px-1">
           <div>
-            <h2 className="text-sm sm:text-base font-black text-slate-900 tracking-tight">
+            <h2 className="text-sm sm:text-base font-black text-slate-900 dark:text-slate-100 tracking-tight">
               {searchQuery
                 ? `Search results for "${searchQuery}" (${filteredMeals.length})`
                 : selectedCategory !== 'all'
                 ? `Category: ${FOOD_CATEGORIES.find((c) => c.id === selectedCategory)?.label || ''} (${filteredMeals.length})`
                 : 'Popular Campus Meals'}
             </h2>
-            <p className="text-[11px] text-slate-500 font-medium">Fresh dishes cooked daily on campus</p>
+            <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">Fresh dishes cooked daily on campus</p>
           </div>
           {searchQuery && (
             <button
               onClick={() => setSearchQuery('')}
-              className="text-xs font-bold text-[#0D472B] hover:underline cursor-pointer"
+              className="text-xs font-bold text-[#0D472B] dark:text-emerald-400 hover:underline cursor-pointer"
             >
               Clear filter
             </button>
@@ -651,14 +806,14 @@ export const HomeFeed: React.FC<HomeFeedProps> = ({
         {isLoading ? (
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
             {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
-              <div key={i} className="h-56 bg-slate-200/70 animate-pulse rounded-2xl" />
+              <div key={i} className="h-56 bg-slate-200/70 dark:bg-slate-800 animate-pulse rounded-2xl" />
             ))}
           </div>
         ) : filteredMeals.length === 0 ? (
-          <div className="bg-white rounded-3xl p-8 border border-emerald-100 text-center space-y-3">
-            <UtensilsCrossed className="w-10 h-10 text-slate-300 mx-auto" />
-            <h3 className="font-extrabold text-sm text-slate-900">No dishes found</h3>
-            <p className="text-xs text-slate-500 max-w-xs mx-auto">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl p-8 border border-emerald-100 dark:border-slate-800 text-center space-y-3">
+            <UtensilsCrossed className="w-10 h-10 text-slate-300 dark:text-slate-600 mx-auto" />
+            <h3 className="font-extrabold text-sm text-slate-900 dark:text-slate-100">No dishes found</h3>
+            <p className="text-xs text-slate-500 dark:text-slate-400 max-w-xs mx-auto">
               We couldn't find any meals matching your search. Try checking another category or clearing your query.
             </p>
             <button
@@ -666,7 +821,7 @@ export const HomeFeed: React.FC<HomeFeedProps> = ({
                 setSearchQuery('');
                 setSelectedCategory('all');
               }}
-              className="px-4 py-2 bg-[#0D472B] text-white text-xs font-bold rounded-full cursor-pointer hover:bg-emerald-800"
+              className="px-4 py-2 bg-[#0D472B] dark:bg-emerald-700 text-white text-xs font-bold rounded-full cursor-pointer hover:bg-emerald-800"
             >
               Show All Meals
             </button>

@@ -181,7 +181,7 @@ export const MenuView: React.FC<MenuViewProps> = ({
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search dishes (e.g. Jollof Rice, Amala, Shawarma, Zobo)..."
-              className="w-full bg-white border border-rose-100 rounded-2xl py-3.5 pl-11 pr-4 text-sm font-bold text-slate-800 placeholder-slate-400 shadow-xs focus:ring-2 focus:ring-[#D6001C] outline-none transition-all"
+              className="w-full bg-white dark:bg-slate-900 border border-rose-100 dark:border-slate-800 rounded-2xl py-3.5 pl-11 pr-4 text-sm font-bold text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 shadow-xs focus:ring-2 focus:ring-[#D6001C] outline-none transition-all"
             />
             <Search className="w-5 h-5 text-slate-400 absolute left-4 top-3.5" />
           </div>
@@ -196,7 +196,7 @@ export const MenuView: React.FC<MenuViewProps> = ({
               setActiveFilter('all');
               setSearchQuery('');
             }}
-            className="px-4 py-3.5 bg-slate-100 hover:bg-rose-50 text-slate-700 hover:text-[#D6001C] rounded-2xl text-xs font-bold transition-colors cursor-pointer shrink-0 border border-slate-200"
+            className="px-4 py-3.5 bg-slate-100 dark:bg-slate-800 hover:bg-rose-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 hover:text-[#D6001C] dark:hover:text-rose-400 rounded-2xl text-xs font-bold transition-colors cursor-pointer shrink-0 border border-slate-200 dark:border-slate-700"
           >
             Reset
           </motion.button>
@@ -220,7 +220,7 @@ export const MenuView: React.FC<MenuViewProps> = ({
               className={`px-4 py-2 rounded-xl transition-all cursor-pointer border shrink-0 ${
                 activeFilter === f.id
                   ? 'bg-[#D6001C] text-white border-[#D6001C] shadow-xs'
-                  : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                  : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800'
               }`}
             >
               {f.label}
@@ -231,7 +231,7 @@ export const MenuView: React.FC<MenuViewProps> = ({
         {/* Stand / Kitchen Selector Tabs with Animated Active Indicator */}
         <div>
           <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-black text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+            <span className="text-xs font-black text-slate-800 dark:text-slate-200 uppercase tracking-wider flex items-center gap-1.5">
               <Store className="w-3.5 h-3.5 text-[#D6001C]" />
               Select Kitchen Stand:
             </span>
@@ -241,7 +241,7 @@ export const MenuView: React.FC<MenuViewProps> = ({
                   triggerHaptic(20);
                   setSelectedVendorFilter('all');
                 }}
-                className="text-[11px] font-bold text-[#D6001C] hover:underline cursor-pointer"
+                className="text-[11px] font-bold text-[#D6001C] dark:text-rose-400 hover:underline cursor-pointer"
               >
                 Show All Stands
               </button>
@@ -255,8 +255,8 @@ export const MenuView: React.FC<MenuViewProps> = ({
               }}
               className={`relative px-4 py-2 rounded-xl text-xs font-bold shrink-0 transition-all cursor-pointer ${
                 selectedVendorFilter === 'all'
-                  ? 'bg-slate-900 text-white shadow-sm'
-                  : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
+                  ? 'bg-slate-900 dark:bg-emerald-700 text-white shadow-sm'
+                  : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800'
               }`}
             >
               All Kitchens ({allKnownVendors.length})
@@ -273,8 +273,8 @@ export const MenuView: React.FC<MenuViewProps> = ({
                   }}
                   className={`relative px-4 py-2 rounded-xl text-xs font-bold shrink-0 transition-all cursor-pointer flex items-center gap-1.5 ${
                     isSelected
-                      ? 'bg-slate-900 text-white shadow-sm'
-                      : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
+                      ? 'bg-slate-900 dark:bg-emerald-700 text-white shadow-sm'
+                      : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800'
                   }`}
                 >
                   <span>{vend.name}</span>
@@ -298,8 +298,8 @@ export const MenuView: React.FC<MenuViewProps> = ({
             }}
             className={`px-4 py-2 rounded-full font-bold text-xs tracking-wide shrink-0 transition-colors cursor-pointer ${
               selectedCategoryId === 'all'
-                ? 'bg-rose-100 text-[#D6001C] border border-rose-300 font-black'
-                : 'bg-white text-slate-600 hover:bg-rose-50 border border-slate-200'
+                ? 'bg-rose-100 dark:bg-rose-950/60 text-[#D6001C] dark:text-rose-400 border border-rose-300 dark:border-rose-800 font-black'
+                : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-rose-50 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800'
             }`}
           >
             All Categories
@@ -317,8 +317,8 @@ export const MenuView: React.FC<MenuViewProps> = ({
                 }}
                 className={`px-4 py-2 rounded-full font-bold text-xs tracking-wide shrink-0 transition-colors cursor-pointer ${
                   isSelected
-                    ? 'bg-rose-100 text-[#D6001C] border border-rose-300 font-black'
-                    : 'bg-white text-slate-600 hover:bg-rose-50 border border-slate-200'
+                    ? 'bg-rose-100 dark:bg-rose-950/60 text-[#D6001C] dark:text-rose-400 border border-rose-300 dark:border-rose-800 font-black'
+                    : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-rose-50 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800'
                 }`}
               >
                 {cat.name}
@@ -330,13 +330,41 @@ export const MenuView: React.FC<MenuViewProps> = ({
 
       {/* Main Content: Meals Grouped Per Stand with Staggered Entrance Animation */}
       {isLoading ? (
-        <div className="space-y-8">
+        <div className="space-y-10 animate-pulse">
           {[1, 2].map((i) => (
-            <div key={i} className="animate-pulse space-y-4">
-              <div className="h-10 bg-slate-200 rounded-2xl w-1/3" />
+            <div key={i} className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-3xl p-5 sm:p-7 space-y-5 shadow-2xs">
+              {/* Stand Header Skeleton */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-100 dark:border-slate-800">
+                <div className="flex items-center gap-3.5">
+                  <div className="w-14 h-14 rounded-2xl bg-slate-200/80 dark:bg-slate-800 shrink-0" />
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <div className="w-40 h-5 bg-slate-200/80 dark:bg-slate-800 rounded" />
+                      <div className="w-14 h-4 bg-slate-200/80 dark:bg-slate-800 rounded-full" />
+                    </div>
+                    <div className="w-56 h-3 bg-slate-200/60 dark:bg-slate-800/60 rounded" />
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-20 h-7 bg-slate-200/80 dark:bg-slate-800 rounded-xl" />
+                  <div className="w-28 h-7 bg-slate-200/80 dark:bg-slate-800 rounded-xl" />
+                </div>
+              </div>
+
+              {/* Grid of Dishes Skeleton */}
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
                 {[1, 2, 3, 4].map((j) => (
-                  <div key={j} className="h-64 bg-slate-100 rounded-3xl" />
+                  <div key={j} className="bg-slate-50/80 dark:bg-slate-800/80 rounded-3xl p-3 border border-slate-100/90 dark:border-slate-700/80 space-y-3">
+                    <div className="aspect-square bg-slate-200/80 dark:bg-slate-700 rounded-2xl w-full" />
+                    <div className="space-y-1.5">
+                      <div className="w-3/4 h-4 bg-slate-200/80 dark:bg-slate-700 rounded" />
+                      <div className="w-1/2 h-3 bg-slate-200/60 dark:bg-slate-700/60 rounded" />
+                    </div>
+                    <div className="flex items-center justify-between pt-1">
+                      <div className="w-16 h-5 bg-slate-200/80 dark:bg-slate-700 rounded-full" />
+                      <div className="w-7 h-7 bg-slate-200/80 dark:bg-slate-700 rounded-full" />
+                    </div>
+                  </div>
                 ))}
               </div>
             </div>
@@ -358,12 +386,12 @@ export const MenuView: React.FC<MenuViewProps> = ({
                 initial={{ opacity: 0, y: 18 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.35, ease: 'easeOut' }}
-                className="bg-slate-50/70 border border-rose-100/80 rounded-3xl p-5 sm:p-7 space-y-5 shadow-2xs"
+                className="bg-slate-50/70 dark:bg-slate-900/60 border border-rose-100/80 dark:border-slate-800 rounded-3xl p-5 sm:p-7 space-y-5 shadow-2xs"
               >
                 {/* Stand / Kitchen Header Card */}
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-rose-100/70">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-rose-100/70 dark:border-slate-800">
                   <div className="flex items-center gap-3.5">
-                    <div className="w-12 h-12 rounded-2xl overflow-hidden bg-rose-100 shrink-0 border border-rose-200 shadow-2xs">
+                    <div className="w-12 h-12 rounded-2xl overflow-hidden bg-rose-100 dark:bg-slate-800 shrink-0 border border-rose-200 dark:border-slate-700 shadow-2xs">
                       <img
                         src={vendor.logo_url || vendor.cover_image_url || 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=100'}
                         alt={vendor.name}
@@ -372,33 +400,33 @@ export const MenuView: React.FC<MenuViewProps> = ({
                     </div>
                     <div>
                       <div className="flex items-center gap-2">
-                        <h2 className="text-lg sm:text-xl font-black text-slate-900 tracking-tight">
+                        <h2 className="text-lg sm:text-xl font-black text-slate-900 dark:text-slate-100 tracking-tight">
                           {vendor.name}
                         </h2>
                         <span className={`text-[10px] font-black px-2 py-0.5 rounded-md uppercase ${
-                          vendor.is_open ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
+                          vendor.is_open ? 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-400' : 'bg-rose-100 dark:bg-rose-950/60 text-rose-800 dark:text-rose-400'
                         }`}>
                           {vendor.is_open ? 'Open' : 'Closed'}
                         </span>
                       </div>
                       {vendor.slogan ? (
-                        <p className="text-xs text-[#D6001C] font-semibold italic mt-0.5">
+                        <p className="text-xs text-[#D6001C] dark:text-rose-400 font-semibold italic mt-0.5">
                           "{vendor.slogan}"
                         </p>
                       ) : (
-                        <p className="text-xs text-slate-500 font-medium mt-0.5">
+                        <p className="text-xs text-slate-500 dark:text-slate-400 font-medium mt-0.5">
                           {vendor.description || 'Authentic campus dishes'}
                         </p>
                       )}
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-3 text-xs text-slate-600">
-                    <div className="flex items-center gap-1 bg-white px-3 py-1.5 rounded-xl border border-rose-100 font-bold shadow-2xs">
+                  <div className="flex items-center gap-3 text-xs text-slate-600 dark:text-slate-300">
+                    <div className="flex items-center gap-1 bg-white dark:bg-slate-800 px-3 py-1.5 rounded-xl border border-rose-100 dark:border-slate-700 font-bold shadow-2xs">
                       <Star className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
                       <span>{vendor.rating ? vendor.rating.toFixed(1) : '4.8'}</span>
                     </div>
-                    <div className="flex items-center gap-1 bg-white px-3 py-1.5 rounded-xl border border-rose-100 font-bold shadow-2xs">
+                    <div className="flex items-center gap-1 bg-white dark:bg-slate-800 px-3 py-1.5 rounded-xl border border-rose-100 dark:border-slate-700 font-bold shadow-2xs">
                       <Clock className="w-3.5 h-3.5 text-[#D6001C]" />
                       <span>{vendor.opening_time || '07:30'} - {vendor.closing_time || '21:00'}</span>
                     </div>
@@ -431,7 +459,7 @@ export const MenuView: React.FC<MenuViewProps> = ({
                     ))}
                   </motion.div>
                 ) : (
-                  <div className="text-center py-6 text-xs text-slate-400">
+                  <div className="text-center py-6 text-xs text-slate-400 dark:text-slate-500">
                     No matching dishes found in this stand for current filters.
                   </div>
                 )}
@@ -443,11 +471,11 @@ export const MenuView: React.FC<MenuViewProps> = ({
         <motion.div
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
-          className="bg-white rounded-3xl p-10 text-center border border-rose-100 shadow-xs space-y-3"
+          className="bg-white dark:bg-slate-900 rounded-3xl p-10 text-center border border-rose-100 dark:border-slate-800 shadow-xs space-y-3"
         >
-          <Sparkles className="w-12 h-12 text-rose-300 mx-auto" />
-          <h3 className="text-base font-black text-slate-900">No Meals Found</h3>
-          <p className="text-xs text-slate-500 max-w-md mx-auto">
+          <Sparkles className="w-12 h-12 text-rose-300 dark:text-rose-500 mx-auto" />
+          <h3 className="text-base font-black text-slate-900 dark:text-slate-100">No Meals Found</h3>
+          <p className="text-xs text-slate-500 dark:text-slate-400 max-w-md mx-auto">
             We couldn't find any dishes matching your search query or filter combination.
           </p>
           <button

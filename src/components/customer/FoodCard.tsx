@@ -54,10 +54,10 @@ export const FoodCard: React.FC<FoodCardProps> = ({ item, onSelect }) => {
       whileHover={availability.isAvailable ? { y: -4, scale: 1.015 } : undefined}
       whileTap={availability.isAvailable ? { scale: 0.97 } : undefined}
       onClick={() => onSelect(item)}
-      className={`bg-white rounded-2xl sm:rounded-3xl p-3 sm:p-4 shadow-2xs hover:shadow-lg transition-all cursor-pointer flex flex-col justify-between relative group select-none overflow-hidden border ${
+      className={`bg-white dark:bg-slate-900 rounded-2xl sm:rounded-3xl p-3 sm:p-4 shadow-2xs hover:shadow-lg transition-all cursor-pointer flex flex-col justify-between relative group select-none overflow-hidden border ${
         availability.isAvailable
-          ? 'border-emerald-100/80 hover:shadow-emerald-950/5'
-          : 'border-slate-200 bg-slate-50/60 opacity-85'
+          ? 'border-emerald-100/80 dark:border-slate-800 hover:shadow-emerald-950/5 dark:hover:border-slate-700'
+          : 'border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-900/60 opacity-85'
       }`}
     >
       {/* Top badges & Favorite heart */}
@@ -68,7 +68,7 @@ export const FoodCard: React.FC<FoodCardProps> = ({ item, onSelect }) => {
             <span>{availability.badgeLabel}</span>
           </span>
         ) : (
-          <span className="text-[9px] sm:text-[10px] font-bold text-slate-600 bg-emerald-50 px-2 py-0.5 rounded-full flex items-center gap-1 border border-emerald-100">
+          <span className="text-[9px] sm:text-[10px] font-bold text-slate-600 dark:text-slate-300 bg-emerald-50 dark:bg-slate-800 px-2 py-0.5 rounded-full flex items-center gap-1 border border-emerald-100 dark:border-slate-700">
             <Clock className="w-2.5 h-2.5 text-[#FF7A00]" />
             <span>15-20m</span>
           </span>
@@ -78,18 +78,18 @@ export const FoodCard: React.FC<FoodCardProps> = ({ item, onSelect }) => {
           whileHover={{ scale: 1.15 }}
           whileTap={{ scale: 0.85 }}
           onClick={handleFavoriteClick}
-          className="p-1.5 rounded-full bg-slate-50 hover:bg-emerald-50 transition-colors text-slate-400 hover:text-emerald-700 shadow-2xs cursor-pointer ml-auto"
+          className="p-1.5 rounded-full bg-slate-50 dark:bg-slate-800 hover:bg-emerald-50 dark:hover:bg-slate-700 transition-colors text-slate-400 dark:text-slate-500 hover:text-emerald-700 dark:hover:text-emerald-400 shadow-2xs cursor-pointer ml-auto"
         >
           <Heart
             className={`w-3.5 h-3.5 sm:w-4 sm:h-4 transition-colors ${
-              favorite ? 'fill-[#FF7A00] text-[#FF7A00]' : 'text-slate-400'
+              favorite ? 'fill-[#FF7A00] text-[#FF7A00]' : 'text-slate-400 dark:text-slate-500'
             }`}
           />
         </motion.button>
       </div>
 
       {/* Food Photo Container */}
-      <div className="relative my-1 w-full aspect-4/3 overflow-hidden rounded-xl sm:rounded-2xl bg-emerald-50/40">
+      <div className="relative my-1 w-full aspect-4/3 overflow-hidden rounded-xl sm:rounded-2xl bg-emerald-50/40 dark:bg-slate-800/60">
         <LazyImage
           src={item.image_url || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&q=80&w=300'}
           alt={item.name}
@@ -110,22 +110,22 @@ export const FoodCard: React.FC<FoodCardProps> = ({ item, onSelect }) => {
 
       {/* Details */}
       <div className="mt-2 space-y-0.5">
-        <h3 className="font-black text-slate-900 text-xs sm:text-sm tracking-tight truncate group-hover:text-[#0D472B] transition-colors">
+        <h3 className="font-black text-slate-900 dark:text-slate-100 text-xs sm:text-sm tracking-tight truncate group-hover:text-[#0D472B] dark:group-hover:text-emerald-400 transition-colors">
           {item.name}
         </h3>
-        <p className="text-[10px] sm:text-xs text-slate-400 font-medium truncate">
+        <p className="text-[10px] sm:text-xs text-slate-400 dark:text-slate-400 font-medium truncate">
           {vendor?.name || item.description || item.category || 'MTU Fresh Special'}
         </p>
       </div>
 
       {/* Price & Add to Bag */}
-      <div className="mt-2.5 flex items-center justify-between pt-2 border-t border-slate-100">
-        <span className="text-xs sm:text-sm font-black text-slate-900">
+      <div className="mt-2.5 flex items-center justify-between pt-2 border-t border-slate-100 dark:border-slate-800">
+        <span className="text-xs sm:text-sm font-black text-slate-900 dark:text-slate-100">
           {displayPrice}
         </span>
 
         {!availability.isAvailable ? (
-          <span className="text-[10px] font-black text-rose-700 bg-rose-50 border border-rose-200/80 px-2.5 py-1 rounded-xl cursor-not-allowed uppercase tracking-wider select-none">
+          <span className="text-[10px] font-black text-rose-700 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/40 border border-rose-200/80 dark:border-rose-900 px-2.5 py-1 rounded-xl cursor-not-allowed uppercase tracking-wider select-none">
             {availability.badgeLabel}
           </span>
         ) : (

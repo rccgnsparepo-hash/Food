@@ -2,6 +2,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { useAuthStore } from './stores/useAuthStore';
 import { useCartStore } from './stores/useCartStore';
 import { useMarketplaceStore } from './stores/useMarketplaceStore';
+import { useThemeStore } from './stores/useThemeStore';
 import { seedInitialDataIfNeeded } from './lib/seed';
 import { MenuItem } from './types';
 
@@ -27,7 +28,7 @@ import { AuthModal } from './components/auth/AuthModal';
 import { AuthGatewayPage } from './components/auth/AuthGatewayPage';
 import { ErrorBoundary } from './components/ui/ErrorBoundary';
 import { Toaster } from 'sonner';
-import { User, LogOut, Phone, MapPin, Shield, KeyRound, MailWarning, Bell, CheckCircle } from 'lucide-react';
+import { User, LogOut, Phone, MapPin, Shield, KeyRound, MailWarning, Bell, CheckCircle, Sun, Moon, Monitor } from 'lucide-react';
 import { requestFCMToken, setupForegroundFCMListener } from './lib/fcm';
 import { NetworkStatusBanner } from './components/common/NetworkStatusBanner';
 import { NotificationCenter } from './components/layout/NotificationCenter';
@@ -38,6 +39,7 @@ export default function App() {
   const { initAuth, user, role, setRole, logout, isInitLoading, isEmailVerified } = useAuthStore();
   const { isOpen: isCartOpen, setCartOpen } = useCartStore();
   const { initMarketplace } = useMarketplaceStore();
+  const { theme, setTheme, initTheme } = useThemeStore();
   const unreadCount = useNotificationStore((state) => state.unreadCount);
 
   // Real-time Push & Order Notification listener
@@ -100,6 +102,7 @@ export default function App() {
   }, [user?.uid, role]);
 
   useEffect(() => {
+    const unsubTheme = initTheme();
     const unsub = initAuth();
     initMarketplace();
     seedInitialDataIfNeeded();
@@ -124,6 +127,7 @@ export default function App() {
     navigator.serviceWorker?.addEventListener('message', handleServiceWorkerMessage);
 
     return () => {
+      unsubTheme();
       unsub();
       if (unsubFcm) unsubFcm();
       navigator.serviceWorker?.removeEventListener('message', handleServiceWorkerMessage);
@@ -143,13 +147,13 @@ export default function App() {
   // 1. Initial Page Load State
   if (isInitLoading) {
     return (
-      <div className="min-h-screen bg-[#F9ECEC] flex flex-col items-center justify-center p-6 text-center">
+      <div className="min-h-screen bg-[#F9ECEC] dark:bg-slate-950 flex flex-col items-center justify-center p-6 text-center text-slate-900 dark:text-slate-100 transition-colors">
         <div className="w-16 h-16 bg-[#D6001C] text-white rounded-3xl font-black text-3xl flex items-center justify-center shadow-xl shadow-red-500/30 animate-pulse mb-4">
           B
         </div>
-        <h2 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">BUKKIT MARKETPLACE</h2>
-        <p className="text-xs font-extrabold text-[#D6001C] uppercase tracking-widest mt-1">Mountain Top University • Prayer City</p>
-        <div className="mt-6 flex items-center gap-2 text-xs font-bold text-slate-500">
+        <h2 className="text-xl sm:text-2xl font-black tracking-tight">BUKKIT MARKETPLACE</h2>
+        <p className="text-xs font-extrabold text-[#D6001C] dark:text-red-400 uppercase tracking-widest mt-1">Mountain Top University • Prayer City</p>
+        <div className="mt-6 flex items-center gap-2 text-xs font-bold text-slate-500 dark:text-slate-400">
           <div className="w-4 h-4 border-2 border-[#D6001C] border-t-transparent rounded-full animate-spin"></div>
           <span>Loading BUKKIT Marketplace...</span>
         </div>
@@ -165,7 +169,7 @@ export default function App() {
   const isGuest = user.uid.startsWith('guest_');
 
   return (
-    <div className="min-h-screen bg-[#F9ECEC] text-slate-900 font-sans antialiased selection:bg-[#D6001C] selection:text-white">
+    <div className="min-h-screen bg-[#F9ECEC] dark:bg-slate-950 text-slate-900 dark:text-slate-100 font-sans antialiased selection:bg-[#D6001C] selection:text-white transition-colors duration-200">
       {/* Real-time Network Connectivity Resilience Banner */}
       <NetworkStatusBanner />
 
@@ -267,7 +271,7 @@ export default function App() {
                   )}
 
                   {activeView === 'profile' && (
-                    <div className="max-w-md mx-auto bg-white rounded-3xl p-8 shadow-xs border border-rose-100 text-center space-y-4">
+                    <div className="max-w-md mx-auto bg-white dark:bg-slate-900 rounded-3xl p-8 shadow-xs border border-rose-100 dark:border-slate-800 text-center space-y-4 transition-colors">
                       <div className="w-20 h-20 rounded-full overflow-hidden border-4 border-[#D6001C] mx-auto shadow-md">
                         <img
                           src={user?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(user?.email || 'user')}`}
@@ -276,29 +280,72 @@ export default function App() {
                         />
                       </div>
                       <div>
-                        <h2 className="font-extrabold text-xl text-slate-900">{user?.name}</h2>
-                        <p className="text-xs text-slate-400 font-medium">{user?.email}</p>
-                        <span className="inline-block mt-1 bg-red-100 text-red-800 text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase">
+                        <h2 className="font-extrabold text-xl text-slate-900 dark:text-slate-100">{user?.name}</h2>
+                        <p className="text-xs text-slate-400 dark:text-slate-500 font-medium">{user?.email}</p>
+                        <span className="inline-block mt-1 bg-red-100 dark:bg-red-950/50 text-red-800 dark:text-red-300 text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase">
                           Account: {user?.role || role}
                         </span>
                       </div>
 
-                      <div className="bg-rose-50/80 p-4 rounded-2xl text-xs text-slate-700 space-y-2 text-left border border-rose-100">
+                      {/* Theme Preference Settings Box in Profile */}
+                      <div className="bg-slate-50 dark:bg-slate-800/60 p-3.5 rounded-2xl border border-slate-200/80 dark:border-slate-700/80 text-left space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-black text-slate-900 dark:text-slate-200">Theme Appearance</span>
+                          <span className="text-[10px] font-bold text-slate-400 uppercase">{theme}</span>
+                        </div>
+                        <div className="grid grid-cols-3 gap-2">
+                          <button
+                            onClick={() => setTheme('light')}
+                            className={`py-2 px-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                              theme === 'light'
+                                ? 'bg-white text-[#0D472B] shadow-xs font-black border border-emerald-200'
+                                : 'bg-slate-200/60 dark:bg-slate-800 text-slate-600 dark:text-slate-300'
+                            }`}
+                          >
+                            <Sun className="w-3.5 h-3.5 text-amber-500" />
+                            <span>Light</span>
+                          </button>
+                          <button
+                            onClick={() => setTheme('dark')}
+                            className={`py-2 px-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                              theme === 'dark'
+                                ? 'bg-slate-950 text-white shadow-xs font-black border border-slate-700'
+                                : 'bg-slate-200/60 dark:bg-slate-800 text-slate-600 dark:text-slate-300'
+                            }`}
+                          >
+                            <Moon className="w-3.5 h-3.5 text-blue-400" />
+                            <span>Dark</span>
+                          </button>
+                          <button
+                            onClick={() => setTheme('system')}
+                            className={`py-2 px-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                              theme === 'system'
+                                ? 'bg-white dark:bg-slate-950 text-[#0D472B] dark:text-emerald-400 shadow-xs font-black border border-emerald-200 dark:border-emerald-800'
+                                : 'bg-slate-200/60 dark:bg-slate-800 text-slate-600 dark:text-slate-300'
+                            }`}
+                          >
+                            <Monitor className="w-3.5 h-3.5 text-emerald-500" />
+                            <span>Auto</span>
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="bg-rose-50/80 dark:bg-slate-800/80 p-4 rounded-2xl text-xs text-slate-700 dark:text-slate-200 space-y-2 text-left border border-rose-100 dark:border-slate-700">
                         <div className="flex items-center gap-2">
-                          <Phone className="w-4 h-4 text-[#D6001C]" />
+                          <Phone className="w-4 h-4 text-[#D6001C] dark:text-red-400" />
                           <span>{user?.phone || '+234 810 000 0000'}</span>
                         </div>
                         <div className="flex items-center gap-2">
-                          <MapPin className="w-4 h-4 text-[#D6001C]" />
+                          <MapPin className="w-4 h-4 text-[#D6001C] dark:text-red-400" />
                           <span>{user?.address || 'Mountain Top University Campus'}</span>
                         </div>
                       </div>
 
                       {/* FCM Notifications Setting Box */}
-                      <div className="bg-slate-900 text-white p-4 rounded-2xl text-xs text-left space-y-2 border border-slate-800">
+                      <div className="bg-slate-900 dark:bg-slate-800 text-white p-4 rounded-2xl text-xs text-left space-y-2 border border-slate-800 dark:border-slate-700">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2 font-bold text-slate-200">
-                            <Bell className="w-4 h-4 text-[#D6001C]" />
+                            <Bell className="w-4 h-4 text-[#D6001C] dark:text-red-400" />
                             <span>Live Order Notifications</span>
                           </div>
                           <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${fcmPermissionGranted ? 'bg-emerald-500/20 text-emerald-400' : 'bg-amber-500/20 text-amber-300'}`}>
@@ -324,7 +371,7 @@ export default function App() {
 
                       <button
                         onClick={() => logout()}
-                        className="w-full bg-slate-900 hover:bg-black text-white font-bold py-3.5 rounded-2xl text-xs flex items-center justify-center gap-2 transition-colors cursor-pointer"
+                        className="w-full bg-slate-900 dark:bg-slate-800 hover:bg-black dark:hover:bg-slate-700 text-white font-bold py-3.5 rounded-2xl text-xs flex items-center justify-center gap-2 transition-colors cursor-pointer border border-transparent dark:border-slate-700"
                       >
                         <LogOut className="w-4 h-4" />
                         <span>Log Out & Exit</span>

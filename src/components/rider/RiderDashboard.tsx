@@ -344,18 +344,18 @@ export const RiderDashboard: React.FC = () => {
         <motion.div
           initial={{ scale: 0.98, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
-          className="bg-white rounded-3xl p-6 shadow-md border-2 border-emerald-600 space-y-4"
+          className="bg-white dark:bg-slate-900 rounded-3xl p-6 shadow-md border-2 border-emerald-600 dark:border-emerald-500 space-y-4"
         >
-          <div className="flex items-center justify-between border-b border-emerald-100 pb-3">
+          <div className="flex items-center justify-between border-b border-emerald-100 dark:border-slate-800 pb-3">
             <div className="flex items-center gap-2">
               <span className="bg-emerald-600 text-white font-extrabold text-xs px-3 py-1 rounded-full uppercase tracking-wider">
                 ACTIVE RUN (#{myActiveOrder.id.slice(-6)})
               </span>
-              <span className="text-xs font-bold text-slate-600">
+              <span className="text-xs font-bold text-slate-600 dark:text-slate-300">
                 Status: {myActiveOrder.status.replace(/_/g, ' ').toUpperCase()}
               </span>
             </div>
-            <span className="text-sm font-black text-emerald-700">
+            <span className="text-sm font-black text-emerald-700 dark:text-emerald-400">
               Delivery Fee: ₦{(myActiveOrder.delivery_fee || 400).toLocaleString()} (Earn ₦{Math.round((myActiveOrder.delivery_fee || 400) * 0.75).toLocaleString()})
             </span>
           </div>
@@ -364,30 +364,30 @@ export const RiderDashboard: React.FC = () => {
             {/* Left Column: Details & Step Controls */}
             <div className="space-y-4">
               {/* Pickup info */}
-              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200">
-                <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider block mb-1">
+              <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700">
+                <span className="text-[10px] font-extrabold text-slate-400 dark:text-slate-500 uppercase tracking-wider block mb-1">
                   1. VENDOR KITCHEN PICKUP
                 </span>
-                <h3 className="font-extrabold text-slate-900 text-sm">
+                <h3 className="font-extrabold text-slate-900 dark:text-slate-100 text-sm">
                   {myActiveOrder.vendor_name || myActiveOrder.restaurant_name}
                 </h3>
-                <p className="text-xs text-slate-500">{myActiveOrder.vendor_address || 'Central Campus Plaza'}</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400">{myActiveOrder.vendor_address || 'Central Campus Plaza'}</p>
               </div>
 
               {/* Delivery destination info */}
-              <div className="p-4 rounded-2xl bg-emerald-50/60 border border-emerald-200">
-                <span className="text-[10px] font-extrabold text-emerald-700 uppercase tracking-wider block mb-1">
+              <div className="p-4 rounded-2xl bg-emerald-50/60 dark:bg-slate-800/80 border border-emerald-200 dark:border-emerald-800/50">
+                <span className="text-[10px] font-extrabold text-emerald-700 dark:text-emerald-400 uppercase tracking-wider block mb-1">
                   2. CUSTOMER DESTINATION
                 </span>
-                <h3 className="font-extrabold text-slate-900 text-sm">
+                <h3 className="font-extrabold text-slate-900 dark:text-slate-100 text-sm">
                   {myActiveOrder.customer_name || myActiveOrder.user_name}
                 </h3>
-                <p className="text-xs font-bold text-slate-800">{myActiveOrder.delivery_address}</p>
+                <p className="text-xs font-bold text-slate-800 dark:text-slate-200">{myActiveOrder.delivery_address}</p>
                 {myActiveOrder.delivery_room && (
-                  <p className="text-xs font-black text-emerald-800 mt-0.5">Room: {myActiveOrder.delivery_room}</p>
+                  <p className="text-xs font-black text-emerald-800 dark:text-emerald-400 mt-0.5">Room: {myActiveOrder.delivery_room}</p>
                 )}
                 {myActiveOrder.notes && (
-                  <p className="text-[11px] text-slate-600 italic mt-1 bg-white p-2 rounded-xl border border-emerald-100">
+                  <p className="text-[11px] text-slate-600 dark:text-slate-300 italic mt-1 bg-white dark:bg-slate-900 p-2 rounded-xl border border-emerald-100 dark:border-slate-700">
                     "{myActiveOrder.notes}"
                   </p>
                 )}
@@ -397,14 +397,14 @@ export const RiderDashboard: React.FC = () => {
               <div className="flex items-center gap-3">
                 <a
                   href={`tel:${myActiveOrder.customer_phone || '+2348100000000'}`}
-                  className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl text-xs font-bold flex items-center justify-center gap-2"
+                  className="flex-1 py-2.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 rounded-xl text-xs font-bold flex items-center justify-center gap-2"
                 >
-                  <Phone className="w-4 h-4 text-emerald-600" />
+                  <Phone className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
                   <span>Call Customer</span>
                 </a>
                 <button
                   onClick={() => setShowChat(true)}
-                  className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2"
+                  className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 cursor-pointer"
                 >
                   <MessageSquare className="w-4 h-4" />
                   <span>Chat Customer</span>
@@ -417,7 +417,7 @@ export const RiderDashboard: React.FC = () => {
                 {['assigned', 'rider_assigned'].includes(myActiveOrder.status) && (
                   <button
                     onClick={handleArrivedAtVendor}
-                    className="w-full py-3 rounded-2xl bg-amber-500 hover:bg-amber-600 text-white font-extrabold text-xs transition-colors flex items-center justify-center gap-2"
+                    className="w-full py-3 rounded-2xl bg-amber-500 hover:bg-amber-600 text-white font-extrabold text-xs transition-colors flex items-center justify-center gap-2 cursor-pointer"
                   >
                     <span>Mark: Arrived at Vendor Kitchen</span>
                   </button>
@@ -427,7 +427,7 @@ export const RiderDashboard: React.FC = () => {
                 {['rider_arrived_vendor', 'ready', 'ready_for_pickup'].includes(myActiveOrder.status) && (
                   <button
                     onClick={() => setPickupModalOpen(true)}
-                    className="w-full py-3.5 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs shadow-lg shadow-emerald-600/30 transition-all flex items-center justify-center gap-2"
+                    className="w-full py-3.5 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs shadow-lg shadow-emerald-600/30 transition-all flex items-center justify-center gap-2 cursor-pointer"
                   >
                     <KeyRound className="w-4 h-4" />
                     <span>Enter Kitchen Pickup Code to Collect Meal</span>
@@ -438,7 +438,7 @@ export const RiderDashboard: React.FC = () => {
                 {['picked_up', 'out_for_delivery', 'on_the_way'].includes(myActiveOrder.status) && (
                   <button
                     onClick={handleArrivedAtCustomer}
-                    className="w-full py-3 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs transition-colors flex items-center justify-center gap-2"
+                    className="w-full py-3 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs transition-colors flex items-center justify-center gap-2 cursor-pointer"
                   >
                     <span>Mark: Arrived at Customer Hall / Room</span>
                   </button>
@@ -448,7 +448,7 @@ export const RiderDashboard: React.FC = () => {
                 {['arrived_at_delivery', 'out_for_delivery', 'on_the_way'].includes(myActiveOrder.status) && (
                   <button
                     onClick={() => setDeliveryModalOpen(true)}
-                    className="w-full py-3.5 rounded-2xl bg-linear-to-r from-emerald-600 to-teal-700 hover:from-emerald-700 hover:to-teal-800 text-white font-black text-xs shadow-xl shadow-emerald-600/30 transition-all flex items-center justify-center gap-2"
+                    className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-700 hover:to-teal-800 text-white font-black text-xs shadow-xl shadow-emerald-600/30 transition-all flex items-center justify-center gap-2 cursor-pointer"
                   >
                     <ShieldCheck className="w-4 h-4" />
                     <span>Enter Customer Delivery PIN to Complete Run</span>
@@ -460,12 +460,12 @@ export const RiderDashboard: React.FC = () => {
             {/* Right Column: Live Campus Navigation Map */}
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-1.5 text-xs font-extrabold text-slate-900">
-                  <MapPin className="w-4 h-4 text-emerald-600" />
+                <div className="flex items-center gap-1.5 text-xs font-extrabold text-slate-900 dark:text-slate-100">
+                  <MapPin className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
                   <span>Campus Turn-by-Turn Route</span>
                 </div>
                 {gpsAccuracy !== null && (
-                  <span className="text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-lg">
+                  <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-lg">
                     GPS Accuracy: ±{gpsAccuracy}m
                   </span>
                 )}
@@ -489,19 +489,19 @@ export const RiderDashboard: React.FC = () => {
       ) : null}
 
       {/* AVAILABLE RUNS POOL */}
-      <div className="bg-white rounded-3xl p-6 shadow-xs border border-slate-200 space-y-4">
+      <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 shadow-xs border border-slate-200 dark:border-slate-800 space-y-4">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-base font-black text-slate-900">Available Campus Orders</h2>
-            <p className="text-xs text-slate-500">Claim nearby kitchen orders ready for student delivery</p>
+            <h2 className="text-base font-black text-slate-900 dark:text-slate-100">Available Campus Orders</h2>
+            <p className="text-xs text-slate-500 dark:text-slate-400">Claim nearby kitchen orders ready for student delivery</p>
           </div>
-          <span className="bg-slate-100 text-slate-700 text-xs font-bold px-3 py-1 rounded-full">
+          <span className="bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs font-bold px-3 py-1 rounded-full">
             {availableOrders.length} Available
           </span>
         </div>
 
         {availableOrders.length === 0 ? (
-          <div className="text-center py-10 text-slate-400 space-y-2">
+          <div className="text-center py-10 text-slate-400 dark:text-slate-500 space-y-2">
             <Clock className="w-8 h-8 mx-auto opacity-40" />
             <p className="text-xs font-bold">No unassigned orders in the campus dispatch queue.</p>
           </div>
@@ -510,19 +510,19 @@ export const RiderDashboard: React.FC = () => {
             {availableOrders.map((ord) => (
               <div
                 key={ord.id}
-                className="p-4 rounded-2xl border border-slate-200 hover:border-emerald-500 bg-slate-50/50 space-y-3 transition-all"
+                className="p-4 rounded-2xl border border-slate-200 dark:border-slate-800 hover:border-emerald-500 dark:hover:border-emerald-500 bg-slate-50/50 dark:bg-slate-800/50 space-y-3 transition-all"
               >
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-black text-slate-900">#{ord.id.slice(-6)}</span>
-                  <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full">
+                  <span className="text-xs font-black text-slate-900 dark:text-slate-100">#{ord.id.slice(-6)}</span>
+                  <span className="text-xs font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 px-2 py-0.5 rounded-full">
                     Earn ₦{Math.round((ord.delivery_fee || 400) * 0.75).toLocaleString()}
                   </span>
                 </div>
 
                 <div className="text-xs space-y-1">
-                  <p className="font-bold text-slate-800">From: {ord.vendor_name || ord.restaurant_name}</p>
-                  <p className="text-slate-600">To: {ord.delivery_address}</p>
-                  {ord.delivery_room && <p className="text-emerald-700 font-bold">Room: {ord.delivery_room}</p>}
+                  <p className="font-bold text-slate-800 dark:text-slate-200">From: {ord.vendor_name || ord.restaurant_name}</p>
+                  <p className="text-slate-600 dark:text-slate-400">To: {ord.delivery_address}</p>
+                  {ord.delivery_room && <p className="text-emerald-700 dark:text-emerald-400 font-bold">Room: {ord.delivery_room}</p>}
                 </div>
 
                 <button
@@ -539,32 +539,32 @@ export const RiderDashboard: React.FC = () => {
       </div>
 
       {/* EARNINGS LEDGER */}
-      <div className="bg-white rounded-3xl p-6 shadow-xs border border-slate-200 space-y-4">
+      <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 shadow-xs border border-slate-200 dark:border-slate-800 space-y-4">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-base font-black text-slate-900">Delivery Earnings Ledger</h2>
-            <p className="text-xs text-slate-500">Authoritative audit of payouts per delivery</p>
+            <h2 className="text-base font-black text-slate-900 dark:text-slate-100">Delivery Earnings Ledger</h2>
+            <p className="text-xs text-slate-500 dark:text-slate-400">Authoritative audit of payouts per delivery</p>
           </div>
-          <DollarSign className="w-5 h-5 text-emerald-600" />
+          <DollarSign className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
         </div>
 
         {earningsLedger.length === 0 ? (
-          <div className="text-xs text-slate-400 py-4 text-center">
+          <div className="text-xs text-slate-400 dark:text-slate-500 py-4 text-center">
             Completed delivery earnings will appear here in real-time.
           </div>
         ) : (
-          <div className="divide-y divide-slate-100">
+          <div className="divide-y divide-slate-100 dark:divide-slate-800">
             {earningsLedger.slice(0, 5).map((earn) => (
               <div key={earn.delivery_earning_id} className="py-2.5 flex items-center justify-between text-xs">
                 <div>
-                  <span className="font-bold text-slate-900">Order #{earn.order_id.slice(-6)}</span>
-                  <span className="text-[10px] text-slate-400 block">
+                  <span className="font-bold text-slate-900 dark:text-slate-100">Order #{earn.order_id.slice(-6)}</span>
+                  <span className="text-[10px] text-slate-400 dark:text-slate-500 block">
                     {new Date(earn.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                   </span>
                 </div>
                 <div className="text-right">
-                  <span className="font-black text-emerald-600">+₦{earn.rider_earning.toLocaleString()}</span>
-                  <span className="text-[10px] text-slate-400 block">Fee: ₦{earn.delivery_fee}</span>
+                  <span className="font-black text-emerald-600 dark:text-emerald-400">+₦{earn.rider_earning.toLocaleString()}</span>
+                  <span className="text-[10px] text-slate-400 dark:text-slate-500 block">Fee: ₦{earn.delivery_fee}</span>
                 </div>
               </div>
             ))}
@@ -575,13 +575,13 @@ export const RiderDashboard: React.FC = () => {
       {/* MODAL 1: ENTER KITCHEN PICKUP PIN */}
       {pickupModalOpen && (
         <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl p-6 max-w-sm w-full space-y-4 shadow-2xl border border-emerald-100 text-center">
-            <div className="w-12 h-12 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center mx-auto">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 max-w-sm w-full space-y-4 shadow-2xl border border-emerald-100 dark:border-slate-800 text-center">
+            <div className="w-12 h-12 rounded-2xl bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 flex items-center justify-center mx-auto">
               <KeyRound className="w-6 h-6" />
             </div>
             <div>
-              <h3 className="font-black text-slate-900 text-base">Verify Kitchen Pickup</h3>
-              <p className="text-xs text-slate-500 mt-1">
+              <h3 className="font-black text-slate-900 dark:text-slate-100 text-base">Verify Kitchen Pickup</h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
                 Enter the 4-digit Pickup Code displayed on the Vendor's screen
               </p>
             </div>
@@ -592,20 +592,20 @@ export const RiderDashboard: React.FC = () => {
               value={pickupCodeInput}
               onChange={(e) => setPickupCodeInput(e.target.value)}
               placeholder="e.g. 4829"
-              className="w-full text-center tracking-widest text-2xl font-black bg-slate-50 border-2 border-emerald-500 rounded-2xl py-3 text-slate-900 outline-none focus:ring-4 focus:ring-emerald-500/20"
+              className="w-full text-center tracking-widest text-2xl font-black bg-slate-50 dark:bg-slate-800 border-2 border-emerald-500 rounded-2xl py-3 text-slate-900 dark:text-slate-100 outline-none focus:ring-4 focus:ring-emerald-500/20"
             />
 
             <div className="flex gap-2 pt-2">
               <button
                 onClick={() => setPickupModalOpen(false)}
-                className="flex-1 py-3 rounded-xl bg-slate-100 font-bold text-xs text-slate-700 hover:bg-slate-200"
+                className="flex-1 py-3 rounded-xl bg-slate-100 dark:bg-slate-800 font-bold text-xs text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 cursor-pointer"
               >
                 Cancel
               </button>
               <button
                 onClick={handleConfirmPickupWithPIN}
                 disabled={isVerifyingPickup}
-                className="flex-1 py-3 rounded-xl bg-emerald-600 font-black text-xs text-white hover:bg-emerald-700 shadow-md shadow-emerald-600/30"
+                className="flex-1 py-3 rounded-xl bg-emerald-600 font-black text-xs text-white hover:bg-emerald-700 shadow-md shadow-emerald-600/30 cursor-pointer"
               >
                 {isVerifyingPickup ? 'Verifying...' : 'Verify Pickup'}
               </button>
@@ -617,13 +617,13 @@ export const RiderDashboard: React.FC = () => {
       {/* MODAL 2: ENTER CUSTOMER DELIVERY PIN */}
       {deliveryModalOpen && (
         <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl p-6 max-w-sm w-full space-y-4 shadow-2xl border border-emerald-100 text-center">
-            <div className="w-12 h-12 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center mx-auto">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 max-w-sm w-full space-y-4 shadow-2xl border border-emerald-100 dark:border-slate-800 text-center">
+            <div className="w-12 h-12 rounded-2xl bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 flex items-center justify-center mx-auto">
               <ShieldCheck className="w-6 h-6" />
             </div>
             <div>
-              <h3 className="font-black text-slate-900 text-base">Verify Customer Delivery</h3>
-              <p className="text-xs text-slate-500 mt-1">
+              <h3 className="font-black text-slate-900 dark:text-slate-100 text-base">Verify Customer Delivery</h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
                 Ask the customer for their 4-digit Delivery PIN shown on their screen
               </p>
             </div>
@@ -634,20 +634,20 @@ export const RiderDashboard: React.FC = () => {
               value={deliveryCodeInput}
               onChange={(e) => setDeliveryCodeInput(e.target.value)}
               placeholder="e.g. 7192"
-              className="w-full text-center tracking-widest text-2xl font-black bg-slate-50 border-2 border-emerald-500 rounded-2xl py-3 text-slate-900 outline-none focus:ring-4 focus:ring-emerald-500/20"
+              className="w-full text-center tracking-widest text-2xl font-black bg-slate-50 dark:bg-slate-800 border-2 border-emerald-500 rounded-2xl py-3 text-slate-900 dark:text-slate-100 outline-none focus:ring-4 focus:ring-emerald-500/20"
             />
 
             <div className="flex gap-2 pt-2">
               <button
                 onClick={() => setDeliveryModalOpen(false)}
-                className="flex-1 py-3 rounded-xl bg-slate-100 font-bold text-xs text-slate-700 hover:bg-slate-200"
+                className="flex-1 py-3 rounded-xl bg-slate-100 dark:bg-slate-800 font-bold text-xs text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 cursor-pointer"
               >
                 Cancel
               </button>
               <button
                 onClick={handleConfirmDeliveryWithPIN}
                 disabled={isVerifyingDelivery}
-                className="flex-1 py-3 rounded-xl bg-emerald-600 font-black text-xs text-white hover:bg-emerald-700 shadow-md shadow-emerald-600/30"
+                className="flex-1 py-3 rounded-xl bg-emerald-600 font-black text-xs text-white hover:bg-emerald-700 shadow-md shadow-emerald-600/30 cursor-pointer"
               >
                 {isVerifyingDelivery ? 'Verifying...' : 'Complete Run'}
               </button>

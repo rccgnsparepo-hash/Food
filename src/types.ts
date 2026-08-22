@@ -435,6 +435,13 @@ export interface Order {
   estimated_delivery_at?: string;
   cancellation_reason?: string;
 
+  // Post-Order Customer Rating & Feedback
+  food_rating?: number; // 1 to 5 stars
+  delivery_rating?: number; // 1 to 5 stars
+  feedback_tags?: string[];
+  feedback_comment?: string;
+  rated_at?: string;
+
   // History & Audit
   status_history?: OrderStatusHistoryItem[];
   university_id?: string;

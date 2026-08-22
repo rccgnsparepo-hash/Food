@@ -100,19 +100,19 @@ export const BukkitLogo: React.FC<BukkitLogoProps> = ({
   if (variant === 'badge') {
     return (
       <div
-        className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-2xl bg-white shadow-xs border border-emerald-100 ${className}`}
+        className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-2xl bg-white dark:bg-slate-900 shadow-xs border border-emerald-100 dark:border-slate-800 transition-colors ${className}`}
       >
         {IconSvg}
         <div className="text-left">
           <div className="flex items-center gap-1">
-            <span className="font-black text-[#0D472B] tracking-tight leading-none text-base">
+            <span className="font-black text-[#0D472B] dark:text-emerald-400 tracking-tight leading-none text-base">
               BUKKIT
             </span>
             <span className="text-[9px] font-black bg-[#FF7A00] text-white px-1.5 py-0.2 rounded-md">
               INT
             </span>
           </div>
-          <span className="text-[8px] font-bold text-slate-500 tracking-wider uppercase block">
+          <span className="text-[8px] font-bold text-slate-500 dark:text-slate-400 tracking-wider uppercase block">
             CAMPUS FOOD FAST
           </span>
         </div>
@@ -123,7 +123,7 @@ export const BukkitLogo: React.FC<BukkitLogoProps> = ({
   // Default / Horizontal Variant
   return (
     <div className={`inline-flex items-center gap-2.5 ${className}`}>
-      <div className="relative flex items-center justify-center p-1 rounded-2xl bg-emerald-950/5 border border-emerald-900/10 shadow-2xs">
+      <div className="relative flex items-center justify-center p-1 rounded-2xl bg-emerald-950/5 dark:bg-emerald-500/10 border border-emerald-900/10 dark:border-emerald-500/20 shadow-2xs">
         {IconSvg}
       </div>
 
@@ -131,7 +131,7 @@ export const BukkitLogo: React.FC<BukkitLogoProps> = ({
         <div className="flex items-center gap-1.5">
           <span
             className={`font-black tracking-tight leading-none ${currentSize.text} ${
-              theme === 'light' ? 'text-white' : 'text-[#0D472B]'
+              theme === 'light' ? 'text-white' : 'text-[#0D472B] dark:text-emerald-400'
             }`}
           >
             BUKKIT
@@ -144,7 +144,7 @@ export const BukkitLogo: React.FC<BukkitLogoProps> = ({
           <span className="w-1 h-1 rounded-full bg-[#FF7A00]" />
           <span
             className={`font-bold uppercase tracking-widest leading-none ${currentSize.sub} ${
-              theme === 'light' ? 'text-emerald-200' : 'text-[#FF7A00]'
+              theme === 'light' ? 'text-emerald-200' : 'text-[#FF7A00] dark:text-orange-400'
             }`}
           >
             GOOD FOOD • DELIVERED FAST

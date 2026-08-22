@@ -45,7 +45,7 @@ interface AuthState {
     vendorId?: string;
     vehicleType?: 'bicycle' | 'motorcycle' | 'walking' | 'scooter';
   }) => Promise<UserProfile>;
-  loginWithGoogle: (targetRole?: UserRole, isSignUpFlow?: boolean) => Promise<UserProfile>;
+  loginWithGoogle: (targetRole?: UserRole, isSignUpFlow?: boolean, adminKey?: string) => Promise<UserProfile>;
   resetPassword: (email: string) => Promise<void>;
   resendVerificationEmail: () => Promise<void>;
   reloadUser: () => Promise<boolean>;
@@ -309,10 +309,24 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         }
       }
 
+      // Pre-save pending registration role in local & session storage BEFORE auth state fires
+      try {
+        localStorage.setItem('bukkit_pending_registration_role', role);
+        sessionStorage.setItem('bukkit_pending_registration_role', role);
+        localStorage.setItem(`bukkit_pending_email_role_${cleanEmail.toLowerCase()}`, role);
+        sessionStorage.setItem(`bukkit_pending_email_role_${cleanEmail.toLowerCase()}`, role);
+      } catch (e) {}
+
       // Register user directly in active Firebase Authentication
       const userCred = await createUserWithEmailAndPassword(auth, cleanEmail, password);
       const createdUid = userCred.user.uid;
       const isEmailVerified = userCred.user.emailVerified;
+
+      // Save pending registration role with UID in local & session storage
+      try {
+        localStorage.setItem(`bukkit_pending_role_${createdUid}`, role);
+        sessionStorage.setItem(`bukkit_pending_role_${createdUid}`, role);
+      } catch (e) {}
 
       // Dispatch email verification link immediately
       if (userCred.user) {
@@ -454,9 +468,23 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     }
   },
 
-  loginWithGoogle: async (targetRole = 'customer', isSignUpFlow = false) => {
+  loginWithGoogle: async (targetRole = 'customer', isSignUpFlow = false, adminKey?: string) => {
     set({ isLoading: true, authStatus: 'loading', authError: null });
     try {
+      if (isSignUpFlow && (targetRole === 'admin' || targetRole === 'super_admin')) {
+        const validKeys = ['MTU-ADMIN-2026', 'BUKKIT-ADMIN-88', 'ADMIN123', 'ADMIN', 'MTUADMIN'];
+        if (!adminKey || !validKeys.includes(adminKey.trim().toUpperCase())) {
+          throw new Error('Invalid Admin Passkey. Access Denied. (Default Key: MTU-ADMIN-2026)');
+        }
+      }
+
+      // Pre-save pending Google role in local & session storage BEFORE popup
+      try {
+        localStorage.setItem('bukkit_pending_google_role', targetRole);
+        sessionStorage.setItem('bukkit_pending_google_role', targetRole);
+        localStorage.setItem('bukkit_pending_google_is_signup', isSignUpFlow ? 'true' : 'false');
+      } catch (e) {}
+
       const provider = new GoogleAuthProvider();
       const result = await signInWithPopup(auth, provider);
       const isVerified = result.user.emailVerified;
@@ -468,18 +496,21 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         // User clicked "Log In" with Google
         if (!profile) {
           await signOut(auth).catch(() => {});
-          throw new Error(`No BUKKIT account found for ${result.user.email || 'this Google account'}. Please click "Create Account / Sign Up" first.`);
+          throw new Error(`No existing BUKKIT account found for ${result.user.email || 'this Google account'}. Please select your account type and sign up.`);
         }
       } else {
-        // User clicked "Sign Up" with Google
-        if (!profile) {
-          const now = new Date().toISOString();
+        // User clicked "Sign Up" with Google - create or enforce the selected targetRole
+        const now = new Date().toISOString();
+        const fullName = result.user.displayName || 'BUKKIT User';
+        
+        // If profile didn't exist OR was created as default customer during signup race, construct authoritative profile
+        if (!profile || (profile.role !== targetRole && isSignUpFlow)) {
           profile = {
             id: result.user.uid,
             uid: result.user.uid,
-            name: result.user.displayName || 'BUKKIT User',
-            first_name: result.user.displayName?.split(' ')[0] || 'BUKKIT',
-            last_name: result.user.displayName?.split(' ').slice(1).join(' ') || 'User',
+            name: fullName,
+            first_name: fullName.split(' ')[0] || 'BUKKIT',
+            last_name: fullName.split(' ').slice(1).join(' ') || 'User',
             email: result.user.email || '',
             phone: result.user.phoneNumber || '+234 810 000 1122',
             status: 'active',
@@ -491,15 +522,61 @@ export const useAuthStore = create<AuthState>((set, get) => ({
             permissions: getRolePermissions(targetRole),
             university_id: 'uni_mtu',
             campus_id: 'campus_mtu_main',
+            vendor_id: (targetRole === 'kitchen' || targetRole === 'kitchen_manager' || targetRole === 'kitchen_staff') ? 'vendor_mtu_canteen' : undefined,
             avatar_url: result.user.photoURL || `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(result.user.email || 'user')}`,
-            created_at: now,
+            created_at: profile?.created_at || now,
             updated_at: now,
             last_login_at: now
           };
-          await setDoc(doc(db, 'users', result.user.uid), cleanFirestoreData(profile));
 
-          if (targetRole === 'customer') {
-            await setDoc(doc(db, 'customer_profiles', result.user.uid), cleanFirestoreData({
+          let subProfilePromise: Promise<any> = Promise.resolve();
+          if (targetRole === 'rider') {
+            const riderProf: RiderProfile = {
+              rider_id: result.user.uid,
+              user_id: result.user.uid,
+              full_name: fullName,
+              phone: result.user.phoneNumber || '+234 810 000 1122',
+              vehicle_type: 'motorcycle',
+              availability_status: 'available',
+              is_online: true,
+              is_verified: true,
+              rating: 5.0,
+              completed_deliveries: 0,
+              total_deliveries: 0,
+              earnings_balance: 0,
+              university_id: 'uni_mtu',
+              campus_id: 'campus_mtu_main',
+              created_at: now,
+              updated_at: now
+            };
+            profile.rider_profile = riderProf;
+            subProfilePromise = setDoc(doc(db, 'rider_profiles', result.user.uid), cleanFirestoreData(riderProf)).catch(() => {});
+          } else if (targetRole === 'kitchen' || targetRole === 'kitchen_manager' || targetRole === 'kitchen_staff') {
+            const kitchenProf: KitchenStaffProfile = {
+              user_id: result.user.uid,
+              vendor_id: 'rest_ronalds',
+              vendor_name: "Ronald's Food House",
+              role: targetRole as any,
+              permissions: getRolePermissions(targetRole),
+              shift_status: 'on_duty',
+              created_at: now,
+              updated_at: now
+            };
+            profile.kitchen_profile = kitchenProf;
+            subProfilePromise = setDoc(doc(db, 'kitchen_staff_profiles', result.user.uid), cleanFirestoreData(kitchenProf)).catch(() => {});
+          } else if (targetRole === 'admin' || targetRole === 'super_admin') {
+            const adminProf: AdminProfile = {
+              user_id: result.user.uid,
+              department: 'Platform Operations',
+              is_super_admin: targetRole === 'super_admin',
+              permissions: getRolePermissions(targetRole),
+              created_at: now,
+              updated_at: now
+            };
+            profile.admin_profile = adminProf;
+            subProfilePromise = setDoc(doc(db, 'admin_profiles', result.user.uid), cleanFirestoreData(adminProf)).catch(() => {});
+          } else {
+            const custProf: CustomerProfile = {
               user_id: result.user.uid,
               default_address: 'Mountain Top University',
               university_id: 'uni_mtu',
@@ -508,10 +585,27 @@ export const useAuthStore = create<AuthState>((set, get) => ({
               favorite_vendor_ids: [],
               created_at: now,
               updated_at: now
-            }));
+            };
+            profile.customer_profile = custProf;
+            subProfilePromise = setDoc(doc(db, 'customer_profiles', result.user.uid), cleanFirestoreData(custProf)).catch(() => {});
           }
+
+          await Promise.all([
+            setDoc(doc(db, 'users', result.user.uid), cleanFirestoreData(profile)),
+            subProfilePromise
+          ]);
         }
       }
+
+      // Cleanup pending role helpers
+      try {
+        localStorage.removeItem('bukkit_pending_google_role');
+        sessionStorage.removeItem('bukkit_pending_google_role');
+        localStorage.removeItem('bukkit_pending_google_is_signup');
+      } catch (e) {}
+
+      // Authoritative role from profile
+      const authoritativeRole = profile.active_role || profile.role || targetRole;
 
       try {
         localStorage.setItem('bukkit_active_user', JSON.stringify(profile));
@@ -519,7 +613,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
       set({
         user: profile,
-        role: profile.active_role || targetRole,
+        role: authoritativeRole,
         isLoading: false,
         authStatus: 'success',
         authError: null
@@ -549,12 +643,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   reloadUser: async () => {
     if (auth.currentUser) {
-      try {
-        await auth.currentUser.reload();
-      } catch (rErr) {
-        console.warn('Firebase user reload error:', rErr);
-      }
-
+      await auth.currentUser.reload();
       const isVerified = auth.currentUser.emailVerified;
       set({ isEmailVerified: isVerified });
 
@@ -574,6 +663,15 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
           let profile = await resolveAuthoritativeUserProfile(auth.currentUser.uid) || await findUserProfileByEmail(auth.currentUser.email || '');
           if (!profile) {
+            // Check if there was a pending registration role stored
+            let detectedRole: UserRole = 'customer';
+            try {
+              const pRole = localStorage.getItem(`bukkit_pending_role_${auth.currentUser.uid}`) || sessionStorage.getItem(`bukkit_pending_role_${auth.currentUser.uid}`);
+              if (pRole && ['customer', 'rider', 'kitchen', 'admin', 'kitchen_manager', 'kitchen_staff', 'super_admin'].includes(pRole)) {
+                detectedRole = pRole as UserRole;
+              }
+            } catch (e) {}
+
             const now = new Date().toISOString();
             const emailVal = auth.currentUser.email || '';
             profile = {
@@ -591,10 +689,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
               created_at: now,
               updated_at: now,
               last_login_at: now,
-              roles: ['customer'],
-              active_role: 'customer',
-              role: 'customer',
-              permissions: getRolePermissions('customer'),
+              roles: [detectedRole],
+              active_role: detectedRole,
+              role: detectedRole,
+              permissions: getRolePermissions(detectedRole),
               university_id: 'uni_mtu',
               campus_id: 'campus_mtu_main'
             };
@@ -611,7 +709,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
             user: profile,
             role: profile.active_role || profile.role || 'customer',
             isEmailVerified: true,
-            authStatus: 'success',
+            authStatus: 'idle',
             authError: null
           });
         } catch (e) {

@@ -219,18 +219,18 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ onClose, onOrderCr
       className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs overflow-y-auto flex flex-col justify-between p-3 sm:p-6"
     >
       {/* Top Bar */}
-      <div className="max-w-3xl mx-auto w-full bg-white rounded-3xl p-5 shadow-lg border border-emerald-100 flex items-center justify-between mb-4">
+      <div className="max-w-3xl mx-auto w-full bg-white dark:bg-slate-900 rounded-3xl p-5 shadow-lg border border-emerald-100 dark:border-slate-800 flex items-center justify-between mb-4">
         <motion.button
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
           onClick={onClose}
-          className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors"
+          className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 transition-colors cursor-pointer"
         >
           <ArrowLeft className="w-5 h-5" />
         </motion.button>
         <div className="text-center">
-          <h1 className="text-lg font-black text-slate-900">Checkout & Delivery Setup</h1>
-          <p className="text-xs text-emerald-700 font-medium">{restaurantName || 'MTU Campus Food'}</p>
+          <h1 className="text-lg font-black text-slate-900 dark:text-slate-100">Checkout & Delivery Setup</h1>
+          <p className="text-xs text-emerald-700 dark:text-emerald-400 font-medium">{restaurantName || 'MTU Campus Food'}</p>
         </div>
         <div className="w-9" />
       </div>
@@ -242,57 +242,57 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ onClose, onOrderCr
         className="max-w-3xl mx-auto w-full space-y-4 flex-1 pb-6"
       >
         {/* SECTION 1: CUSTOMER CONTACT INFORMATION */}
-        <motion.div variants={staggerItem} className="bg-white rounded-3xl p-5 shadow-xs border border-slate-200 space-y-4">
-          <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
+        <motion.div variants={staggerItem} className="bg-white dark:bg-slate-900 rounded-3xl p-5 shadow-xs border border-slate-200 dark:border-slate-800 space-y-4">
+          <div className="flex items-center gap-2 border-b border-slate-100 dark:border-slate-800 pb-3">
             <User className="w-5 h-5 text-emerald-600" />
             <div>
-              <h2 className="font-extrabold text-slate-900 text-sm">Customer Contact Information</h2>
-              <p className="text-xs text-slate-500">For rider communications and arrival alerts</p>
+              <h2 className="font-extrabold text-slate-900 dark:text-slate-100 text-sm">Customer Contact Information</h2>
+              <p className="text-xs text-slate-500 dark:text-slate-400">For rider communications and arrival alerts</p>
             </div>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="text-xs font-bold text-slate-700 block mb-1">Full Name</label>
+              <label className="text-xs font-bold text-slate-700 dark:text-slate-300 block mb-1">Full Name</label>
               <input
                 type="text"
                 value={customerName}
                 onChange={(e) => setCustomerName(e.target.value)}
                 placeholder="e.g. Oluwaseun Adeleke"
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-medium text-slate-900 focus:ring-2 focus:ring-emerald-600 outline-none"
+                className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2.5 text-xs font-medium text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-emerald-600 outline-none"
               />
             </div>
             <div>
-              <label className="text-xs font-bold text-slate-700 block mb-1">Phone Number (Required for Rider)</label>
+              <label className="text-xs font-bold text-slate-700 dark:text-slate-300 block mb-1">Phone Number (Required for Rider)</label>
               <input
                 type="tel"
                 value={customerPhone}
                 onChange={(e) => setCustomerPhone(e.target.value)}
                 placeholder="e.g. +234 810 123 4567"
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-medium text-slate-900 focus:ring-2 focus:ring-emerald-600 outline-none"
+                className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2.5 text-xs font-medium text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-emerald-600 outline-none"
               />
             </div>
           </div>
         </motion.div>
 
         {/* SECTION 2: CAMPUS FOOD DELIVERY INFORMATION */}
-        <motion.div variants={staggerItem} className="bg-white rounded-3xl p-5 shadow-xs border border-slate-200 space-y-4">
-          <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+        <motion.div variants={staggerItem} className="bg-white dark:bg-slate-900 rounded-3xl p-5 shadow-xs border border-slate-200 dark:border-slate-800 space-y-4">
+          <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
             <div className="flex items-center gap-2">
               <Building className="w-5 h-5 text-emerald-600" />
               <div>
-                <h2 className="font-extrabold text-slate-900 text-sm">Campus Food Delivery Location</h2>
-                <p className="text-xs text-slate-500">Live GPS pin, campus hall, room number & drop-off guidance</p>
+                <h2 className="font-extrabold text-slate-900 dark:text-slate-100 text-sm">Campus Food Delivery Location</h2>
+                <p className="text-xs text-slate-500 dark:text-slate-400">Live GPS pin, campus hall, room number & drop-off guidance</p>
               </div>
             </div>
-            <span className="text-[11px] font-black bg-emerald-50 text-emerald-800 px-2.5 py-1 rounded-xl border border-emerald-200">
+            <span className="text-[11px] font-black bg-emerald-50 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 px-2.5 py-1 rounded-xl border border-emerald-200 dark:border-emerald-900/50">
               {detectedZoneInfo.split('•')[0] || 'Zone A'}
             </span>
           </div>
 
           {/* Quick Select Campus Locations */}
           <div>
-            <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1.5">
+            <label className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider block mb-1.5">
               ⚡ Quick Select Campus Landmark / Hostel
             </label>
             <div className="flex flex-wrap gap-1.5">
@@ -316,7 +316,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ onClose, onOrderCr
                   className={`text-xs font-semibold px-2.5 py-1.5 rounded-xl border transition-all cursor-pointer ${
                     Math.abs(lat - loc.latitude) < 0.0003 && Math.abs(lng - loc.longitude) < 0.0003
                       ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
-                      : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                      : 'bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700'
                   }`}
                 >
                   {loc.name.split('(')[0].trim()}
@@ -328,11 +328,11 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ onClose, onOrderCr
           {/* Interactive Campus Map Picker */}
           <div className="space-y-1.5">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+              <span className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
                 <MapPin className="w-3.5 h-3.5 text-emerald-600" />
                 Live Campus GPS Pin & Drop-off Spot
               </span>
-              <span className="text-[10px] text-slate-500 font-medium">
+              <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">
                 Tap map, drag pin or click GPS button
               </span>
             </div>
@@ -359,90 +359,90 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ onClose, onOrderCr
           </div>
 
           {/* Delivery Zone & Fee Summary Pill */}
-          <div className="bg-emerald-50/80 border border-emerald-200/80 rounded-2xl p-3 flex items-center justify-between text-xs text-emerald-950">
+          <div className="bg-emerald-50/80 dark:bg-emerald-950/40 border border-emerald-200/80 dark:border-emerald-900/50 rounded-2xl p-3 flex items-center justify-between text-xs text-emerald-950 dark:text-emerald-200">
             <div className="space-y-0.5">
               <p className="font-extrabold flex items-center gap-1.5">
-                <Truck className="w-3.5 h-3.5 text-emerald-700" />
+                <Truck className="w-3.5 h-3.5 text-emerald-700 dark:text-emerald-400" />
                 {detectedZoneInfo}
               </p>
-              <p className="text-[10px] text-emerald-700 font-medium">
+              <p className="text-[10px] text-emerald-700 dark:text-emerald-400 font-medium">
                 Calculated authoritatively from kitchen coordinates to your campus drop-off
               </p>
             </div>
             <div className="text-right shrink-0">
-              <span className="text-xs text-emerald-700 font-bold block">Delivery Fee</span>
-              <span className="text-sm font-black text-emerald-950">₦{deliveryFee.toLocaleString()}</span>
+              <span className="text-xs text-emerald-700 dark:text-emerald-400 font-bold block">Delivery Fee</span>
+              <span className="text-sm font-black text-emerald-950 dark:text-emerald-100">₦{deliveryFee.toLocaleString()}</span>
             </div>
           </div>
 
           {/* Detailed Address Inputs */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="text-xs font-bold text-slate-700 block mb-1">Campus / Institution</label>
+              <label className="text-xs font-bold text-slate-700 dark:text-slate-300 block mb-1">Campus / Institution</label>
               <input
                 type="text"
                 value={campus}
                 onChange={(e) => setCampus(e.target.value)}
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-medium text-slate-900 focus:ring-2 focus:ring-emerald-600 outline-none"
+                className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2.5 text-xs font-medium text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-emerald-600 outline-none"
               />
             </div>
             <div>
-              <label className="text-xs font-bold text-slate-700 block mb-1">Building / Department / Faculty</label>
+              <label className="text-xs font-bold text-slate-700 dark:text-slate-300 block mb-1">Building / Department / Faculty</label>
               <input
                 type="text"
                 value={building}
                 onChange={(e) => setBuilding(e.target.value)}
                 placeholder="e.g. Daniel Hall / CBAS Complex"
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-medium text-slate-900 focus:ring-2 focus:ring-emerald-600 outline-none"
+                className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2.5 text-xs font-medium text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-emerald-600 outline-none"
               />
             </div>
             <div>
-              <label className="text-xs font-bold text-slate-700 block mb-1">Hostel / Hall / Wing</label>
+              <label className="text-xs font-bold text-slate-700 dark:text-slate-300 block mb-1">Hostel / Hall / Wing</label>
               <input
                 type="text"
                 value={hostelHall}
                 onChange={(e) => setHostelHall(e.target.value)}
                 placeholder="e.g. Block B, 2nd Floor"
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-medium text-slate-900 focus:ring-2 focus:ring-emerald-600 outline-none"
+                className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2.5 text-xs font-medium text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-emerald-600 outline-none"
               />
             </div>
             <div>
-              <label className="text-xs font-bold text-slate-700 block mb-1">Room / Office Number</label>
+              <label className="text-xs font-bold text-slate-700 dark:text-slate-300 block mb-1">Room / Office Number</label>
               <input
                 type="text"
                 value={roomNumber}
                 onChange={(e) => setRoomNumber(e.target.value)}
                 placeholder="e.g. Room 214 / Office G12"
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-medium text-slate-900 focus:ring-2 focus:ring-emerald-600 outline-none"
+                className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2.5 text-xs font-medium text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-emerald-600 outline-none"
               />
             </div>
           </div>
 
           <div>
-            <label className="text-xs font-bold text-slate-700 block mb-1">Exact Landmark / Meeting Point</label>
+            <label className="text-xs font-bold text-slate-700 dark:text-slate-300 block mb-1">Exact Landmark / Meeting Point</label>
             <input
               type="text"
               value={exactLocation}
               onChange={(e) => setExactLocation(e.target.value)}
               placeholder="e.g. In front of Daniel Hall Porter's Lodge or Cafeteria Stairs"
-              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-medium text-slate-900 focus:ring-2 focus:ring-emerald-600 outline-none"
+              className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2.5 text-xs font-medium text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-emerald-600 outline-none"
             />
           </div>
 
           <div>
-            <label className="text-xs font-bold text-slate-700 block mb-1">Delivery Instructions for Courier</label>
+            <label className="text-xs font-bold text-slate-700 dark:text-slate-300 block mb-1">Delivery Instructions for Courier</label>
             <textarea
               rows={2}
               value={deliveryInstructions}
               onChange={(e) => setDeliveryInstructions(e.target.value)}
               placeholder="e.g. Please call when you reach the gate. Meet me at the ground floor foyer."
-              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-medium text-slate-900 focus:ring-2 focus:ring-emerald-600 outline-none resize-none"
+              className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs font-medium text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-emerald-600 outline-none resize-none"
             />
           </div>
 
           {/* Delivery Option Selector */}
           <div>
-            <label className="text-xs font-bold text-slate-700 block mb-2">Preferred Delivery Option</label>
+            <label className="text-xs font-bold text-slate-700 dark:text-slate-300 block mb-2">Preferred Delivery Option</label>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
               {[
                 { id: 'room_delivery', label: 'Room Delivery', desc: 'Direct to room door' },
@@ -455,22 +455,22 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ onClose, onOrderCr
                   onClick={() => setPreferredOption(opt.id as PreferredDeliveryOption)}
                   className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
                     preferredOption === opt.id
-                      ? 'border-emerald-600 bg-emerald-50 text-emerald-900 font-bold'
-                      : 'border-slate-200 bg-slate-50 text-slate-600 hover:border-slate-300'
+                      ? 'border-emerald-600 bg-emerald-50 dark:bg-emerald-950/60 text-emerald-900 dark:text-emerald-200 font-bold'
+                      : 'border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:border-slate-300 dark:hover:border-slate-600'
                   }`}
                 >
                   <p className="text-xs font-extrabold">{opt.label}</p>
-                  <p className="text-[10px] text-slate-500">{opt.desc}</p>
+                  <p className="text-[10px] text-slate-500 dark:text-slate-400">{opt.desc}</p>
                 </button>
               ))}
             </div>
           </div>
 
           {/* Contactless Toggle */}
-          <div className="flex items-center justify-between p-3 rounded-2xl bg-slate-50 border border-slate-200">
+          <div className="flex items-center justify-between p-3 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
             <div>
-              <span className="text-xs font-bold text-slate-900 block">Contactless Drop-off</span>
-              <span className="text-[11px] text-slate-500">Rider leaves meal securely at designated spot</span>
+              <span className="text-xs font-bold text-slate-900 dark:text-slate-100 block">Contactless Drop-off</span>
+              <span className="text-[11px] text-slate-500 dark:text-slate-400">Rider leaves meal securely at designated spot</span>
             </div>
             <input
               type="checkbox"
@@ -482,20 +482,20 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ onClose, onOrderCr
         </motion.div>
 
         {/* SECTION 3: ORDER ITEMS SNAPSHOT */}
-        <motion.div variants={staggerItem} className="bg-white rounded-3xl p-5 shadow-xs border border-slate-200 space-y-3">
-          <h2 className="font-extrabold text-slate-900 text-sm">Order Items Summary</h2>
-          <div className="divide-y divide-slate-100">
+        <motion.div variants={staggerItem} className="bg-white dark:bg-slate-900 rounded-3xl p-5 shadow-xs border border-slate-200 dark:border-slate-800 space-y-3">
+          <h2 className="font-extrabold text-slate-900 dark:text-slate-100 text-sm">Order Items Summary</h2>
+          <div className="divide-y divide-slate-100 dark:divide-slate-800">
             {items.map((i) => (
               <div key={i.menuItem.id} className="flex items-center justify-between py-2 text-xs">
                 <div>
-                  <span className="font-bold text-slate-900">
+                  <span className="font-bold text-slate-900 dark:text-slate-100">
                     {i.quantity}x {i.menuItem.name}
                   </span>
                   {i.selectedVariant?.name && (
-                    <span className="text-[10px] text-slate-500 ml-1">({i.selectedVariant.name})</span>
+                    <span className="text-[10px] text-slate-500 dark:text-slate-400 ml-1">({i.selectedVariant.name})</span>
                   )}
                 </div>
-                <span className="font-black text-slate-900">
+                <span className="font-black text-slate-900 dark:text-slate-100">
                   ₦{((i.menuItem.base_price ?? i.menuItem.price ?? 0) * i.quantity).toLocaleString()}
                 </span>
               </div>
@@ -504,10 +504,10 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ onClose, onOrderCr
         </motion.div>
 
         {/* SECTION 4: PAYMENT SELECTION (WALLET / SPLIT / PAYSTACK) */}
-        <motion.div variants={staggerItem} className="bg-white rounded-3xl p-5 shadow-xs border border-slate-200 space-y-3">
+        <motion.div variants={staggerItem} className="bg-white dark:bg-slate-900 rounded-3xl p-5 shadow-xs border border-slate-200 dark:border-slate-800 space-y-3">
           <div className="flex items-center justify-between">
-            <h2 className="font-extrabold text-slate-900 text-sm">Authoritative Payment Method</h2>
-            <div className="flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full">
+            <h2 className="font-extrabold text-slate-900 dark:text-slate-100 text-sm">Authoritative Payment Method</h2>
+            <div className="flex items-center gap-1 text-[11px] font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 px-2 py-0.5 rounded-full">
               <Wallet className="w-3.5 h-3.5" />
               <span>Wallet: ₦{walletBalance.toLocaleString()}</span>
             </div>
@@ -518,10 +518,10 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ onClose, onOrderCr
             <button
               type="button"
               onClick={() => setPaymentMethod('wallet')}
-              className={`p-3.5 rounded-2xl border-2 text-left transition-all flex flex-col justify-between ${
+              className={`p-3.5 rounded-2xl border-2 text-left transition-all flex flex-col justify-between cursor-pointer ${
                 paymentMethod === 'wallet'
-                  ? 'border-emerald-600 bg-emerald-50/70 shadow-xs'
-                  : 'border-slate-200 hover:border-slate-300'
+                  ? 'border-emerald-600 bg-emerald-50/70 dark:bg-emerald-950/50 shadow-xs'
+                  : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-slate-300 dark:hover:border-slate-600'
               }`}
             >
               <div className="flex items-center justify-between w-full">
@@ -531,8 +531,8 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ onClose, onOrderCr
                 </span>
               </div>
               <div className="mt-3">
-                <span className="font-extrabold text-xs text-slate-900 block">100% In-App Wallet</span>
-                <span className="text-[10px] text-slate-500 block">
+                <span className="font-extrabold text-xs text-slate-900 dark:text-slate-100 block">100% In-App Wallet</span>
+                <span className="text-[10px] text-slate-500 dark:text-slate-400 block">
                   {canPayFullWallet ? 'Instant 1-Click Debit' : 'Insufficient Balance'}
                 </span>
               </div>
@@ -542,10 +542,10 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ onClose, onOrderCr
             <button
               type="button"
               onClick={() => setPaymentMethod('split_wallet_paystack')}
-              className={`p-3.5 rounded-2xl border-2 text-left transition-all flex flex-col justify-between ${
+              className={`p-3.5 rounded-2xl border-2 text-left transition-all flex flex-col justify-between cursor-pointer ${
                 paymentMethod === 'split_wallet_paystack'
-                  ? 'border-emerald-600 bg-emerald-50/70 shadow-xs'
-                  : 'border-slate-200 hover:border-slate-300'
+                  ? 'border-emerald-600 bg-emerald-50/70 dark:bg-emerald-950/50 shadow-xs'
+                  : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-slate-300 dark:hover:border-slate-600'
               }`}
             >
               <div className="flex items-center justify-between w-full">
@@ -555,8 +555,8 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ onClose, onOrderCr
                 </span>
               </div>
               <div className="mt-3">
-                <span className="font-extrabold text-xs text-slate-900 block">Wallet + Card</span>
-                <span className="text-[10px] text-slate-500 block">Use wallet & pay balance</span>
+                <span className="font-extrabold text-xs text-slate-900 dark:text-slate-100 block">Wallet + Card</span>
+                <span className="text-[10px] text-slate-500 dark:text-slate-400 block">Use wallet & pay balance</span>
               </div>
             </button>
 
@@ -564,10 +564,10 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ onClose, onOrderCr
             <button
               type="button"
               onClick={() => setPaymentMethod('paystack')}
-              className={`p-3.5 rounded-2xl border-2 text-left transition-all flex flex-col justify-between ${
+              className={`p-3.5 rounded-2xl border-2 text-left transition-all flex flex-col justify-between cursor-pointer ${
                 paymentMethod === 'paystack'
-                  ? 'border-emerald-600 bg-emerald-50/70 shadow-xs'
-                  : 'border-slate-200 hover:border-slate-300'
+                  ? 'border-emerald-600 bg-emerald-50/70 dark:bg-emerald-950/50 shadow-xs'
+                  : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-slate-300 dark:hover:border-slate-600'
               }`}
             >
               <div className="flex items-center justify-between w-full">
@@ -577,22 +577,22 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ onClose, onOrderCr
                 </span>
               </div>
               <div className="mt-3">
-                <span className="font-extrabold text-xs text-slate-900 block">Direct Card / Bank</span>
-                <span className="text-[10px] text-slate-500 block">Instant secure gateway</span>
+                <span className="font-extrabold text-xs text-slate-900 dark:text-slate-100 block">Direct Card / Bank</span>
+                <span className="text-[10px] text-slate-500 dark:text-slate-400 block">Instant secure gateway</span>
               </div>
             </button>
           </div>
 
           {/* Breakdown if split payment */}
           {paymentMethod === 'split_wallet_paystack' && (
-            <div className="p-3 rounded-2xl bg-amber-50 border border-amber-200 text-xs text-amber-900 space-y-1">
+            <div className="p-3 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900/50 text-xs text-amber-900 dark:text-amber-300 space-y-1">
               <div className="flex justify-between font-bold">
                 <span>Deduct from Wallet:</span>
                 <span>₦{walletDeduction.toLocaleString()}</span>
               </div>
               <div className="flex justify-between font-bold">
                 <span>Balance to Pay via Paystack:</span>
-                <span className="text-amber-800 font-black">₦{remainingCardAmount.toLocaleString()}</span>
+                <span className="text-amber-800 dark:text-amber-300 font-black">₦{remainingCardAmount.toLocaleString()}</span>
               </div>
             </div>
           )}

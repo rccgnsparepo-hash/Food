@@ -86,7 +86,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ onCheckout }) => {
               animate={{ x: '0%' }}
               exit={{ x: '100%' }}
               transition={{ type: 'spring', stiffness: 350, damping: 32 }}
-              className="w-screen max-w-md bg-white shadow-2xl flex flex-col justify-between"
+              className="w-screen max-w-md bg-white dark:bg-slate-900 shadow-2xl flex flex-col justify-between"
             >
               {/* Header */}
               <div className="p-6 bg-gradient-to-r from-[#0D472B] to-[#0A3A22] text-white flex items-center justify-between shadow-md">
@@ -114,8 +114,8 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ onCheckout }) => {
               {/* Cart Items List */}
               <div className="p-6 flex-1 overflow-y-auto space-y-3.5">
                 {hasUnavailableItems && (
-                  <div className="p-3 bg-rose-50 border border-rose-200 rounded-2xl flex items-start gap-2.5 text-xs text-rose-900">
-                    <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                  <div className="p-3 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/50 rounded-2xl flex items-start gap-2.5 text-xs text-rose-900 dark:text-rose-300">
+                    <AlertTriangle className="w-4 h-4 text-rose-600 dark:text-rose-400 shrink-0 mt-0.5" />
                     <div>
                       <span className="font-black">Notice:</span> Some items in your bag became unavailable or sold out. Please remove them to complete your order.
                     </div>
@@ -124,11 +124,11 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ onCheckout }) => {
 
                 {itemsWithStatus.length === 0 ? (
                   <div className="text-center py-16 space-y-3">
-                    <div className="w-16 h-16 rounded-full bg-emerald-50 border border-emerald-100 flex items-center justify-center mx-auto text-emerald-800">
-                      <ShoppingBag className="w-8 h-8 text-[#0D472B]" />
+                    <div className="w-16 h-16 rounded-full bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-100 dark:border-emerald-900/50 flex items-center justify-center mx-auto text-emerald-800 dark:text-emerald-400">
+                      <ShoppingBag className="w-8 h-8 text-[#0D472B] dark:text-emerald-400" />
                     </div>
-                    <p className="font-extrabold text-slate-800">Your cart is empty</p>
-                    <p className="text-xs text-slate-400">Add delicious campus meals to get started!</p>
+                    <p className="font-extrabold text-slate-800 dark:text-slate-200">Your cart is empty</p>
+                    <p className="text-xs text-slate-400 dark:text-slate-500">Add delicious campus meals to get started!</p>
                   </div>
                 ) : (
                   itemsWithStatus.map((item) => {
@@ -143,11 +143,11 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ onCheckout }) => {
                         exit={{ opacity: 0, scale: 0.95 }}
                         className={`p-4 rounded-2xl border flex items-center justify-between gap-3 shadow-2xs transition-all ${
                           !isAvail
-                            ? 'bg-rose-50/70 border-rose-200'
-                            : 'bg-emerald-50/40 border-emerald-100/90'
+                            ? 'bg-rose-50/70 dark:bg-rose-950/30 border-rose-200 dark:border-rose-900/50'
+                            : 'bg-emerald-50/40 dark:bg-slate-800/60 border-emerald-100/90 dark:border-slate-700'
                         }`}
                       >
-                        <div className="relative w-16 h-16 rounded-xl overflow-hidden shrink-0 bg-slate-100 border border-slate-200">
+                        <div className="relative w-16 h-16 rounded-xl overflow-hidden shrink-0 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
                           <img
                             src={
                               item.menuItem.image_url ||
@@ -165,24 +165,24 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ onCheckout }) => {
 
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-1.5">
-                            <h4 className="font-black text-slate-900 text-sm truncate">
+                            <h4 className="font-black text-slate-900 dark:text-slate-100 text-sm truncate">
                               {item.menuItem.name}
                             </h4>
                             {!isAvail && (
-                              <span className="text-[9px] font-black text-rose-700 bg-rose-100 px-1.5 py-0.5 rounded uppercase">
+                              <span className="text-[9px] font-black text-rose-700 dark:text-rose-400 bg-rose-100 dark:bg-rose-950/60 px-1.5 py-0.5 rounded uppercase">
                                 {item.availability.badgeLabel}
                               </span>
                             )}
                           </div>
                           
-                          <span className="text-xs font-black text-[#0D472B] block mt-0.5">
+                          <span className="text-xs font-black text-[#0D472B] dark:text-emerald-400 block mt-0.5">
                             ₦{(itemPrice * item.quantity).toLocaleString()}
                           </span>
 
                           {/* Options list */}
                           {item.selectedOptions &&
                             Object.keys(item.selectedOptions).length > 0 && (
-                              <div className="text-[10px] text-slate-500 mt-0.5 truncate">
+                              <div className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5 truncate">
                                 {Object.entries(item.selectedOptions).map(([k, v]) => (
                                   <span key={k} className="mr-2">
                                     • {v}
@@ -194,33 +194,33 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ onCheckout }) => {
 
                         {/* Quantity Controls */}
                         {isAvail ? (
-                          <div className="flex items-center gap-2 bg-white px-2 py-1 rounded-xl border border-emerald-100">
+                          <div className="flex items-center gap-2 bg-white dark:bg-slate-800 px-2 py-1 rounded-xl border border-emerald-100 dark:border-slate-700">
                             <motion.button
                               whileTap={{ scale: 0.85 }}
                               onClick={() => updateQuantity(item.menuItem.id, item.quantity - 1)}
-                              className="p-1 text-slate-600 hover:text-[#0D472B] cursor-pointer"
+                              className="p-1 text-slate-600 dark:text-slate-400 hover:text-[#0D472B] dark:hover:text-emerald-400 cursor-pointer"
                             >
                               <Minus className="w-3.5 h-3.5" />
                             </motion.button>
-                            <span className="text-xs font-black w-4 text-center text-slate-800">
+                            <span className="text-xs font-black w-4 text-center text-slate-800 dark:text-slate-200">
                               {item.quantity}
                             </span>
                             <motion.button
                               whileTap={{ scale: 0.85 }}
                               onClick={() => updateQuantity(item.menuItem.id, item.quantity + 1)}
-                              className="p-1 text-slate-600 hover:text-[#0D472B] cursor-pointer"
+                              className="p-1 text-slate-600 dark:text-slate-400 hover:text-[#0D472B] dark:hover:text-emerald-400 cursor-pointer"
                             >
                               <Plus className="w-3.5 h-3.5" />
                             </motion.button>
                           </div>
                         ) : (
-                          <span className="text-[10px] text-rose-600 font-bold">Void</span>
+                          <span className="text-[10px] text-rose-600 dark:text-rose-400 font-bold">Void</span>
                         )}
 
                         <motion.button
                           whileTap={{ scale: 0.85 }}
                           onClick={() => removeItem(item.menuItem.id)}
-                          className="p-1.5 text-slate-400 hover:text-rose-600 transition-colors cursor-pointer"
+                          className="p-1.5 text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 transition-colors cursor-pointer"
                         >
                           <Trash2 className="w-4 h-4" />
                         </motion.button>
@@ -232,29 +232,29 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ onCheckout }) => {
 
               {/* Footer Summary */}
               {items.length > 0 && (
-                <div className="p-6 bg-slate-50 border-t border-emerald-100 space-y-4">
-                  <div className="space-y-2 text-xs font-bold text-slate-600">
+                <div className="p-6 bg-slate-50 dark:bg-slate-900 border-t border-emerald-100 dark:border-slate-800 space-y-4">
+                  <div className="space-y-2 text-xs font-bold text-slate-600 dark:text-slate-400">
                     <div className="flex justify-between">
                       <span>Subtotal</span>
-                      <span className="text-slate-900 font-black">
+                      <span className="text-slate-900 dark:text-slate-100 font-black">
                         ₦{subtotal.toLocaleString()}
                       </span>
                     </div>
                     <div className="flex justify-between">
                       <span>Service Fee (5%)</span>
-                      <span className="text-slate-900 font-black">
+                      <span className="text-slate-900 dark:text-slate-100 font-black">
                         ₦{serviceFee.toLocaleString()}
                       </span>
                     </div>
                     <div className="flex justify-between">
                       <span>Estimated Delivery (Campus)</span>
-                      <span className="text-slate-900 font-black">
+                      <span className="text-slate-900 dark:text-slate-100 font-black">
                         ₦{deliveryFee.toLocaleString()}
                       </span>
                     </div>
-                    <div className="flex justify-between pt-2 border-t border-slate-200 text-base font-black text-slate-900">
+                    <div className="flex justify-between pt-2 border-t border-slate-200 dark:border-slate-800 text-base font-black text-slate-900 dark:text-slate-100">
                       <span>Total</span>
-                      <span className="text-[#0D472B]">₦{total.toLocaleString()}</span>
+                      <span className="text-[#0D472B] dark:text-emerald-400">₦{total.toLocaleString()}</span>
                     </div>
                   </div>
 
@@ -265,7 +265,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ onCheckout }) => {
                     onClick={handleProceedToCheckout}
                     className={`w-full font-black py-4 px-6 rounded-2xl flex items-center justify-between transition-all ${
                       hasUnavailableItems
-                        ? 'bg-slate-300 text-slate-500 cursor-not-allowed'
+                        ? 'bg-slate-300 dark:bg-slate-800 text-slate-500 dark:text-slate-400 cursor-not-allowed'
                         : 'bg-[#FF7A00] hover:bg-[#E65100] text-white shadow-lg shadow-orange-500/20 cursor-pointer'
                     }`}
                   >
