@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ArrowRight, Utensils, Building2, MapPin, CheckCircle2, GraduationCap } from 'lucide-react';
+import { BukkitLogo, BukkitIcon } from '../common/BukkitLogo';
 import { useMarketplaceStore } from '../../stores/useMarketplaceStore';
 import { useAuthStore } from '../../stores/useAuthStore';
 import { doc, setDoc } from 'firebase/firestore';
@@ -70,12 +71,7 @@ export const SplashOnboarding: React.FC<SplashOnboardingProps> = ({ onStart }) =
 
       {/* Top Branding */}
       <div className="pt-8 text-center z-10">
-        <div className="w-14 h-14 rounded-2xl bg-white/10 backdrop-blur-md flex items-center justify-center mx-auto mb-3 border border-white/20">
-          <Utensils className="w-7 h-7 text-yellow-300" />
-        </div>
-        <span className="text-xs font-extrabold tracking-widest uppercase text-red-100">
-          Nigerian University Food Marketplace
-        </span>
+        <BukkitLogo variant="badge" size="sm" theme="dark" subtitleText="CAMPUS FOOD DELIVERY" />
       </div>
 
       {step === 'intro' ? (
@@ -83,19 +79,19 @@ export const SplashOnboarding: React.FC<SplashOnboardingProps> = ({ onStart }) =
           {/* Main Center Logo & Statement */}
           <div className="text-center my-auto z-10 max-w-sm px-4">
             <div className="relative inline-block mb-6">
-              <div className="w-24 h-24 sm:w-32 sm:h-32 mx-auto flex items-center justify-center text-yellow-400 font-black text-6xl sm:text-7xl drop-shadow-2xl">
-                MTU
+              <div className="p-4 rounded-3xl bg-slate-950/80 border border-slate-800 shadow-2xl backdrop-blur-md">
+                <BukkitLogo variant="stacked" size="xl" theme="light" subtitleText="MOUNTAIN TOP UNIVERSITY" />
               </div>
-              <span className="text-[10px] font-bold text-yellow-200 uppercase tracking-widest absolute -bottom-2 left-1/2 -translate-x-1/2 whitespace-nowrap bg-red-900/60 px-2.5 py-0.5 rounded-full border border-yellow-400/30">
+              <span className="text-[10px] font-bold text-orange-200 uppercase tracking-widest absolute -bottom-2 left-1/2 -translate-x-1/2 whitespace-nowrap bg-slate-900 px-3 py-0.5 rounded-full border border-orange-500/40 shadow-sm">
                 Prayer City, Ogun State
               </span>
             </div>
 
             <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight mb-2">
-              Mountain Top University
+              Fast Campus Meals
             </h1>
             <p className="text-xs sm:text-sm text-red-100/90 leading-relaxed font-medium max-w-xs mx-auto">
-              Order meals directly from verified campus canteens and food vendors with real-time tracking.
+              Order food from verified kitchen stands & canteens with live courier tracking.
             </p>
           </div>
 

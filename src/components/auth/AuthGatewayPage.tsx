@@ -34,6 +34,7 @@ import { useAuthStore } from '../../stores/useAuthStore';
 import { useMarketplaceStore } from '../../stores/useMarketplaceStore';
 import { translateFirebaseAuthError } from '../../lib/authErrorTranslator';
 import { PasswordStrengthMeter } from './PasswordStrengthMeter';
+import { BukkitLogo } from '../common/BukkitLogo';
 import { UserRole } from '../../types';
 
 type AuthStatus = 'idle' | 'loading' | 'success' | 'error' | 'email-verification-required';
@@ -550,27 +551,11 @@ export const AuthGatewayPage: React.FC = () => {
               transition={{ duration: 0.3 }}
               className="bg-white rounded-[32px] p-6 sm:p-8 shadow-2xl border border-slate-100/90 relative z-20 w-full max-w-md mx-auto"
             >
-              {/* TOP BRAND BADGE (Circular Pizza/Food Logo like screenshot) */}
+              {/* TOP BRAND BADGE */}
               <div className="flex items-center justify-between mb-5">
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-full border-2 border-[#D6001C]/20 bg-rose-50 flex items-center justify-center relative shadow-sm shrink-0">
-                    <div className="w-8 h-8 rounded-full bg-[#D6001C] text-white flex items-center justify-center font-black text-sm">
-                      B
-                    </div>
-                    {/* Tiny badge dot */}
-                    <span className="absolute -top-0.5 -right-0.5 w-3 h-3 bg-amber-400 rounded-full border-2 border-white" />
-                  </div>
-                  <div>
-                    <h1 className="text-xs font-black tracking-tight text-slate-900 uppercase">
-                      BUKKIT CAMPUS FOOD
-                    </h1>
-                    <p className="text-[10px] font-bold text-slate-400 tracking-wider">
-                      MTU MARKETPLACE
-                    </p>
-                  </div>
-                </div>
+                <BukkitLogo variant="full" size="sm" subtitleText="MTU MARKETPLACE" />
 
-                <span className="text-[10px] font-extrabold bg-rose-50 text-[#D6001C] px-2.5 py-1 rounded-full border border-rose-100 uppercase">
+                <span className="text-[10px] font-black bg-slate-900 text-white px-3 py-1 rounded-full uppercase tracking-wider">
                   {selectedRole}
                 </span>
               </div>

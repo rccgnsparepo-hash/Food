@@ -26,6 +26,7 @@ import { FinancialsManager } from './FinancialsManager';
 import { AuditLogsViewer } from './AuditLogsViewer';
 import { CampusMapManager } from './CampusMapManager';
 import { NotificationHub } from './NotificationHub';
+import { BukkitLogo } from '../common/BukkitLogo';
 import { triggerHaptic } from '../../utils/haptics';
 import { Bell } from 'lucide-react';
 
@@ -92,13 +93,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToApp }) =
               </motion.button>
             )}
             <div>
-              <div className="flex items-center gap-2">
-                <span className="text-base font-black tracking-tight text-white">NIGERIAN UNIVERSITY FOOD MARKETPLACE</span>
-                <span className="bg-[#D6001C] text-white text-[10px] font-extrabold px-2 py-0.5 rounded-md uppercase tracking-wider">
-                  ADMIN CONTROL
+              <div className="flex items-center gap-2.5">
+                <BukkitLogo variant="full" size="sm" theme="dark" subtitleText="ADMIN OPERATIONS CONSOLE" />
+                <span className="bg-[#FF5A00] text-white text-[10px] font-black px-2 py-0.5 rounded-md uppercase tracking-wider">
+                  MASTER RBAC
                 </span>
               </div>
-              <p className="text-[11px] text-slate-400 hidden sm:block">Centralized Operations, RBAC Roles, Live Deliveries & Catalog</p>
             </div>
           </div>
 

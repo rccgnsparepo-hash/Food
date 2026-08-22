@@ -28,6 +28,7 @@ import { useAuthStore } from '../../stores/useAuthStore';
 import { useMarketplaceStore } from '../../stores/useMarketplaceStore';
 import { translateFirebaseAuthError } from '../../lib/authErrorTranslator';
 import { PasswordStrengthMeter } from './PasswordStrengthMeter';
+import { BukkitLogo } from '../common/BukkitLogo';
 import { UserRole } from '../../types';
 
 interface AuthModalProps {
@@ -565,28 +566,28 @@ export const AuthModal: React.FC<AuthModalProps> = ({ initialMode = 'login', onC
         className="bg-white dark:bg-slate-900 rounded-[32px] max-w-md w-full shadow-2xl border border-red-100 dark:border-slate-800 overflow-hidden relative my-auto"
       >
         {/* Red Brand Header Banner */}
-        <div className="bg-[#D6001C] text-white p-6 text-center relative">
+        <div className="bg-slate-950 text-white p-6 text-center relative border-b border-slate-800">
           <button
             onClick={onClose}
             disabled={isLoadingState}
-            className="absolute top-4 right-4 p-2 rounded-full bg-black/20 hover:bg-black/30 text-white transition-colors cursor-pointer disabled:opacity-50"
+            className="absolute top-4 right-4 p-2 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors cursor-pointer disabled:opacity-50"
           >
             <X className="w-4 h-4" />
           </button>
 
-          <div className="w-12 h-12 bg-white text-[#D6001C] rounded-2xl font-black text-2xl flex items-center justify-center mx-auto shadow-md mb-2">
-            B
+          <div className="flex justify-center mb-2">
+            <BukkitLogo variant="stacked" size="md" theme="dark" subtitleText="CAMPUS FOOD DELIVERY" />
           </div>
-          <h2 className="text-xl font-extrabold tracking-tight text-white flex items-center justify-center gap-1.5">
+          <h2 className="text-lg font-extrabold tracking-tight text-white flex items-center justify-center gap-1.5 mt-1">
             <span>
-              {mode === 'login' && 'Sign In to BUKKIT'}
-              {mode === 'register' && 'Create BUKKIT Account'}
+              {mode === 'login' && 'Sign In to Account'}
+              {mode === 'register' && 'Create Campus Account'}
               {mode === 'forgot_password' && 'Reset Password'}
               {mode === 'verify_email' && 'Verify Email Address'}
             </span>
-            <Sparkles className="w-4 h-4 text-amber-300 animate-pulse" />
+            <Sparkles className="w-4 h-4 text-amber-400 animate-pulse" />
           </h2>
-          <p className="text-xs font-medium text-red-100 mt-0.5">
+          <p className="text-[11px] font-medium text-slate-400 mt-0.5">
             Mountain Top University • Prayer City Marketplace
           </p>
         </div>

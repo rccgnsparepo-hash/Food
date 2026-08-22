@@ -24,6 +24,7 @@ import { Order, OrderReceipt, UserProfile, Vendor } from '../../types';
 import { buildValidatedOrderReceipt, generateBukkitReceiptPDF } from '../../services/receiptService';
 import { triggerHaptic } from '../../utils/haptics';
 import { toast } from 'sonner';
+import { BukkitLogo, BukkitIcon } from '../common/BukkitLogo';
 
 interface OrderReceiptModalProps {
   order: Order;
@@ -104,15 +105,7 @@ export const OrderReceiptModal: React.FC<OrderReceiptModalProps> = ({
           {/* Top Control Bar (Hidden when printing) */}
           <div className="bg-slate-900 text-white px-6 py-4 flex items-center justify-between border-b border-slate-800 print:hidden shrink-0">
             <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-xl bg-[#D6001C] flex items-center justify-center text-white font-black text-sm shadow-xs">
-                B
-              </div>
-              <div>
-                <h2 className="font-extrabold text-sm text-white">BUKKIT Official Receipt</h2>
-                <p className="text-[11px] text-slate-400 font-mono">
-                  {receipt ? receipt.receipt_id : `Order #${order.id}`}
-                </p>
-              </div>
+              <BukkitLogo variant="full" size="sm" theme="dark" subtitleText="OFFICIAL RECEIPT" />
             </div>
 
             <div className="flex items-center gap-2">
@@ -189,18 +182,7 @@ export const OrderReceiptModal: React.FC<OrderReceiptModalProps> = ({
                 <div className="border-b border-slate-100 pb-6 space-y-4">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <div className="flex items-center gap-3">
-                      <div className="w-12 h-12 rounded-2xl bg-[#D6001C] text-white flex items-center justify-center font-black text-2xl shadow-md shadow-red-500/20">
-                        B
-                      </div>
-                      <div>
-                        <span className="text-[10px] font-black text-[#D6001C] uppercase tracking-widest block">
-                          BUKKIT CAMPUS FOOD
-                        </span>
-                        <h1 className="text-xl font-black text-slate-900 leading-tight">
-                          Official Order Receipt
-                        </h1>
-                        <p className="text-xs text-slate-500">Mountain Top University Food Delivery Network</p>
-                      </div>
+                      <BukkitLogo variant="full" size="md" subtitleText="CAMPUS FOOD NETWORK • OFFICIAL RECEIPT" />
                     </div>
 
                     <div className="flex flex-wrap sm:flex-col sm:items-end gap-2 text-right">

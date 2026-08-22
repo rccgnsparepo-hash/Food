@@ -244,26 +244,50 @@ export async function generateBukkitReceiptPDF(receipt: OrderReceipt): Promise<v
     const margin = 14;
     const contentWidth = pageWidth - margin * 2;
 
-    // 1. BRAND HEADER (BUKKIT Red #D6001C)
-    doc.setFillColor(214, 0, 28);
-    doc.rect(0, 0, pageWidth, 32, 'F');
+    // 1. BRAND HEADER (Dark slate & BUKKIT Brand)
+    doc.setFillColor(15, 23, 42); // slate-900
+    doc.rect(0, 0, pageWidth, 36, 'F');
 
-    // Logo & Brand Name
+    // BUKKIT Speed Motion Streaks in PDF Header (Orange #FF5A00)
+    doc.setFillColor(255, 90, 0);
+    doc.roundedRect(margin, 10, 8, 1.8, 0.9, 0.9, 'F');
+    doc.roundedRect(margin - 3, 13.5, 12, 2.0, 1.0, 1.0, 'F');
+    doc.roundedRect(margin, 17, 7, 1.8, 0.9, 0.9, 'F');
+
+    // BUKKIT Chef Hat 'B' emblem box
+    doc.setFillColor(255, 255, 255);
+    doc.roundedRect(margin + 10, 8, 12, 12, 2, 2, 'F');
+    doc.setTextColor(255, 90, 0);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(11);
+    doc.text('B', margin + 14.5, 16.5);
+
+    // Wordmark & Subheading
     doc.setTextColor(255, 255, 255);
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(20);
-    doc.text('BUKKIT CAMPUS FOOD', margin, 14);
+    doc.setFontSize(18);
+    doc.text('BUKKIT', margin + 26, 15);
+    
+    // Orange food pill
+    doc.setFillColor(255, 90, 0);
+    doc.roundedRect(margin + 56, 9.5, 14, 6, 1.5, 1.5, 'F');
+    doc.setFontSize(7);
+    doc.setTextColor(255, 255, 255);
+    doc.text('FOOD', margin + 58.5, 14);
 
-    doc.setFontSize(8.5);
+    doc.setFontSize(7.5);
     doc.setFont('helvetica', 'normal');
-    doc.text('OFFICIAL ORDER RECEIPT & PAYMENT CONFIRMATION', margin, 21);
-    doc.text('Mountain Top University Campus Food Delivery Network', margin, 26);
+    doc.setTextColor(203, 213, 225);
+    doc.text('OFFICIAL ORDER RECEIPT & PAYMENT CONFIRMATION', margin + 26, 21);
+    doc.text('Mountain Top University Campus Food Delivery Network', margin + 26, 26);
 
     // Receipt Reference Pill on the top right
     doc.setFontSize(8);
     doc.setFont('helvetica', 'bold');
-    doc.text(`RECEIPT: ${receipt.receipt_id}`, pageWidth - margin, 14, { align: 'right' });
-    doc.text(`ORDER: #${receipt.order_id}`, pageWidth - margin, 20, { align: 'right' });
+    doc.setTextColor(255, 255, 255);
+    doc.text(`RECEIPT: ${receipt.receipt_id}`, pageWidth - margin, 13, { align: 'right' });
+    doc.setTextColor(203, 213, 225);
+    doc.text(`ORDER: #${receipt.order_id}`, pageWidth - margin, 19, { align: 'right' });
     doc.text(
       `DATE: ${new Date(receipt.created_at).toLocaleString('en-GB', {
         day: '2-digit',
@@ -273,11 +297,11 @@ export async function generateBukkitReceiptPDF(receipt: OrderReceipt): Promise<v
         minute: '2-digit',
       })}`,
       pageWidth - margin,
-      26,
+      25,
       { align: 'right' }
     );
 
-    let y = 38;
+    let y = 42;
 
     // 2. STATUS BADGES BAR
     doc.setFillColor(248, 250, 252);

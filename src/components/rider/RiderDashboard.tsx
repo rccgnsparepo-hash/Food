@@ -26,6 +26,7 @@ import { CustomerChat } from '../customer/CustomerChat';
 import { triggerHaptic } from '../../utils/haptics';
 import { toast } from 'sonner';
 import { staggerContainer, staggerItem } from '../../utils/motion';
+import { BukkitLogo, BukkitIcon } from '../common/BukkitLogo';
 import {
   getOrCreateRiderProfile,
   updateRiderAvailability,
@@ -277,9 +278,7 @@ export const RiderDashboard: React.FC = () => {
       {/* HEADER BANNER */}
       <div className="bg-slate-900 text-white rounded-3xl p-6 shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center gap-4">
-          <div className="w-14 h-14 rounded-2xl bg-emerald-600 flex items-center justify-center text-white shadow-lg">
-            <Bike className="w-8 h-8" />
-          </div>
+          <BukkitLogo variant="badge" size="sm" theme="dark" subtitleText="CAMPUS COURIER FLEET" />
           <div>
             <div className="flex items-center gap-2">
               <h1 className="text-xl font-extrabold">{user?.name || 'Campus Courier'}</h1>

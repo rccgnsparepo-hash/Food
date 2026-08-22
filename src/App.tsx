@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
+import { BukkitLogo } from './components/common/BukkitLogo';
 import { useAuthStore } from './stores/useAuthStore';
 import { useCartStore } from './stores/useCartStore';
 import { useMarketplaceStore } from './stores/useMarketplaceStore';
@@ -147,14 +148,10 @@ export default function App() {
   // 1. Initial Page Load State
   if (isInitLoading) {
     return (
-      <div className="min-h-screen bg-[#F9ECEC] dark:bg-slate-950 flex flex-col items-center justify-center p-6 text-center text-slate-900 dark:text-slate-100 transition-colors">
-        <div className="w-16 h-16 bg-[#D6001C] text-white rounded-3xl font-black text-3xl flex items-center justify-center shadow-xl shadow-red-500/30 animate-pulse mb-4">
-          B
-        </div>
-        <h2 className="text-xl sm:text-2xl font-black tracking-tight">BUKKIT MARKETPLACE</h2>
-        <p className="text-xs font-extrabold text-[#D6001C] dark:text-red-400 uppercase tracking-widest mt-1">Mountain Top University • Prayer City</p>
-        <div className="mt-6 flex items-center gap-2 text-xs font-bold text-slate-500 dark:text-slate-400">
-          <div className="w-4 h-4 border-2 border-[#D6001C] border-t-transparent rounded-full animate-spin"></div>
+      <div className="min-h-screen bg-[#0F172A] flex flex-col items-center justify-center p-6 text-center text-white transition-colors">
+        <BukkitLogo variant="stacked" size="xl" theme="dark" subtitleText="CAMPUS FOOD DELIVERY • PRAYER CITY" />
+        <div className="mt-8 flex items-center gap-2.5 text-xs font-bold text-slate-400 bg-slate-800/80 px-4 py-2 rounded-full border border-slate-700">
+          <div className="w-4 h-4 border-2 border-[#FF5A00] border-t-transparent rounded-full animate-spin"></div>
           <span>Loading BUKKIT Marketplace...</span>
         </div>
       </div>

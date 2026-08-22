@@ -33,6 +33,7 @@ import { Vendor, MenuItem, Order, VendorWorker, KitchenDetails } from '../../typ
 import { triggerHaptic } from '../../utils/haptics';
 import { toast } from 'sonner';
 import { ImageUploadInput } from '../common/ImageUploadInput';
+import { BukkitLogo } from '../common/BukkitLogo';
 import { updateKitchenDetails } from '../../services/kitchenService';
 import { transitionOrderStatus } from '../../services/orderLifecycleService';
 
@@ -343,9 +344,7 @@ export const KitchenDashboard: React.FC = () => {
             </div>
             <div className="space-y-1">
               <div className="flex items-center gap-2 flex-wrap">
-                <span className="bg-[#D6001C] text-white text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider">
-                  KITCHEN PHASE
-                </span>
+                <BukkitLogo variant="badge" size="xs" subtitleText="KITCHEN PARTNER" />
                 <span className="bg-white/10 text-slate-200 text-xs font-bold px-2.5 py-0.5 rounded-full flex items-center gap-1">
                   <ChefHat className="w-3 h-3 text-amber-400" />
                   {currentZone?.name || 'Campus Food Stand'}

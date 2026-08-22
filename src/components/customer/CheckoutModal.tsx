@@ -33,6 +33,7 @@ import { createAuthoritativeOrder } from '../../services/orderLifecycleService';
 import { subscribeToWallet } from '../../services/walletService';
 import { calculateDeliveryFee } from '../../services/deliveryFeeService';
 import { DEFAULT_MTU_CAMPUS_LOCATIONS, DEFAULT_MTU_BOUNDARY, isWithinCampusBoundary } from '../../services/campusLocationService';
+import { BukkitLogo } from '../common/BukkitLogo';
 
 interface CheckoutModalProps {
   onClose: () => void;
@@ -232,7 +233,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ onClose, onOrderCr
           <h1 className="text-lg font-black text-slate-900 dark:text-slate-100">Checkout & Delivery Setup</h1>
           <p className="text-xs text-emerald-700 dark:text-emerald-400 font-medium">{restaurantName || 'MTU Campus Food'}</p>
         </div>
-        <div className="w-9" />
+        <BukkitLogo variant="icon" size="sm" />
       </div>
 
       <motion.div
