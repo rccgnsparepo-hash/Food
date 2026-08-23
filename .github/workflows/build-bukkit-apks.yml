@@ -88,16 +88,16 @@ jobs:
         with:
           node-version: 22
 
-      - name: 3. Setup Java JDK 17
+      - name: 3. Setup Android SDK
+        if: steps.check_run.outputs.should_run == 'true'
+        uses: android-actions/setup-android@v3
+
+      - name: 4. Setup Java JDK 21 (Temurin)
         if: steps.check_run.outputs.should_run == 'true'
         uses: actions/setup-java@v4
         with:
-          distribution: 'zulu'
-          java-version: 17
-
-      - name: 4. Setup Android SDK
-        if: steps.check_run.outputs.should_run == 'true'
-        uses: android-actions/setup-android@v3
+          distribution: 'temurin'
+          java-version: '21'
 
       - name: 5. Install Dependencies
         if: steps.check_run.outputs.should_run == 'true'
@@ -157,15 +157,21 @@ jobs:
 
       - name: 9. Build Native Android APK with Gradle
         if: steps.check_run.outputs.should_run == 'true'
+        env:
+          JAVA_HOME: ${{ env.JAVA_HOME }}
         run: |
+          echo "Using Java Home: $JAVA_HOME"
+          java -version
+          javac -version
+          
           cd android
           chmod +x gradlew
           
           BUILD_TYPE="${{ inputs.build_type || 'debug' }}"
           if [ "$BUILD_TYPE" = "release" ]; then
-            ./gradlew assembleRelease || ./gradlew assembleDebug
+            ./gradlew assembleRelease -Dorg.gradle.java.home="$JAVA_HOME" || ./gradlew assembleDebug -Dorg.gradle.java.home="$JAVA_HOME"
           else
-            ./gradlew assembleDebug
+            ./gradlew assembleDebug -Dorg.gradle.java.home="$JAVA_HOME"
           fi
 
       - name: 10. Prepare Artifact Package
