@@ -25,7 +25,7 @@ import {
   TrendingUp,
   Tag
 } from 'lucide-react';
-import { doc, updateDoc, setDoc, collection, onSnapshot, query, where } from 'firebase/firestore';
+import { doc, updateDoc, setDoc, collection, onSnapshot, query, where } from "../../lib/embeddedDb";
 import { db } from '../../lib/firebase';
 import { useAuthStore } from '../../stores/useAuthStore';
 import { useMarketplaceStore } from '../../stores/useMarketplaceStore';

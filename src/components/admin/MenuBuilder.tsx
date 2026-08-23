@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Plus, Edit2, Trash2, ShieldCheck, Flame, DollarSign, Sparkles, AlertCircle, Utensils } from 'lucide-react';
-import { doc, setDoc, deleteDoc, collection, addDoc } from 'firebase/firestore';
+import { doc, setDoc, deleteDoc, collection, addDoc } from "../../lib/embeddedDb";
 import { db } from '../../lib/firebase';
 import { Vendor, FoodCategory, MenuItem, VerificationStatus, ItemStatus, MenuItemVariant } from '../../types';
 import { triggerHaptic } from '../../utils/haptics';

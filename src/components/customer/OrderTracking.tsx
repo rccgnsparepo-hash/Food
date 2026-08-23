@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { doc, onSnapshot } from 'firebase/firestore';
+import { doc, onSnapshot } from "../../lib/embeddedDb";
 import { db } from '../../lib/firebase';
 import { Order, OrderStatus } from '../../types';
 import { MapPicker } from '../ui/MapPicker';
-import { CustomerChat } from './CustomerChat';
+import { RealtimeDeliveryChatModal } from '../common/RealtimeDeliveryChatModal';
 import { OrderReceiptModal } from './OrderReceiptModal';
 import {
   ArrowLeft,
@@ -400,12 +400,18 @@ export const OrderTracking: React.FC<OrderTrackingProps> = ({ orderId, onBack })
         </div>
       </div>
 
-      {/* Customer Chat Drawer */}
-      {showChat && (
-        <CustomerChat
+      {/* Customer Delivery Chat Modal */}
+      {showChat && order && (
+        <RealtimeDeliveryChatModal
           orderId={order.id}
+          orderNumber={order.order_number || order.id.slice(-6)}
+          currentUserId={user?.uid || ''}
+          currentUserName={user?.name || 'Customer'}
+          currentUserRole="customer"
+          recipientId={order.rider_id || 'rider'}
+          recipientName={order.rider_name || 'Delivery Courier'}
           vendorName={order.vendor_name || 'Vendor Kitchen'}
-          riderName={order.rider_name || 'Rider'}
+          isOrderDelivered={order.status === 'delivered'}
           onClose={() => setShowChat(false)}
         />
       )}

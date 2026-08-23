@@ -9,7 +9,7 @@ import {
   CustomerDeliveryInfo
 } from '../types';
 import { db } from '../lib/firebase';
-import { doc, getDoc, setDoc, updateDoc, collection, query, where, getDocs, orderBy, onSnapshot } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc, collection, query, where, getDocs, orderBy, onSnapshot } from "../lib/embeddedDb";
 import { validateOrderStatusTransition } from './authService';
 import { triggerHaptic } from '../utils/haptics';
 import { recordAuditLog, recordOrderTransition, logAuditEvent } from './auditLogService';

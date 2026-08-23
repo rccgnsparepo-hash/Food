@@ -24,10 +24,32 @@ export const BukkitIcon: React.FC<{
   theme?: 'dark' | 'light' | 'color' | 'mono' | 'receipt';
 }> = ({ size = 36, className = '', theme = 'color' }) => {
   const isReceiptOrMono = theme === 'mono' || theme === 'receipt';
-  const isLight = theme === 'light';
+  const isExplicitDark = theme === 'dark';
+  const isExplicitLight = theme === 'light';
 
   // ID generator for unique gradient references
   const gradId = `bkt_${Math.random().toString(36).substring(2, 7)}`;
+
+  // Determine cutout/counter fill color
+  // When theme='dark', the container is dark so cutouts must be dark
+  // When theme='light', container is light so cutouts are white
+  // When theme='receipt', cutouts are white (or dark on screen dark mode)
+  // When theme='color' (adaptive), we use Tailwind classes for dynamic theme response
+  const cutoutClass = isExplicitDark
+    ? 'fill-slate-950 text-slate-950'
+    : isExplicitLight
+    ? 'fill-white text-white'
+    : isReceiptOrMono
+    ? 'fill-white dark:fill-slate-900 text-white dark:text-slate-900'
+    : 'fill-white dark:fill-slate-900 text-white dark:text-slate-900';
+
+  const bodyFill = isReceiptOrMono
+    ? '#EA580C'
+    : isExplicitDark
+    ? `url(#${gradId}_glow)`
+    : isExplicitLight
+    ? `url(#${gradId}_glow)`
+    : `url(#${gradId}_glow)`;
 
   return (
     <svg
@@ -46,8 +68,8 @@ export const BukkitIcon: React.FC<{
         </linearGradient>
         <linearGradient id={`${gradId}_glow`} x1="0%" y1="0%" x2="0%" y2="100%">
           <stop offset="0%" stopColor="#FF5A00" />
-          <stop offset="55%" stopColor="#FFFFFF" />
-          <stop offset="100%" stopColor="#FFFFFF" />
+          <stop offset="45%" stopColor="#FF7A00" />
+          <stop offset="100%" stopColor="#FF4500" />
         </linearGradient>
         <filter id={`${gradId}_shadow`} x="-20%" y="-20%" width="140%" height="140%">
           <feDropShadow dx="0" dy="2" stdDeviation="3" floodColor="#FF5A00" floodOpacity="0.4" />
@@ -74,16 +96,16 @@ export const BukkitIcon: React.FC<{
           {/* Hat Top Puffs */}
           <path
             d="M 12 34 C 4 34 0 26 3 18 C 6 10 15 8 24 11 C 28 3 42 -1 54 5 C 65 10 68 20 66 28 C 74 28 80 35 77 42 C 74 48 66 50 58 48 L 16 48 C 13 44 12 39 12 34 Z"
-            fill={isReceiptOrMono ? '#0F172A' : '#FFFFFF'}
-            stroke={isReceiptOrMono ? 'none' : '#0F172A'}
-            strokeWidth={isReceiptOrMono ? 0 : 1}
+            fill="#FFFFFF"
+            stroke="#0F172A"
+            strokeWidth={1}
           />
           {/* Hat Brim Band */}
           <path
             d="M 18 40 L 68 40 C 72 40 74 43 73 46 L 71 52 C 70 54 68 56 64 56 L 14 56 C 10 56 8 54 9 52 L 11 46 C 12 43 15 40 18 40 Z"
-            fill={isReceiptOrMono ? '#0F172A' : '#FFFFFF'}
-            stroke={isReceiptOrMono ? 'none' : '#0F172A'}
-            strokeWidth={isReceiptOrMono ? 0 : 0.8}
+            fill="#FFFFFF"
+            stroke="#0F172A"
+            strokeWidth={0.8}
           />
           <path
             d="M 16 46 L 66 46"
@@ -96,8 +118,8 @@ export const BukkitIcon: React.FC<{
         {/* 3. Slanted Capital 'B' Body */}
         <path
           d="M 104 64 C 100 64 96 68 94 73 L 74 152 C 72 158 77 162 83 162 L 140 162 C 162 162 178 150 181 131 C 183 118 176 108 165 102 C 173 96 177 86 175 77 C 172 64 159 64 142 64 L 104 64 Z"
-          fill={isReceiptOrMono ? '#0F172A' : `url(#${gradId}_glow)`}
-          stroke={isReceiptOrMono ? '#0F172A' : '#111827'}
+          fill={bodyFill}
+          stroke={isReceiptOrMono ? '#EA580C' : '#FF4500'}
           strokeWidth="1.5"
           filter={isReceiptOrMono ? undefined : `url(#${gradId}_shadow)`}
         />
@@ -105,19 +127,22 @@ export const BukkitIcon: React.FC<{
         {/* Top Counter of 'B' */}
         <path
           d="M 118 78 L 138 78 C 146 78 152 82 151 88 C 150 94 144 97 136 97 L 113 97 L 118 78 Z"
-          fill={isReceiptOrMono ? '#FFFFFF' : '#111827'}
+          className={cutoutClass}
+          fill="currentColor"
         />
 
         {/* Bottom Counter of 'B' */}
         <path
           d="M 108 111 L 137 111 C 147 111 154 116 152 125 C 150 134 142 139 132 139 L 102 139 L 108 111 Z"
-          fill={isReceiptOrMono ? '#FFFFFF' : '#111827'}
+          className={cutoutClass}
+          fill="currentColor"
         />
 
         {/* Inner Lightning Notch */}
         <polygon
           points="100,84 115,84 105,106 119,106 94,144 102,110 91,110"
-          fill={isReceiptOrMono ? '#FFFFFF' : '#111827'}
+          className={cutoutClass}
+          fill="currentColor"
         />
       </g>
     </svg>
@@ -144,6 +169,23 @@ export const BukkitLogo: React.FC<BukkitLogoProps> = ({
 
   const currentSize = sizeMap[size] || sizeMap.md;
 
+  // Exact color resolution based on explicit or adaptive theme
+  const getWordmarkColor = () => {
+    if (theme === 'dark') return 'text-white';
+    if (theme === 'light') return 'text-slate-900';
+    if (theme === 'receipt') return 'text-slate-900 dark:text-white print:text-black';
+    // Adaptive default ('color')
+    return 'text-slate-900 dark:text-white print:text-black';
+  };
+
+  const getSubtitleColor = () => {
+    if (theme === 'dark') return 'text-orange-400';
+    if (theme === 'light') return 'text-[#EA580C]';
+    if (theme === 'receipt') return 'text-slate-500 dark:text-slate-400 print:text-slate-700';
+    // Adaptive default ('color')
+    return 'text-[#EA580C] dark:text-orange-400 print:text-slate-700';
+  };
+
   // Icon only
   if (variant === 'icon') {
     return (
@@ -166,15 +208,15 @@ export const BukkitLogo: React.FC<BukkitLogoProps> = ({
         <BukkitIcon size={currentSize.icon} theme="receipt" />
         <div className="flex flex-col text-left">
           <div className="flex items-center gap-1.5">
-            <span className={`font-black italic tracking-tighter uppercase leading-none font-sans text-slate-900 ${currentSize.text}`}>
+            <span className={`font-black italic tracking-tighter uppercase leading-none font-sans ${getWordmarkColor()} ${currentSize.text}`}>
               BUKKIT
             </span>
-            <span className="bg-[#EA580C] text-white text-[8px] font-black px-1.5 py-0.5 rounded-sm uppercase tracking-wider">
+            <span className="bg-[#EA580C] text-white text-[8px] font-black px-1.5 py-0.5 rounded-sm uppercase tracking-wider print:bg-black print:text-white shadow-2xs">
               OFFICIAL
             </span>
           </div>
           {showSubtitle && (
-            <span className="text-[9px] font-extrabold uppercase tracking-widest text-slate-500 mt-0.5">
+            <span className={`text-[9px] font-extrabold uppercase tracking-widest mt-0.5 ${getSubtitleColor()}`}>
               {subtitleText}
             </span>
           )}
@@ -188,7 +230,7 @@ export const BukkitLogo: React.FC<BukkitLogoProps> = ({
     return (
       <div
         onClick={onClick}
-        className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-2xl bg-slate-900 text-white shadow-md border border-slate-800 transition-colors ${className} ${onClick ? 'cursor-pointer hover:bg-slate-800' : ''}`}
+        className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-2xl bg-slate-900 dark:bg-slate-800 text-white shadow-md border border-slate-800 dark:border-slate-700 transition-colors ${className} ${onClick ? 'cursor-pointer hover:bg-slate-800 dark:hover:bg-slate-700' : ''}`}
       >
         <BukkitIcon size={currentSize.icon} theme="dark" />
         <div className="text-left">
@@ -196,12 +238,12 @@ export const BukkitLogo: React.FC<BukkitLogoProps> = ({
             <span className="font-black italic tracking-tight text-white leading-none text-base">
               BUKKIT
             </span>
-            <span className="text-[8px] font-black bg-[#FF5A00] text-white px-1.5 py-0.5 rounded-md">
+            <span className="text-[8px] font-black bg-[#FF5A00] text-white px-1.5 py-0.5 rounded-md shadow-2xs">
               EXPRESS
             </span>
           </div>
           {showSubtitle && (
-            <span className="text-[8px] font-bold text-slate-400 tracking-wider uppercase block mt-0.5">
+            <span className="text-[8px] font-bold text-slate-300 dark:text-slate-400 tracking-wider uppercase block mt-0.5">
               {subtitleText}
             </span>
           )}
@@ -219,19 +261,13 @@ export const BukkitLogo: React.FC<BukkitLogoProps> = ({
       >
         <BukkitIcon size={currentSize.icon * 1.3} theme={theme} />
         <span
-          className={`font-black italic tracking-tighter uppercase leading-none mt-2 font-sans ${
-            theme === 'light'
-              ? 'text-white'
-              : 'text-slate-900 dark:text-white'
-          } ${currentSize.text}`}
+          className={`font-black italic tracking-tighter uppercase leading-none mt-2 font-sans ${getWordmarkColor()} ${currentSize.text}`}
         >
           BUKKIT
         </span>
         {showSubtitle && (
           <span
-            className={`font-extrabold uppercase tracking-widest mt-1 ${currentSize.sub} ${
-              theme === 'light' ? 'text-rose-100' : 'text-[#FF5A00] dark:text-orange-400'
-            }`}
+            className={`font-extrabold uppercase tracking-widest mt-1 ${currentSize.sub} ${getSubtitleColor()}`}
           >
             {subtitleText}
           </span>
@@ -253,11 +289,7 @@ export const BukkitLogo: React.FC<BukkitLogoProps> = ({
       <div className="flex flex-col text-left">
         <div className="flex items-center gap-1.5">
           <span
-            className={`font-black italic tracking-tighter uppercase leading-none font-sans ${
-              theme === 'light'
-                ? 'text-white'
-                : 'text-slate-900 dark:text-white'
-            } ${currentSize.text}`}
+            className={`font-black italic tracking-tighter uppercase leading-none font-sans ${getWordmarkColor()} ${currentSize.text}`}
           >
             BUKKIT
           </span>
@@ -269,11 +301,7 @@ export const BukkitLogo: React.FC<BukkitLogoProps> = ({
           <div className="flex items-center gap-1 mt-0.5">
             <span className="w-1.5 h-1.5 rounded-full bg-[#FF5A00] shrink-0 animate-pulse" />
             <span
-              className={`font-black uppercase tracking-widest leading-none truncate ${currentSize.sub} ${
-                theme === 'light'
-                  ? 'text-orange-200'
-                  : 'text-[#FF5A00] dark:text-orange-400'
-              }`}
+              className={`font-black uppercase tracking-widest leading-none truncate ${currentSize.sub} ${getSubtitleColor()}`}
             >
               {subtitleText}
             </span>

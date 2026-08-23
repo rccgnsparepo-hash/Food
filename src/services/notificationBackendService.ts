@@ -7,8 +7,17 @@ import {
   NotificationHealthStats,
   NotificationPlatform,
   NotificationAppType,
-  NotificationSeverity
+  NotificationSeverity,
+  PushSubscriptionRecord
 } from '../types';
+import {
+  dispatchWebPushToUser,
+  dispatchWebPushToRole,
+  saveWebPushSubscription,
+  removeWebPushSubscription,
+  listAllWebPushSubscriptions,
+  getVapidPublicKey
+} from '../server/webPushService';
 
 // In-memory token & notification store for authoritative real-time routing & resilience
 const activeDeviceTokens = new Map<string, DeviceTokenRecord>();
@@ -584,8 +593,26 @@ export async function dispatchOrderEventPipeline(
     let recipientTokens: DeviceTokenRecord[] = [];
     if (target.recipientUserId === 'broadcast_riders') {
       recipientTokens = getTokensForAppType('RIDER');
+      // Also broadcast Web Push to all active riders
+      dispatchWebPushToRole('RIDER', {
+        title: target.title,
+        body: target.body,
+        deepLink: target.deepLink,
+        severity: target.severity,
+        orderId: payload.orderId,
+        role: 'rider'
+      }).catch(() => {});
     } else {
       recipientTokens = getTokensForUser(target.recipientUserId);
+      // Dispatch Web Push to user's registered Web & PWA browsers
+      dispatchWebPushToUser(target.recipientUserId, {
+        title: target.title,
+        body: target.body,
+        deepLink: target.deepLink,
+        severity: target.severity,
+        orderId: payload.orderId,
+        role: target.recipientRole.toLowerCase()
+      }).catch(() => {});
     }
 
     sentCount += recipientTokens.length > 0 ? recipientTokens.length : 1;
@@ -685,6 +712,15 @@ export async function dispatchWalletEventPipeline(payload: {
   totalDeliveredCount++;
   lastDispatchTime = now;
 
+  // Send Web Push alert to user
+  dispatchWebPushToUser(payload.userId, {
+    title,
+    body,
+    deepLink: '/wallet',
+    severity: 'INFO',
+    role: 'customer'
+  }).catch(() => {});
+
   return { success: true, notification: notifRecord };
 }
 
@@ -723,6 +759,15 @@ export async function dispatchAdminAlertPipeline(payload: {
   totalSentCount += adminTokens.length > 0 ? adminTokens.length : 1;
   totalDeliveredCount++;
   lastDispatchTime = now;
+
+  // Dispatch Web Push to all Admin subscriptions
+  dispatchWebPushToRole('ADMIN', {
+    title: `[${payload.severity}] ${payload.title}`,
+    body: payload.body,
+    deepLink: '/admin/operations',
+    severity: payload.severity,
+    role: 'admin'
+  }).catch(() => {});
 
   return { success: true, dispatchedToAdminsCount: Math.max(1, adminTokens.length) };
 }
@@ -816,5 +861,52 @@ export function getNotificationHealth(): NotificationHealthStats {
     averageLatencyMs: avgLatency,
     lastDispatchTimestamp: lastDispatchTime,
     serviceWorkerStatus: 'active'
+  };
+}
+
+/**
+ * Direct push dispatch to specific user (e.g. Chat Messages, Direct Alerts)
+ */
+export async function dispatchPushNotificationToUser(payload: {
+  recipientUserId: string;
+  title: string;
+  body: string;
+  deepLink?: string;
+  channelId?: string;
+  data?: Record<string, any>;
+}): Promise<{ success: boolean; notificationId: string; tokensTargeted: number }> {
+  const now = new Date().toISOString();
+  const notifId = `notif_chat_${Date.now()}_${Math.floor(1000 + Math.random() * 9000)}`;
+
+  const notifRecord: NotificationRecord = {
+    notification_id: notifId,
+    recipient_user_id: payload.recipientUserId,
+    recipient_role: 'CUSTOMER',
+    notification_key: `direct_${payload.recipientUserId}_${Date.now()}`,
+    type: 'CHAT_MESSAGE',
+    title: payload.title,
+    body: payload.body,
+    deep_link: payload.deepLink || '/chat',
+    status: 'delivered',
+    severity: 'INFO',
+    metadata: payload.data || {},
+    created_at: now,
+    read_at: null
+  };
+
+  persistedNotifications.set(notifId, notifRecord);
+  totalSentCount++;
+  totalDeliveredCount++;
+  lastDispatchTime = now;
+
+  // Check active tokens for user
+  const userTokens = Array.from(activeDeviceTokens.values()).filter(
+    (t) => t.user_id === payload.recipientUserId && t.active
+  );
+
+  return {
+    success: true,
+    notificationId: notifId,
+    tokensTargeted: Math.max(1, userTokens.length)
   };
 }

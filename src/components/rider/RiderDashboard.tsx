@@ -17,12 +17,12 @@ import {
   User,
   AlertCircle
 } from 'lucide-react';
-import { collection, query, where, onSnapshot, doc, updateDoc, setDoc, orderBy } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, doc, updateDoc, setDoc, orderBy } from "../../lib/embeddedDb";
 import { db } from '../../lib/firebase';
 import { Order, OrderStatus, DeliveryEarning, RiderProfile } from '../../types';
 import { useAuthStore } from '../../stores/useAuthStore';
 import { MapPicker } from '../ui/MapPicker';
-import { CustomerChat } from '../customer/CustomerChat';
+import { RealtimeDeliveryChatModal } from '../common/RealtimeDeliveryChatModal';
 import { triggerHaptic } from '../../utils/haptics';
 import { toast } from 'sonner';
 import { staggerContainer, staggerItem } from '../../utils/motion';
@@ -655,12 +655,18 @@ export const RiderDashboard: React.FC = () => {
         </div>
       )}
 
-      {/* CHAT DRAWER */}
+      {/* REALTIME DELIVERY CHAT MODAL (Rider <-> Customer) */}
       {showChat && myActiveOrder && (
-        <CustomerChat
+        <RealtimeDeliveryChatModal
           orderId={myActiveOrder.id}
+          orderNumber={myActiveOrder.order_number || myActiveOrder.id.slice(-6)}
+          currentUserId={user?.uid || ''}
+          currentUserName={user?.name || 'Delivery Courier'}
+          currentUserRole="rider"
+          recipientId={myActiveOrder.customer_id || myActiveOrder.user_id || 'customer'}
+          recipientName={myActiveOrder.customer_name || myActiveOrder.user_name || 'Customer'}
           vendorName={myActiveOrder.vendor_name || 'Vendor Kitchen'}
-          riderName={user?.name || 'Rider'}
+          isOrderDelivered={myActiveOrder.status === 'delivered'}
           onClose={() => setShowChat(false)}
         />
       )}

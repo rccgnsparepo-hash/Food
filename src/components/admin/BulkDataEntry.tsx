@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { Upload, FileText, CheckCircle2, AlertCircle, ArrowRight, Database, Download, Store, Sparkles, Clock, DollarSign, Filter, RefreshCw } from 'lucide-react';
-import { doc, setDoc } from 'firebase/firestore';
+import { doc, setDoc } from "../../lib/embeddedDb";
 import { db } from '../../lib/firebase';
 import { useMarketplaceStore } from '../../stores/useMarketplaceStore';
 import { triggerHaptic } from '../../utils/haptics';

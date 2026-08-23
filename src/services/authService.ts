@@ -1,6 +1,6 @@
 import { UserRole, Permission, UserIdentity, UserProfile, Order, OrderStatus } from '../types';
 import { db, auth } from '../lib/firebase';
-import { doc, getDoc, setDoc, updateDoc, collection, query, where, getDocs, limit } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc, collection, query, where, getDocs, limit } from "../lib/embeddedDb";
 
 const cleanFirestoreData = (data: any): any => {
   return JSON.parse(JSON.stringify(data));

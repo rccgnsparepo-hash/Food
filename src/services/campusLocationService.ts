@@ -10,7 +10,7 @@ import {
   query,
   where,
   onSnapshot
-} from 'firebase/firestore';
+} from "../lib/embeddedDb";
 import { CampusLocation, DeliveryZone, CampusBoundary, CampusLocationType } from '../types';
 
 /**

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   Bell,
@@ -13,11 +13,15 @@ import {
   ShoppingBag,
   Wallet,
   Sparkles,
-  Play
+  Play,
+  Radio,
+  Send
 } from 'lucide-react';
 import { NotificationRecord } from '../../types';
-import { useNotificationStore } from '../../services/notificationService';
+import { useNotificationStore, enablePushNotifications } from '../../services/notificationService';
+import { useAuthStore } from '../../stores/useAuthStore';
 import { triggerHaptic } from '../../utils/haptics';
+import { toast } from 'sonner';
 
 interface NotificationCenterProps {
   isOpen: boolean;
@@ -32,10 +36,68 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
 }) => {
   const { notifications, unreadCount, isLoading, markAsRead, markAllAsRead, refetch } =
     useNotificationStore();
+  const { user, role } = useAuthStore();
 
   const [activeFilter, setActiveFilter] = useState<'all' | 'orders' | 'wallet' | 'admin'>('all');
   const [soundEnabled, setSoundEnabled] = useState<boolean>(true);
   const [isSimulating, setIsSimulating] = useState<boolean>(false);
+  const [pushStatus, setPushStatus] = useState<'granted' | 'default' | 'denied' | 'unsupported'>('default');
+
+  useEffect(() => {
+    if (typeof window !== 'undefined' && 'Notification' in window) {
+      setPushStatus(Notification.permission as any);
+    } else {
+      setPushStatus('unsupported');
+    }
+  }, [isOpen]);
+
+  const handleEnablePush = async () => {
+    if (!user?.uid) {
+      toast.info('Please sign in to link push notifications to your account.');
+      return;
+    }
+    const appType =
+      role === 'rider'
+        ? 'RIDER'
+        : role === 'kitchen' || role === 'kitchen_manager' || role === 'kitchen_staff'
+        ? 'VENDOR'
+        : role === 'admin' || role === 'super_admin'
+        ? 'ADMIN'
+        : 'CUSTOMER';
+
+    const success = await enablePushNotifications(user.uid, appType);
+    if (typeof window !== 'undefined' && 'Notification' in window) {
+      setPushStatus(Notification.permission as any);
+    }
+  };
+
+  const handleTestWebPush = async () => {
+    try {
+      toast.loading('Dispatching background Web Push...');
+      const res = await fetch('/api/webpush/test-send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: user?.uid || 'anonymous_guest',
+          title: '🔔 BUKKIT Live Push Verified',
+          body: 'Real Web Push & FCM delivered to your active device.',
+          deepLink: '/orders',
+          severity: 'INFO'
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        toast.dismiss();
+        toast.success('✓ Web Push dispatched to registered devices!');
+      } else {
+        toast.dismiss();
+        toast.error('Could not send push: ' + (data.error || 'Check service worker'));
+      }
+    } catch (e: any) {
+      toast.dismiss();
+      toast.error('Push test failed: ' + e.message);
+    }
+  };
 
   const filteredNotifications = notifications.filter((n) => {
     if (activeFilter === 'orders') return n.type === 'ORDER_STATUS' || n.type === 'DELIVERY_ALERT' || n.type === 'VENDOR_ALERT';
@@ -256,6 +318,35 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
                   );
                 })
               )}
+            </div>
+
+            {/* Web Push & APK System Status Bar */}
+            <div className="px-4 py-3 bg-slate-900 border-t border-slate-800 flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <Radio className={`w-3.5 h-3.5 ${pushStatus === 'granted' ? 'text-emerald-400 animate-pulse' : 'text-amber-400'}`} />
+                <span className="text-[11px] font-bold text-slate-300">
+                  {pushStatus === 'granted' ? 'Push Notifications Active' : 'Push Inactive / Pending'}
+                </span>
+              </div>
+
+              <div className="flex items-center gap-2">
+                {pushStatus !== 'granted' ? (
+                  <button
+                    onClick={handleEnablePush}
+                    className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-[10px] font-black cursor-pointer transition-colors shadow-xs"
+                  >
+                    Enable Push
+                  </button>
+                ) : (
+                  <button
+                    onClick={handleTestWebPush}
+                    className="px-2.5 py-1 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-[10px] font-black cursor-pointer transition-colors flex items-center gap-1 shadow-xs"
+                  >
+                    <Send className="w-2.5 h-2.5" />
+                    <span>Test Web Push</span>
+                  </button>
+                )}
+              </div>
             </div>
 
             {/* Quick Test Simulator Footer */}

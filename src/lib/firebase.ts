@@ -1,12 +1,12 @@
 import { initializeApp, getApps, getApp, FirebaseApp } from 'firebase/app';
 import { getAuth, Auth } from 'firebase/auth';
-import { getFirestore, Firestore } from 'firebase/firestore';
 import { getStorage, FirebaseStorage } from 'firebase/storage';
 import firebaseConfig from '../../firebase-applet-config.json';
+import { embeddedDbInstance } from './embeddedDb';
 
 let app: FirebaseApp;
 let auth: Auth;
-let db: Firestore;
+const db = embeddedDbInstance;
 let storage: FirebaseStorage;
 
 try {
@@ -16,15 +16,11 @@ try {
     app = getApp();
   }
   auth = getAuth(app);
-  // Specify custom database ID if declared in config
-  db = getFirestore(app, firebaseConfig.firestoreDatabaseId || '(default)');
   storage = getStorage(app);
 } catch (error) {
-  console.error('Error initializing Firebase:', error);
-  // Fallback to default
+  console.error('Firebase Auth/Storage initialization notice:', error);
   app = getApps().length ? getApp() : initializeApp(firebaseConfig);
   auth = getAuth(app);
-  db = getFirestore(app);
   storage = getStorage(app);
 }
 
@@ -32,7 +28,6 @@ export { app, auth, db, storage };
 
 /**
  * Recursively removes all `undefined` properties from an object/array
- * so that Firestore setDoc, addDoc, and updateDoc operations will never crash.
  */
 export function cleanFirestoreData<T>(obj: T): T {
   if (obj === null || obj === undefined) {

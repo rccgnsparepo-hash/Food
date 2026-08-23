@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Save, RefreshCw, Search, History, Check, AlertCircle } from 'lucide-react';
-import { doc, updateDoc, collection, addDoc } from 'firebase/firestore';
+import { doc, updateDoc, collection, addDoc } from "../../lib/embeddedDb";
 import { db } from '../../lib/firebase';
 import { Vendor, MenuItem, FoodCategory, VerificationStatus, ItemStatus } from '../../types';
 import { triggerHaptic } from '../../utils/haptics';

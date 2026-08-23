@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { X, Star, Utensils, Bike, Check, Sparkles, MessageSquare, ThumbsUp, Send } from 'lucide-react';
-import { doc, updateDoc, setDoc } from 'firebase/firestore';
+import { doc, updateDoc, setDoc } from "../../lib/embeddedDb";
 import { db } from '../../lib/firebase';
 import { Order } from '../../types';
 import { triggerHaptic } from '../../utils/haptics';

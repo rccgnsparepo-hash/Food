@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { collection, onSnapshot, query, where } from 'firebase/firestore';
+import { collection, onSnapshot, query, where } from "../lib/embeddedDb";
 import { db } from '../lib/firebase';
 import { University, Campus, FoodZone, Vendor, FoodCategory, MenuItem, FoodReview } from '../types';
 import {

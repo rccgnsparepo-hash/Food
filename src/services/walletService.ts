@@ -1,5 +1,5 @@
 import { db } from '../lib/firebase';
-import { doc, getDoc, setDoc, updateDoc, collection, query, where, orderBy, onSnapshot, runTransaction } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc, collection, query, where, orderBy, onSnapshot, runTransaction } from "../lib/embeddedDb";
 import { BukkitWallet, WalletTransaction, WalletTransactionType, UserProfile, UserRole } from '../types';
 import { cleanFirestoreData } from './orderLifecycleService';
 import { logAuditEvent } from './auditService';

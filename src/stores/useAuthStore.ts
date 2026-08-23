@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { UserProfile, UserRole, Permission, CustomerProfile, RiderProfile, KitchenStaffProfile, AdminProfile } from '../types';
 import { auth, db, cleanFirestoreData } from '../lib/firebase';
-import { doc, getDoc, setDoc, updateDoc, onSnapshot } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc, onSnapshot } from "../lib/embeddedDb";
 import {
   onAuthStateChanged,
   signOut,
@@ -14,6 +14,7 @@ import {
 } from 'firebase/auth';
 import { translateFirebaseAuthError } from '../lib/authErrorTranslator';
 import { resolveAuthoritativeUserProfile, findUserProfileByEmail, checkUserExistsInDatabase, getRolePermissions, hasPermission as checkPermission } from '../services/authService';
+import { deactivateDeviceToken } from '../services/fcmDeviceService';
 
 export type AuthStatus = 'idle' | 'loading' | 'success' | 'error' | 'email-verification-required';
 
@@ -649,8 +650,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
       if (isVerified) {
         try {
-          // Update Firestore user document status
-          const { doc, updateDoc, setDoc } = await import('firebase/firestore');
+          // Update user document status
+          const { doc, updateDoc, setDoc } = await import('../lib/embeddedDb');
           try {
             await updateDoc(doc(db, 'users', auth.currentUser.uid), {
               email_verified: true,
@@ -724,6 +725,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   logout: async () => {
     try {
+      const currentUser = auth.currentUser;
+      if (currentUser?.uid) {
+        await deactivateDeviceToken(currentUser.uid).catch(() => {});
+      }
       await signOut(auth);
     } catch (e) {}
     try {

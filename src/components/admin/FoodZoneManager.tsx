@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Plus, Edit2, Trash2, MapPin, Building, Landmark } from 'lucide-react';
-import { doc, setDoc, deleteDoc } from 'firebase/firestore';
+import { doc, setDoc, deleteDoc } from "../../lib/embeddedDb";
 import { db } from '../../lib/firebase';
 import { University, Campus, FoodZone } from '../../types';
 import { triggerHaptic } from '../../utils/haptics';

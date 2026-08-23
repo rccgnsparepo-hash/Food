@@ -21,7 +21,7 @@ import { useAuthStore } from '../../stores/useAuthStore';
 import { pageVariants, staggerContainer, staggerItem } from '../../utils/motion';
 import { triggerHaptic } from '../../utils/haptics';
 import { db } from '../../lib/firebase';
-import { collection, query, where, onSnapshot, orderBy } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, orderBy } from "../../lib/embeddedDb";
 import { WalletTransaction } from '../../types';
 
 export const WalletDealsView: React.FC = () => {

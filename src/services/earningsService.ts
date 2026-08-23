@@ -11,7 +11,7 @@ import {
   onSnapshot,
   getDocs,
   runTransaction
-} from 'firebase/firestore';
+} from "../lib/embeddedDb";
 import {
   Order,
   DeliveryEarning,

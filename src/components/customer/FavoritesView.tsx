@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { motion } from 'motion/react';
 import { Heart } from 'lucide-react';
-import { collection, onSnapshot } from 'firebase/firestore';
+import { collection, onSnapshot } from "../../lib/embeddedDb";
 import { db } from '../../lib/firebase';
 import { MenuItem } from '../../types';
 import { useAuthStore } from '../../stores/useAuthStore';

@@ -9,7 +9,7 @@ import {
   limit,
   onSnapshot,
   getDocs
-} from 'firebase/firestore';
+} from "../lib/embeddedDb";
 import { AuditLog, AuditLogActor, UserRole, OrderStatus, WalletTransactionType } from '../types';
 import { cleanFirestoreData } from './orderLifecycleService';
 

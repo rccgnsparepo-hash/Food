@@ -100,7 +100,7 @@ export const OrderReceiptModal: React.FC<OrderReceiptModalProps> = ({
           initial={{ opacity: 0, scale: 0.96, y: 15 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.96, y: 15 }}
-          className="bg-white w-full max-w-2xl max-h-[92vh] rounded-3xl shadow-2xl border border-rose-100 flex flex-col justify-between overflow-hidden print:max-h-none print:shadow-none print:border-none print:rounded-none"
+          className="bg-white dark:bg-slate-900 w-full max-w-2xl max-h-[92vh] rounded-3xl shadow-2xl border border-rose-100 dark:border-slate-800 flex flex-col justify-between overflow-hidden print:max-h-none print:shadow-none print:border-none print:rounded-none transition-colors"
         >
           {/* Top Control Bar (Hidden when printing) */}
           <div className="bg-slate-900 text-white px-6 py-4 flex items-center justify-between border-b border-slate-800 print:hidden shrink-0">
@@ -150,49 +150,49 @@ export const OrderReceiptModal: React.FC<OrderReceiptModalProps> = ({
           </div>
 
           {/* Scrollable Receipt Body */}
-          <div className="p-6 sm:p-8 overflow-y-auto flex-1 space-y-6 print:p-0 print:overflow-visible text-slate-900 bg-slate-50/40">
+          <div className="p-6 sm:p-8 overflow-y-auto flex-1 space-y-6 print:p-0 print:overflow-visible text-slate-900 dark:text-slate-100 bg-slate-50/60 dark:bg-slate-950/60">
             {isLoading ? (
               <div className="py-20 text-center space-y-3">
-                <div className="w-10 h-10 border-4 border-rose-200 border-t-[#D6001C] rounded-full animate-spin mx-auto" />
-                <p className="text-xs font-bold text-slate-600">Generating authoritative receipt...</p>
+                <div className="w-10 h-10 border-4 border-rose-200 dark:border-rose-900/40 border-t-[#D6001C] rounded-full animate-spin mx-auto" />
+                <p className="text-xs font-bold text-slate-600 dark:text-slate-400">Generating authoritative receipt...</p>
               </div>
             ) : validationError || !receipt ? (
-              <div className="bg-red-50 border border-red-200 rounded-3xl p-8 text-center space-y-4 my-8">
-                <div className="w-12 h-12 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto">
+              <div className="bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900/50 rounded-3xl p-8 text-center space-y-4 my-8">
+                <div className="w-12 h-12 bg-red-100 dark:bg-red-900/50 text-red-600 dark:text-red-400 rounded-full flex items-center justify-center mx-auto">
                   <AlertCircle className="w-6 h-6" />
                 </div>
                 <div>
-                  <h3 className="font-extrabold text-red-900 text-base">Receipt Generation Failed</h3>
-                  <p className="text-xs text-red-700 mt-1 max-w-md mx-auto">
+                  <h3 className="font-extrabold text-red-900 dark:text-red-100 text-base">Receipt Generation Failed</h3>
+                  <p className="text-xs text-red-700 dark:text-red-300 mt-1 max-w-md mx-auto">
                     {validationError || 'Order financial data does not match authoritative records.'}
                   </p>
                 </div>
                 <div className="pt-2">
                   <button
                     onClick={onClose}
-                    className="bg-slate-900 text-white text-xs font-extrabold px-6 py-2.5 rounded-xl hover:bg-black transition-colors"
+                    className="bg-slate-900 dark:bg-slate-800 text-white text-xs font-extrabold px-6 py-2.5 rounded-xl hover:bg-black dark:hover:bg-slate-700 transition-colors"
                   >
                     Close
                   </button>
                 </div>
               </div>
             ) : (
-              <div className="bg-white rounded-3xl p-6 sm:p-8 shadow-xs border border-rose-100 space-y-6 print:border-none print:shadow-none print:p-0">
+              <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 sm:p-8 shadow-xs border border-rose-100 dark:border-slate-800 space-y-6 print:border-none print:shadow-none print:p-0 transition-colors">
                 {/* 1. RECEIPT HEADER */}
-                <div className="border-b border-slate-100 pb-6 space-y-4">
+                <div className="border-b border-slate-100 dark:border-slate-800 pb-6 space-y-4">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <div className="flex items-center gap-3">
                       <BukkitLogo variant="full" size="md" subtitleText="CAMPUS FOOD NETWORK • OFFICIAL RECEIPT" />
                     </div>
 
                     <div className="flex flex-wrap sm:flex-col sm:items-end gap-2 text-right">
-                      <span className="text-xs font-mono font-bold text-slate-900 bg-slate-100 px-3 py-1 rounded-lg">
+                      <span className="text-xs font-mono font-bold text-slate-900 dark:text-slate-100 bg-slate-100 dark:bg-slate-800 px-3 py-1 rounded-lg border border-slate-200/60 dark:border-slate-700">
                         {receipt.receipt_id}
                       </span>
-                      <span className="text-[11px] text-slate-500 font-mono">
+                      <span className="text-[11px] text-slate-500 dark:text-slate-400 font-mono">
                         Order #{receipt.order_id}
                       </span>
-                      <span className="text-[11px] text-slate-500">
+                      <span className="text-[11px] text-slate-500 dark:text-slate-400">
                         {new Date(receipt.created_at).toLocaleString([], {
                           dateStyle: 'medium',
                           timeStyle: 'short',
@@ -203,16 +203,16 @@ export const OrderReceiptModal: React.FC<OrderReceiptModalProps> = ({
 
                   {/* Status Badges Row */}
                   <div className="flex flex-wrap items-center gap-2 pt-2">
-                    <div className="flex items-center gap-1.5 bg-slate-100 text-slate-800 text-xs px-3 py-1.5 rounded-xl font-bold">
-                      <Clock className="w-3.5 h-3.5 text-slate-500" />
+                    <div className="flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 text-xs px-3 py-1.5 rounded-xl font-bold border border-slate-200/60 dark:border-slate-700">
+                      <Clock className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />
                       <span>Status:</span>
                       <span
                         className={`uppercase font-black ${
                           receipt.order_status === 'delivered'
-                            ? 'text-emerald-600'
+                            ? 'text-emerald-600 dark:text-emerald-400'
                             : receipt.order_status === 'cancelled'
-                            ? 'text-slate-500'
-                            : 'text-[#D6001C]'
+                            ? 'text-slate-500 dark:text-slate-400'
+                            : 'text-[#D6001C] dark:text-red-400'
                         }`}
                       >
                         {receipt.order_status.replace(/_/g, ' ')}
@@ -222,8 +222,8 @@ export const OrderReceiptModal: React.FC<OrderReceiptModalProps> = ({
                     <div
                       className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-xl font-bold ${
                         receipt.payment.status === 'paid'
-                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                          : 'bg-amber-50 text-amber-800 border border-amber-200'
+                          ? 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/60'
+                          : 'bg-amber-50 dark:bg-amber-950/50 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800/60'
                       }`}
                     >
                       <CreditCard className="w-3.5 h-3.5" />
@@ -231,7 +231,7 @@ export const OrderReceiptModal: React.FC<OrderReceiptModalProps> = ({
                       <span className="uppercase font-black">{receipt.payment.status}</span>
                     </div>
 
-                    <div className="flex items-center gap-1 text-[11px] text-slate-500 font-mono ml-auto">
+                    <div className="flex items-center gap-1 text-[11px] text-slate-500 dark:text-slate-400 font-mono ml-auto">
                       <span>Ref: {receipt.payment.transaction_reference}</span>
                     </div>
                   </div>
@@ -240,33 +240,33 @@ export const OrderReceiptModal: React.FC<OrderReceiptModalProps> = ({
                 {/* 2 & 3. CUSTOMER & VENDOR DUAL SECTION */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {/* Customer Info Card */}
-                  <div className="bg-slate-50/80 rounded-2xl p-4 border border-slate-100 space-y-2">
-                    <div className="flex items-center gap-2 text-xs font-black text-[#D6001C] uppercase tracking-wider">
+                  <div className="bg-slate-50/80 dark:bg-slate-800/60 rounded-2xl p-4 border border-slate-100 dark:border-slate-700/60 space-y-2">
+                    <div className="flex items-center gap-2 text-xs font-black text-[#D6001C] dark:text-rose-400 uppercase tracking-wider">
                       <User className="w-3.5 h-3.5" />
                       <span>Customer Information</span>
                     </div>
-                    <div className="text-xs space-y-1 text-slate-700">
-                      <p className="font-extrabold text-slate-900 text-sm">{receipt.customer.name}</p>
-                      <p className="flex items-center gap-1 text-slate-600">
-                        <Phone className="w-3 h-3 text-slate-400" />
+                    <div className="text-xs space-y-1 text-slate-700 dark:text-slate-300">
+                      <p className="font-extrabold text-slate-900 dark:text-slate-100 text-sm">{receipt.customer.name}</p>
+                      <p className="flex items-center gap-1 text-slate-600 dark:text-slate-300">
+                        <Phone className="w-3 h-3 text-slate-400 dark:text-slate-500" />
                         {receipt.customer.phone}
                       </p>
                       {receipt.customer.email && (
-                        <p className="text-[11px] text-slate-500">{receipt.customer.email}</p>
+                        <p className="text-[11px] text-slate-500 dark:text-slate-400">{receipt.customer.email}</p>
                       )}
-                      <p className="text-slate-600 pt-1 flex items-start gap-1">
-                        <MapPin className="w-3.5 h-3.5 text-[#D6001C] shrink-0 mt-0.5" />
+                      <p className="text-slate-600 dark:text-slate-300 pt-1 flex items-start gap-1">
+                        <MapPin className="w-3.5 h-3.5 text-[#D6001C] dark:text-rose-400 shrink-0 mt-0.5" />
                         <span>
                           {receipt.customer.delivery_location}
                           {receipt.customer.specific_location && (
-                            <span className="block text-[11px] font-semibold text-slate-500">
+                            <span className="block text-[11px] font-semibold text-slate-500 dark:text-slate-400">
                               {receipt.customer.specific_location}
                             </span>
                           )}
                         </span>
                       </p>
                       {receipt.customer.delivery_instructions && (
-                        <p className="text-[11px] text-slate-500 italic bg-white p-2 rounded-lg border border-slate-200/60 mt-1">
+                        <p className="text-[11px] text-slate-500 dark:text-slate-400 italic bg-white dark:bg-slate-850 p-2 rounded-lg border border-slate-200/60 dark:border-slate-700 mt-1">
                           Note: "{receipt.customer.delivery_instructions}"
                         </p>
                       )}
@@ -274,20 +274,20 @@ export const OrderReceiptModal: React.FC<OrderReceiptModalProps> = ({
                   </div>
 
                   {/* Vendor Info Card */}
-                  <div className="bg-slate-50/80 rounded-2xl p-4 border border-slate-100 space-y-2">
-                    <div className="flex items-center gap-2 text-xs font-black text-[#D6001C] uppercase tracking-wider">
+                  <div className="bg-slate-50/80 dark:bg-slate-800/60 rounded-2xl p-4 border border-slate-100 dark:border-slate-700/60 space-y-2">
+                    <div className="flex items-center gap-2 text-xs font-black text-[#D6001C] dark:text-rose-400 uppercase tracking-wider">
                       <Store className="w-3.5 h-3.5" />
                       <span>Vendor / Kitchen</span>
                     </div>
-                    <div className="text-xs space-y-1 text-slate-700">
-                      <p className="font-extrabold text-slate-900 text-sm">{receipt.vendor.vendor_name}</p>
-                      <p className="text-[11px] text-slate-500 font-mono">ID: {receipt.vendor.vendor_id}</p>
-                      <p className="text-slate-600 flex items-start gap-1 pt-1">
+                    <div className="text-xs space-y-1 text-slate-700 dark:text-slate-300">
+                      <p className="font-extrabold text-slate-900 dark:text-slate-100 text-sm">{receipt.vendor.vendor_name}</p>
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400 font-mono">ID: {receipt.vendor.vendor_id}</p>
+                      <p className="text-slate-600 dark:text-slate-300 flex items-start gap-1 pt-1">
                         <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0 mt-0.5" />
                         <span>{receipt.vendor.vendor_location}</span>
                       </p>
                       {receipt.vendor.vendor_phone && (
-                        <p className="text-[11px] text-slate-500 flex items-center gap-1 pt-1">
+                        <p className="text-[11px] text-slate-500 dark:text-slate-400 flex items-center gap-1 pt-1">
                           <Phone className="w-3 h-3 text-slate-400" />
                           Support: {receipt.vendor.vendor_phone}
                         </p>
@@ -298,11 +298,11 @@ export const OrderReceiptModal: React.FC<OrderReceiptModalProps> = ({
 
                 {/* 4. ORDER ITEMS TABLE */}
                 <div className="space-y-2">
-                  <h3 className="text-xs font-black text-slate-900 uppercase tracking-wider">
+                  <h3 className="text-xs font-black text-slate-900 dark:text-slate-100 uppercase tracking-wider">
                     Order Items Breakdown ({receipt.items.length})
                   </h3>
 
-                  <div className="border border-slate-200 rounded-2xl overflow-hidden shadow-2xs">
+                  <div className="border border-slate-200 dark:border-slate-700 rounded-2xl overflow-hidden shadow-2xs">
                     <table className="w-full text-left text-xs border-collapse">
                       <thead className="bg-slate-900 text-white font-extrabold text-[11px] uppercase tracking-wider">
                         <tr>
@@ -312,21 +312,21 @@ export const OrderReceiptModal: React.FC<OrderReceiptModalProps> = ({
                           <th className="py-3 px-4 text-right">Total</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-slate-100 bg-white">
+                      <tbody className="divide-y divide-slate-100 dark:divide-slate-800 bg-white dark:bg-slate-900">
                         {receipt.items.map((item, idx) => (
-                          <tr key={idx} className="hover:bg-slate-50/70 transition-colors">
+                          <tr key={idx} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/60 transition-colors">
                             <td className="py-3 px-4">
-                              <span className="font-extrabold text-slate-900 block">
+                              <span className="font-extrabold text-slate-900 dark:text-slate-100 block">
                                 {item.product_name_snapshot}
                               </span>
                               {item.variant_name && (
-                                <span className="text-[10px] text-rose-600 font-semibold block">
+                                <span className="text-[10px] text-rose-600 dark:text-rose-400 font-semibold block">
                                   Variant: {item.variant_name}
                                 </span>
                               )}
                               {item.selected_options &&
                                 Object.keys(item.selected_options).length > 0 && (
-                                  <div className="text-[10px] text-slate-500 mt-0.5 space-x-2">
+                                  <div className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5 space-x-2">
                                     {Object.entries(item.selected_options).map(([k, v]) => (
                                       <span key={k}>
                                         • {k}: {v}
@@ -335,13 +335,13 @@ export const OrderReceiptModal: React.FC<OrderReceiptModalProps> = ({
                                   </div>
                                 )}
                             </td>
-                            <td className="py-3 px-3 text-center font-bold text-slate-800">
+                            <td className="py-3 px-3 text-center font-bold text-slate-800 dark:text-slate-200">
                               {item.quantity}
                             </td>
-                            <td className="py-3 px-3 text-right text-slate-600 font-mono">
+                            <td className="py-3 px-3 text-right text-slate-600 dark:text-slate-300 font-mono">
                               ₦{item.unit_price_snapshot.toLocaleString()}
                             </td>
-                            <td className="py-3 px-4 text-right font-black text-slate-900 font-mono">
+                            <td className="py-3 px-4 text-right font-black text-slate-900 dark:text-slate-100 font-mono">
                               ₦{item.line_total.toLocaleString()}
                             </td>
                           </tr>
@@ -403,22 +403,22 @@ export const OrderReceiptModal: React.FC<OrderReceiptModalProps> = ({
                   </div>
 
                   {/* Right: Authoritative Totals Breakdown */}
-                  <div className="bg-rose-50/50 rounded-2xl p-5 border border-rose-100 space-y-2.5">
-                    <h4 className="text-xs font-black text-slate-900 uppercase tracking-wider border-b border-rose-100/80 pb-2">
+                  <div className="bg-rose-50/50 dark:bg-slate-800/60 rounded-2xl p-5 border border-rose-100 dark:border-slate-700/60 space-y-2.5">
+                    <h4 className="text-xs font-black text-slate-900 dark:text-slate-100 uppercase tracking-wider border-b border-rose-100/80 dark:border-slate-700 pb-2">
                       Financial Summary
                     </h4>
 
-                    <div className="space-y-1.5 text-xs text-slate-600">
+                    <div className="space-y-1.5 text-xs text-slate-600 dark:text-slate-300">
                       <div className="flex justify-between">
                         <span>Subtotal:</span>
-                        <span className="font-bold text-slate-900 font-mono">
+                        <span className="font-bold text-slate-900 dark:text-slate-100 font-mono">
                           ₦{receipt.financials.subtotal.toLocaleString()}
                         </span>
                       </div>
 
                       <div className="flex justify-between">
                         <span>Campus Delivery Fee:</span>
-                        <span className="font-bold text-slate-900 font-mono">
+                        <span className="font-bold text-slate-900 dark:text-slate-100 font-mono">
                           ₦{receipt.financials.delivery_fee.toLocaleString()}
                         </span>
                       </div>
@@ -426,14 +426,14 @@ export const OrderReceiptModal: React.FC<OrderReceiptModalProps> = ({
                       {receipt.financials.service_fee > 0 && (
                         <div className="flex justify-between">
                           <span>Service Charge (5%):</span>
-                          <span className="font-bold text-slate-900 font-mono">
+                          <span className="font-bold text-slate-900 dark:text-slate-100 font-mono">
                             ₦{receipt.financials.service_fee.toLocaleString()}
                           </span>
                         </div>
                       )}
 
                       {receipt.financials.discount > 0 && (
-                        <div className="flex justify-between text-emerald-600">
+                        <div className="flex justify-between text-emerald-600 dark:text-emerald-400">
                           <span>Discount Applied:</span>
                           <span className="font-bold font-mono">
                             -₦{receipt.financials.discount.toLocaleString()}
@@ -441,9 +441,9 @@ export const OrderReceiptModal: React.FC<OrderReceiptModalProps> = ({
                         </div>
                       )}
 
-                      <div className="pt-2 border-t border-rose-200 flex justify-between items-center text-base font-black text-slate-900">
-                        <span className="text-[#D6001C]">TOTAL:</span>
-                        <span className="text-xl font-black text-[#D6001C] font-mono">
+                      <div className="pt-2 border-t border-rose-200 dark:border-slate-700 flex justify-between items-center text-base font-black text-slate-900 dark:text-white">
+                        <span className="text-[#D6001C] dark:text-rose-400">TOTAL:</span>
+                        <span className="text-xl font-black text-[#D6001C] dark:text-rose-400 font-mono">
                           ₦{receipt.financials.calculated_total.toLocaleString()}
                         </span>
                       </div>
@@ -452,31 +452,31 @@ export const OrderReceiptModal: React.FC<OrderReceiptModalProps> = ({
                 </div>
 
                 {/* 6. DELIVERY SECTION */}
-                <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100 space-y-2">
+                <div className="bg-slate-50 dark:bg-slate-800/60 rounded-2xl p-4 border border-slate-100 dark:border-slate-700/60 space-y-2">
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2 text-xs font-black text-slate-900 uppercase tracking-wider">
-                      <Truck className="w-4 h-4 text-[#D6001C]" />
+                    <div className="flex items-center gap-2 text-xs font-black text-slate-900 dark:text-slate-100 uppercase tracking-wider">
+                      <Truck className="w-4 h-4 text-[#D6001C] dark:text-rose-400" />
                       <span>Campus Delivery Details</span>
                     </div>
-                    <span className="text-[10px] font-bold bg-white px-2 py-0.5 rounded-md border border-slate-200 text-slate-700">
+                    <span className="text-[10px] font-bold bg-white dark:bg-slate-700 px-2 py-0.5 rounded-md border border-slate-200 dark:border-slate-600 text-slate-700 dark:text-slate-200">
                       {receipt.delivery.delivery_tracking_status}
                     </span>
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs text-slate-600 pt-1">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs text-slate-600 dark:text-slate-300 pt-1">
                     <div>
                       <span className="text-[10px] text-slate-400 block font-bold uppercase">Method</span>
-                      <span className="font-extrabold text-slate-800">{receipt.delivery.method}</span>
+                      <span className="font-extrabold text-slate-800 dark:text-slate-100">{receipt.delivery.method}</span>
                     </div>
                     <div>
                       <span className="text-[10px] text-slate-400 block font-bold uppercase">Runner</span>
-                      <span className="font-extrabold text-slate-800">
+                      <span className="font-extrabold text-slate-800 dark:text-slate-100">
                         {receipt.delivery.rider_name || 'Campus Dispatch Runner'}
                       </span>
                     </div>
                     <div>
                       <span className="text-[10px] text-slate-400 block font-bold uppercase">Timeline</span>
-                      <span className="font-extrabold text-slate-800">
+                      <span className="font-extrabold text-slate-800 dark:text-slate-100">
                         {receipt.delivery.delivered_timestamp
                           ? `Delivered ${new Date(receipt.delivery.delivered_timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
                           : receipt.delivery.estimated_delivery_time}
@@ -486,8 +486,8 @@ export const OrderReceiptModal: React.FC<OrderReceiptModalProps> = ({
                 </div>
 
                 {/* 7. ORDER TIMELINE */}
-                <div className="bg-white rounded-2xl p-4 border border-slate-100 space-y-3">
-                  <h4 className="text-xs font-black text-slate-900 uppercase tracking-wider">
+                <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 border border-slate-100 dark:border-slate-800 space-y-3">
+                  <h4 className="text-xs font-black text-slate-900 dark:text-slate-100 uppercase tracking-wider">
                     Authoritative Order Timeline
                   </h4>
 
@@ -499,20 +499,20 @@ export const OrderReceiptModal: React.FC<OrderReceiptModalProps> = ({
                           key={sIdx}
                           className={`p-2.5 rounded-xl border flex flex-col justify-between ${
                             isCompleted
-                              ? 'bg-emerald-50/60 border-emerald-200 text-emerald-950'
-                              : 'bg-slate-50 border-slate-200/80 text-slate-400'
+                              ? 'bg-emerald-50/60 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800/60 text-emerald-950 dark:text-emerald-200'
+                              : 'bg-slate-50 dark:bg-slate-800/50 border-slate-200/80 dark:border-slate-700/80 text-slate-400 dark:text-slate-500'
                           }`}
                         >
                           <div className="flex items-center gap-1.5 font-bold text-[11px]">
                             {isCompleted ? (
-                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
                             ) : (
-                              <div className="w-3.5 h-3.5 rounded-full border border-slate-300 shrink-0" />
+                              <div className="w-3.5 h-3.5 rounded-full border border-slate-300 dark:border-slate-600 shrink-0" />
                             )}
                             <span className="truncate">{step.title}</span>
                           </div>
                           {step.timestamp && (
-                            <span className="text-[9px] font-mono text-slate-500 mt-1">
+                            <span className="text-[9px] font-mono text-slate-500 dark:text-slate-400 mt-1">
                               {new Date(step.timestamp).toLocaleTimeString([], {
                                 hour: '2-digit',
                                 minute: '2-digit',
@@ -526,22 +526,22 @@ export const OrderReceiptModal: React.FC<OrderReceiptModalProps> = ({
                 </div>
 
                 {/* 8. VERIFICATION QR CODE & OFFICIAL FOOTER */}
-                <div className="border-t border-slate-200 pt-6 flex flex-col sm:flex-row items-center justify-between gap-6">
+                <div className="border-t border-slate-200 dark:border-slate-800 pt-6 flex flex-col sm:flex-row items-center justify-between gap-6">
                   {receipt.qr_code_data_url && (
-                    <div className="flex items-center gap-4 bg-slate-50 p-3 rounded-2xl border border-slate-200 shrink-0">
+                    <div className="flex items-center gap-4 bg-slate-50 dark:bg-slate-800/60 p-3 rounded-2xl border border-slate-200 dark:border-slate-700 shrink-0">
                       <img
                         src={receipt.qr_code_data_url}
                         alt="Receipt QR Verification"
                         className="w-16 h-16 rounded-lg bg-white p-1"
                       />
                       <div className="space-y-0.5 text-left">
-                        <span className="text-[10px] font-black text-slate-900 uppercase tracking-wider block">
+                        <span className="text-[10px] font-black text-slate-900 dark:text-slate-100 uppercase tracking-wider block">
                           Instant QR Verification
                         </span>
-                        <p className="text-[10px] text-slate-500 max-w-[140px] leading-tight">
+                        <p className="text-[10px] text-slate-500 dark:text-slate-400 max-w-[140px] leading-tight">
                           Scan to verify on BUKKIT Campus Network
                         </p>
-                        <span className="text-[9px] font-mono text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded block w-fit font-bold">
+                        <span className="text-[9px] font-mono text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 px-1.5 py-0.5 rounded block w-fit font-bold border border-emerald-200/60 dark:border-emerald-800/50">
                           ✓ Verified Authentic
                         </span>
                       </div>
@@ -549,13 +549,13 @@ export const OrderReceiptModal: React.FC<OrderReceiptModalProps> = ({
                   )}
 
                   <div className="text-center sm:text-right space-y-1 text-xs">
-                    <p className="font-extrabold text-[#D6001C]">
+                    <p className="font-extrabold text-[#D6001C] dark:text-rose-400">
                       Thank you for choosing BUKKIT Campus Food Delivery!
                     </p>
-                    <p className="text-[11px] text-slate-500">
-                      Need help with this order? Email <span className="font-mono text-slate-800 font-bold">support@bukkit.campus.ng</span>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                      Need help with this order? Email <span className="font-mono text-slate-800 dark:text-slate-200 font-bold">support@bukkit.campus.ng</span>
                     </p>
-                    <p className="text-[10px] text-slate-400 font-mono">
+                    <p className="text-[10px] text-slate-400 dark:text-slate-500 font-mono">
                       Security Hash: SHA256-{receipt.receipt_id.replace(/[^a-zA-Z0-9]/g, '').slice(-8)}
                     </p>
                   </div>

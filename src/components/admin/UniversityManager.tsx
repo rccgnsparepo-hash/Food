@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Plus, Edit2, Trash2, CheckCircle, XCircle, MapPin, Building, Globe, Check, Sparkles, Loader2, AlertCircle } from 'lucide-react';
-import { doc, setDoc, deleteDoc, updateDoc } from 'firebase/firestore';
+import { doc, setDoc, deleteDoc, updateDoc } from "../../lib/embeddedDb";
 import { db } from '../../lib/firebase';
 import { University, Campus } from '../../types';
 import { triggerHaptic } from '../../utils/haptics';

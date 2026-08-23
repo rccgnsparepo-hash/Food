@@ -12,11 +12,20 @@ import {
   dispatchOrderEventPipeline,
   dispatchWalletEventPipeline,
   dispatchAdminAlertPipeline,
+  dispatchPushNotificationToUser,
   getUserNotificationHistory,
   markNotificationAsRead,
   markAllNotificationsAsReadForUser,
   getNotificationHealth
 } from './src/services/notificationBackendService.ts';
+import {
+  getVapidPublicKey,
+  saveWebPushSubscription,
+  removeWebPushSubscription,
+  listAllWebPushSubscriptions,
+  dispatchWebPushToUser
+} from './src/server/webPushService.ts';
+import { serverDb } from './src/server/embeddedServerDb.ts';
 
 async function startServer() {
   const app = express();
@@ -29,9 +38,34 @@ async function startServer() {
     res.json({
       status: 'ok',
       service: 'BUKKIT Authoritative Backend',
-      database: 'cloud_sql_postgres & firestore_sync',
+      database: 'embedded_authoritative_db',
       timestamp: new Date().toISOString()
     });
+  });
+
+  // --- EMBEDDED DATABASE REST & SYNC APIS ---
+  app.get('/api/db/dump', (req, res) => {
+    res.json({ success: true, store: serverDb.dump() });
+  });
+
+  app.get('/api/db/:collection', (req, res) => {
+    const data = serverDb.getAll(req.params.collection);
+    res.json({ success: true, data });
+  });
+
+  app.get('/api/db/:collection/:id', (req, res) => {
+    const data = serverDb.getDoc(req.params.collection, req.params.id);
+    res.json({ success: true, data });
+  });
+
+  app.post('/api/db/:collection/:id', (req, res) => {
+    const data = serverDb.setDoc(req.params.collection, req.params.id, req.body);
+    res.json({ success: true, data });
+  });
+
+  app.delete('/api/db/:collection/:id', (req, res) => {
+    const deleted = serverDb.deleteDoc(req.params.collection, req.params.id);
+    res.json({ success: true, deleted });
   });
 
   // --- AUTHENTICATION & IDENTITY APIS ---
@@ -574,6 +608,182 @@ async function startServer() {
       status: true,
       message: 'Status update processed via centralized notification engine'
     });
+  });
+
+  // 12. Multi-device FCM Token Registration
+  app.post('/api/fcm/register-device', (req, res) => {
+    try {
+      const { userId, deviceRecord } = req.body;
+      if (!userId || !deviceRecord || !deviceRecord.fcmToken) {
+        return res.status(400).json({ success: false, message: 'userId and valid deviceRecord required' });
+      }
+
+      // Track in server-side notification engine registry
+      registerDeviceToken({
+        userId,
+        fcmToken: deviceRecord.fcmToken,
+        platform: (deviceRecord.platform?.toUpperCase() as any) || 'ANDROID',
+        appType: (deviceRecord.app?.toUpperCase() as any) || 'CUSTOMER',
+        deviceId: deviceRecord.deviceId
+      });
+
+      return res.json({ success: true, message: 'Device token registered successfully', deviceId: deviceRecord.deviceId });
+    } catch (err: any) {
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // 13. Deactivate Device on Logout
+  app.post('/api/fcm/deactivate-device', (req, res) => {
+    try {
+      const { userId, deviceId } = req.body;
+      return res.json({ success: true, message: 'Device deactivated', userId, deviceId });
+    } catch (err: any) {
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // 14. Realtime Delivery Chat Push Notification
+  app.post('/api/chat/send-message-push', async (req, res) => {
+    try {
+      const { conversationId, orderId, senderName, senderRole, receiverId, messageText } = req.body;
+      if (!conversationId || !receiverId || !messageText) {
+        return res.status(400).json({ success: false, message: 'conversationId, receiverId and messageText required' });
+      }
+
+      const roleDisplay = senderRole === 'rider' ? '🛵 Your Courier' : '📦 Customer';
+      const orderShortId = orderId ? orderId.slice(-6).toUpperCase() : '';
+
+      const pushTitle = `💬 New Message from ${senderName || roleDisplay}`;
+      const pushBody = messageText.length > 80 ? `${messageText.slice(0, 77)}...` : messageText;
+      const deepLink = senderRole === 'rider' ? `/chat/${conversationId}` : `/chat/${conversationId}`;
+
+      // Dispatch push via notification engine
+      const deliveryReport = await dispatchPushNotificationToUser({
+        recipientUserId: receiverId,
+        title: pushTitle,
+        body: pushBody,
+        deepLink,
+        channelId: 'messages',
+        data: {
+          conversationId,
+          orderId: orderId || '',
+          senderRole: senderRole || 'rider',
+          type: 'chat_message'
+        }
+      });
+
+      // Also trigger Web Push to recipient
+      dispatchWebPushToUser(receiverId, {
+        title: pushTitle,
+        body: pushBody,
+        deepLink,
+        severity: 'INFO',
+        conversationId,
+        orderId
+      }).catch(() => {});
+
+      return res.json({ success: true, deliveryReport });
+    } catch (err: any) {
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // ==============================================================================
+  // 15. WEB PUSH NOTIFICATION ROUTES (Push API / RFC 8030 / VAPID)
+  // ==============================================================================
+
+  // Fetch Public VAPID Key for browser subscription registration
+  app.get('/api/webpush/vapid-public-key', (req, res) => {
+    try {
+      const publicKey = getVapidPublicKey();
+      res.json({ success: true, publicKey });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // Register Web Push subscription
+  app.post('/api/webpush/subscribe', (req, res) => {
+    try {
+      const { userId, subscription, role, platform, browser, userAgent } = req.body;
+      if (!subscription || !subscription.endpoint || !subscription.keys) {
+        return res.status(400).json({ success: false, message: 'Valid subscription object required' });
+      }
+
+      const record = saveWebPushSubscription({
+        userId: userId || 'anonymous_guest',
+        subscription,
+        role: role || 'CUSTOMER',
+        platform: platform || 'WEB',
+        browser,
+        userAgent
+      });
+
+      res.json({ success: true, message: 'Web Push subscription registered', record });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // Unsubscribe Web Push subscription
+  app.post('/api/webpush/unsubscribe', (req, res) => {
+    try {
+      const { endpoint } = req.body;
+      if (!endpoint) {
+        return res.status(400).json({ success: false, message: 'endpoint required' });
+      }
+
+      const removed = removeWebPushSubscription(endpoint);
+      res.json({ success: true, removed });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // List all registered Web Push subscriptions
+  app.get('/api/webpush/subscriptions', (req, res) => {
+    try {
+      const subscriptions = listAllWebPushSubscriptions();
+      res.json({ success: true, count: subscriptions.length, subscriptions });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // Test send Web Push to a user or all users
+  app.post('/api/webpush/test-send', async (req, res) => {
+    try {
+      const { userId, title, body, deepLink, severity } = req.body;
+      const pushTitle = title || '🔔 BUKKIT Web Push Live Test';
+      const pushBody = body || 'Testing background & closed-app push notification delivery!';
+      const pushLink = deepLink || '/orders';
+
+      if (userId) {
+        const result = await dispatchWebPushToUser(userId, {
+          title: pushTitle,
+          body: pushBody,
+          deepLink: pushLink,
+          severity: severity || 'INFO'
+        });
+        return res.json({ success: true, target: userId, ...result });
+      } else {
+        const allSubs = listAllWebPushSubscriptions();
+        let sent = 0;
+        for (const sub of allSubs) {
+          const ok = await dispatchWebPushToUser(sub.user_id, {
+            title: pushTitle,
+            body: pushBody,
+            deepLink: pushLink,
+            severity: severity || 'INFO'
+          });
+          if (ok.successful > 0) sent++;
+        }
+        return res.json({ success: true, target: 'all', totalSubscriptions: allSubs.length, delivered: sent });
+      }
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
   });
 
   // Vite Middleware for development

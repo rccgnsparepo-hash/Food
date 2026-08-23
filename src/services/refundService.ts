@@ -6,7 +6,7 @@ import {
   updateDoc,
   runTransaction,
   collection
-} from 'firebase/firestore';
+} from "../lib/embeddedDb";
 import {
   Order,
   OrderStatus,

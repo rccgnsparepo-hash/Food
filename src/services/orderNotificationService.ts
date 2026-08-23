@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { collection, query, where, onSnapshot } from 'firebase/firestore';
+import { collection, query, where, onSnapshot } from "../lib/embeddedDb";
 import { db } from '../lib/firebase';
 import { Order, OrderStatus } from '../types';
 import { useAuthStore } from '../stores/useAuthStore';

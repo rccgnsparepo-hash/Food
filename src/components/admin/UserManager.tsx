@@ -19,7 +19,7 @@ import {
   Lock,
   KeyRound
 } from 'lucide-react';
-import { collection, onSnapshot, query, doc, updateDoc, setDoc } from 'firebase/firestore';
+import { collection, onSnapshot, query, doc, updateDoc, setDoc } from "../../lib/embeddedDb";
 import { db } from '../../lib/firebase';
 import { UserProfile, UserRole, UserStatus } from '../../types';
 import { getRolePermissions } from '../../services/authService';

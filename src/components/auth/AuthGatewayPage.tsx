@@ -514,24 +514,24 @@ export const AuthGatewayPage: React.FC = () => {
   const isLoadingState = authStatus === 'loading';
 
   return (
-    <div className="min-h-screen bg-[#F3F4F7] text-slate-800 font-sans selection:bg-[#D6001C] selection:text-white flex flex-col justify-between relative overflow-hidden">
+    <div className="min-h-screen bg-[#F3F4F7] dark:bg-slate-950 text-slate-800 dark:text-slate-100 font-sans selection:bg-[#D6001C] selection:text-white flex flex-col justify-between relative overflow-hidden transition-colors">
       
       {/* GIANT BACKGROUND WATERMARK HEADING (Matches Reference Screenshot "Signup") */}
-      <div className="absolute top-0 left-0 right-0 text-center pointer-events-none select-none overflow-hidden opacity-[0.06] z-0 pt-2">
-        <span className="font-serif font-black text-[140px] sm:text-[180px] md:text-[220px] lg:text-[260px] tracking-tight text-slate-900 uppercase leading-none block">
+      <div className="absolute top-0 left-0 right-0 text-center pointer-events-none select-none overflow-hidden opacity-[0.06] dark:opacity-[0.03] z-0 pt-2">
+        <span className="font-serif font-black text-[140px] sm:text-[180px] md:text-[220px] lg:text-[260px] tracking-tight text-slate-900 dark:text-white uppercase leading-none block">
           {mode === 'register' ? 'Signup' : 'BUKKIT'}
         </span>
       </div>
 
       {/* CULINARY FOOD ACCENTS IN CORNERS (Matches Reference Screenshot food bowls) */}
       <div 
-        className="hidden md:block absolute -top-12 -right-12 w-72 lg:w-96 h-72 lg:h-96 bg-cover bg-center rounded-full shadow-2xl pointer-events-none z-0 border-8 border-white/40"
+        className="hidden md:block absolute -top-12 -right-12 w-72 lg:w-96 h-72 lg:h-96 bg-cover bg-center rounded-full shadow-2xl pointer-events-none z-0 border-8 border-white/40 dark:border-slate-800/40"
         style={{
           backgroundImage: `url('https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=800&auto=format&fit=crop')`
         }}
       />
       <div 
-        className="hidden md:block absolute -bottom-16 -left-16 w-64 lg:w-80 h-64 lg:h-80 bg-cover bg-center rounded-full shadow-2xl pointer-events-none z-0 border-8 border-white/40"
+        className="hidden md:block absolute -bottom-16 -left-16 w-64 lg:w-80 h-64 lg:h-80 bg-cover bg-center rounded-full shadow-2xl pointer-events-none z-0 border-8 border-white/40 dark:border-slate-800/40"
         style={{
           backgroundImage: `url('https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=800&auto=format&fit=crop')`
         }}
@@ -549,20 +549,20 @@ export const AuthGatewayPage: React.FC = () => {
               initial={{ opacity: 0, scale: 0.98, y: 10 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               transition={{ duration: 0.3 }}
-              className="bg-white rounded-[32px] p-6 sm:p-8 shadow-2xl border border-slate-100/90 relative z-20 w-full max-w-md mx-auto"
+              className="bg-white dark:bg-slate-900 rounded-[32px] p-6 sm:p-8 shadow-2xl border border-slate-100/90 dark:border-slate-800 relative z-20 w-full max-w-md mx-auto transition-colors"
             >
               {/* TOP BRAND BADGE */}
               <div className="flex items-center justify-between mb-5">
                 <BukkitLogo variant="full" size="sm" subtitleText="MTU MARKETPLACE" />
 
-                <span className="text-[10px] font-black bg-slate-900 text-white px-3 py-1 rounded-full uppercase tracking-wider">
+                <span className="text-[10px] font-black bg-slate-900 dark:bg-slate-800 text-white px-3 py-1 rounded-full uppercase tracking-wider border border-transparent dark:border-slate-700">
                   {selectedRole}
                 </span>
               </div>
 
               {/* ROLE SWITCHER TABS - 4 PHASES */}
               <div className="mb-5">
-                <div className="grid grid-cols-4 gap-1 bg-[#F4F5F8] p-1 rounded-full border border-slate-200/80">
+                <div className="grid grid-cols-4 gap-1 bg-[#F4F5F8] dark:bg-slate-800 p-1 rounded-full border border-slate-200/80 dark:border-slate-700">
                   <button
                     type="button"
                     disabled={isLoadingState}
@@ -570,7 +570,7 @@ export const AuthGatewayPage: React.FC = () => {
                     className={`py-1.5 px-1 rounded-full text-[10px] sm:text-[11px] font-black transition-all flex items-center justify-center gap-1 cursor-pointer disabled:opacity-50 ${
                       selectedRole === 'customer'
                         ? 'bg-[#D6001C] text-white shadow-sm'
-                        : 'text-slate-600 hover:text-slate-900'
+                        : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
                     }`}
                   >
                     <ShoppingBag className="w-3 h-3" />
@@ -584,7 +584,7 @@ export const AuthGatewayPage: React.FC = () => {
                     className={`py-1.5 px-1 rounded-full text-[10px] sm:text-[11px] font-black transition-all flex items-center justify-center gap-1 cursor-pointer disabled:opacity-50 ${
                       selectedRole === 'kitchen'
                         ? 'bg-[#D6001C] text-white shadow-sm'
-                        : 'text-slate-600 hover:text-slate-900'
+                        : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
                     }`}
                   >
                     <Utensils className="w-3 h-3" />
@@ -598,7 +598,7 @@ export const AuthGatewayPage: React.FC = () => {
                     className={`py-1.5 px-1 rounded-full text-[10px] sm:text-[11px] font-black transition-all flex items-center justify-center gap-1 cursor-pointer disabled:opacity-50 ${
                       selectedRole === 'rider'
                         ? 'bg-[#D6001C] text-white shadow-sm'
-                        : 'text-slate-600 hover:text-slate-900'
+                        : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
                     }`}
                   >
                     <Bike className="w-3 h-3" />
@@ -611,8 +611,8 @@ export const AuthGatewayPage: React.FC = () => {
                     onClick={() => handleRoleChange('admin')}
                     className={`py-1.5 px-1 rounded-full text-[10px] sm:text-[11px] font-black transition-all flex items-center justify-center gap-1 cursor-pointer disabled:opacity-50 ${
                       selectedRole === 'admin'
-                        ? 'bg-slate-900 text-white shadow-sm'
-                        : 'text-slate-600 hover:text-slate-900'
+                        ? 'bg-slate-900 dark:bg-slate-700 text-white shadow-sm'
+                        : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
                     }`}
                   >
                     <ShieldCheck className="w-3 h-3" />
@@ -628,22 +628,22 @@ export const AuthGatewayPage: React.FC = () => {
                     initial={{ opacity: 0, height: 0 }}
                     animate={{ opacity: 1, height: 'auto' }}
                     exit={{ opacity: 0, height: 0 }}
-                    className="mb-4 p-3 bg-red-50 border border-red-200 rounded-2xl text-xs font-medium text-red-900 flex flex-col gap-2 shadow-xs overflow-hidden"
+                    className="mb-4 p-3 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900/50 rounded-2xl text-xs font-medium text-red-900 dark:text-red-200 flex flex-col gap-2 shadow-xs overflow-hidden"
                   >
                     <div className="flex items-start gap-2">
-                      <AlertCircle className="w-4 h-4 text-[#D6001C] shrink-0 mt-0.5" />
+                      <AlertCircle className="w-4 h-4 text-[#D6001C] dark:text-red-400 shrink-0 mt-0.5" />
                       <div className="flex-1 text-[11px] leading-relaxed">
-                        <strong className="block font-bold text-red-950 mb-0.5">Authentication Error</strong>
+                        <strong className="block font-bold text-red-950 dark:text-red-100 mb-0.5">Authentication Error</strong>
                         <span>{errorMsg}</span>
                       </div>
                     </div>
-                    <div className="flex justify-end pt-1.5 border-t border-red-200/80">
+                    <div className="flex justify-end pt-1.5 border-t border-red-200/80 dark:border-red-900/50">
                       <button
                         type="button"
                         onClick={handleTryAgain}
-                        className="px-3 py-1 bg-white border border-red-200 hover:bg-red-100/60 text-red-700 hover:text-red-900 rounded-xl text-[11px] font-extrabold transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs active:scale-95"
+                        className="px-3 py-1 bg-white dark:bg-slate-800 border border-red-200 dark:border-red-900/50 hover:bg-red-100/60 dark:hover:bg-red-950/60 text-red-700 dark:text-red-300 hover:text-red-900 dark:hover:text-red-100 rounded-xl text-[11px] font-extrabold transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs active:scale-95"
                       >
-                        <RotateCcw className="w-3 h-3 text-red-600" />
+                        <RotateCcw className="w-3 h-3 text-red-600 dark:text-red-400" />
                         <span>Try Again</span>
                       </button>
                     </div>
@@ -655,9 +655,9 @@ export const AuthGatewayPage: React.FC = () => {
                     initial={{ opacity: 0, height: 0 }}
                     animate={{ opacity: 1, height: 'auto' }}
                     exit={{ opacity: 0, height: 0 }}
-                    className="mb-4 p-3 bg-emerald-50 border border-emerald-200 rounded-2xl text-xs font-medium text-emerald-900 flex items-start gap-2 shadow-xs overflow-hidden"
+                    className="mb-4 p-3 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-900/50 rounded-2xl text-xs font-medium text-emerald-900 dark:text-emerald-200 flex items-start gap-2 shadow-xs overflow-hidden"
                   >
-                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
                     <div className="flex-1 text-[11px] leading-relaxed">
                       <span>{successMsg}</span>
                     </div>
@@ -696,16 +696,16 @@ export const AuthGatewayPage: React.FC = () => {
                         value={email}
                         onChange={(e) => handleInputChange('email', e.target.value, setEmail)}
                         placeholder="Enter Email Address"
-                        className={`w-full bg-[#F8F9FC] border rounded-full px-4 py-3 pl-11 text-xs font-semibold text-slate-900 placeholder:text-slate-400 focus:outline-none focus:bg-white focus:ring-2 transition-all ${
+                        className={`w-full bg-[#F8F9FC] dark:bg-slate-800 border rounded-full px-4 py-3 pl-11 text-xs font-semibold text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:bg-white dark:focus:bg-slate-800/90 focus:ring-2 transition-all ${
                           fieldErrors.email
                             ? 'border-red-400 focus:ring-red-400/20'
-                            : 'border-slate-200 focus:border-[#D6001C] focus:ring-red-500/10'
+                            : 'border-slate-200 dark:border-slate-700 focus:border-[#D6001C] focus:ring-red-500/10'
                         }`}
                       />
                       <Mail className="w-4 h-4 text-slate-400 absolute left-4 top-3.5" />
                     </div>
                     {fieldErrors.email && (
-                      <p className="text-[10px] text-red-600 font-bold mt-1 pl-4">{fieldErrors.email}</p>
+                      <p className="text-[10px] text-red-600 dark:text-red-400 font-bold mt-1 pl-4">{fieldErrors.email}</p>
                     )}
                   </div>
 
@@ -718,17 +718,17 @@ export const AuthGatewayPage: React.FC = () => {
                         value={password}
                         onChange={(e) => handleInputChange('password', e.target.value, setPassword)}
                         placeholder="Password"
-                        className={`w-full bg-[#F8F9FC] border rounded-full px-4 py-3 pl-11 pr-11 text-xs font-semibold text-slate-900 placeholder:text-slate-400 focus:outline-none focus:bg-white focus:ring-2 transition-all ${
+                        className={`w-full bg-[#F8F9FC] dark:bg-slate-800 border rounded-full px-4 py-3 pl-11 pr-11 text-xs font-semibold text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:bg-white dark:focus:bg-slate-800/90 focus:ring-2 transition-all ${
                           fieldErrors.password
                             ? 'border-red-400 focus:ring-red-400/20'
-                            : 'border-slate-200 focus:border-[#D6001C] focus:ring-red-500/10'
+                            : 'border-slate-200 dark:border-slate-700 focus:border-[#D6001C] focus:ring-red-500/10'
                         }`}
                       />
                       <Lock className="w-4 h-4 text-slate-400 absolute left-4 top-3.5" />
                       <button
                         type="button"
                         onClick={() => setShowPassword(!showPassword)}
-                        className="absolute right-4 top-3.5 text-slate-400 hover:text-slate-700 cursor-pointer"
+                        className="absolute right-4 top-3.5 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 cursor-pointer"
                       >
                         {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                       </button>
@@ -738,7 +738,7 @@ export const AuthGatewayPage: React.FC = () => {
                         type="button"
                         disabled={isLoadingState}
                         onClick={() => switchMode('forgot_password')}
-                        className="text-[11px] text-[#D6001C] hover:underline font-bold cursor-pointer"
+                        className="text-[11px] text-[#D6001C] dark:text-red-400 hover:underline font-bold cursor-pointer"
                       >
                         Forgot password?
                       </button>
@@ -766,8 +766,8 @@ export const AuthGatewayPage: React.FC = () => {
 
                   <p className="text-[11px] text-slate-400 font-medium text-center leading-tight pt-1">
                     By clicking on 'LOG IN' you agree to the{' '}
-                    <span className="text-slate-700 font-bold underline cursor-pointer">Terms of Service</span> and{' '}
-                    <span className="text-slate-700 font-bold underline cursor-pointer">Privacy Policy</span>.
+                    <span className="text-slate-700 dark:text-slate-300 font-bold underline cursor-pointer">Terms of Service</span> and{' '}
+                    <span className="text-slate-700 dark:text-slate-300 font-bold underline cursor-pointer">Privacy Policy</span>.
                   </p>
 
                   {/* Google Sign In */}
@@ -775,10 +775,10 @@ export const AuthGatewayPage: React.FC = () => {
                     <>
                       <div className="relative my-2">
                         <div className="absolute inset-0 flex items-center">
-                          <div className="w-full border-t border-slate-200" />
+                          <div className="w-full border-t border-slate-200 dark:border-slate-800" />
                         </div>
                         <div className="relative flex justify-center text-[10px]">
-                          <span className="bg-white px-2.5 text-slate-400 font-bold uppercase tracking-wider">
+                          <span className="bg-white dark:bg-slate-900 px-2.5 text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider">
                             Join with
                           </span>
                         </div>
@@ -789,7 +789,7 @@ export const AuthGatewayPage: React.FC = () => {
                           type="button"
                           onClick={handleGoogleSignIn}
                           disabled={isLoadingState}
-                          className="w-10 h-10 rounded-full border border-slate-200 bg-white hover:bg-slate-50 flex items-center justify-center transition-all shadow-xs cursor-pointer"
+                          className="w-10 h-10 rounded-full border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-750 flex items-center justify-center transition-all shadow-xs cursor-pointer"
                         >
                           <svg className="w-4 h-4" viewBox="0 0 24 24">
                             <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
@@ -802,12 +802,12 @@ export const AuthGatewayPage: React.FC = () => {
                     </>
                   )}
 
-                  <p className="text-center text-xs text-slate-500 font-bold pt-2">
+                  <p className="text-center text-xs text-slate-500 dark:text-slate-400 font-bold pt-2">
                     Need an account?{' '}
                     <button
                       type="button"
                       onClick={() => switchMode('register')}
-                      className="text-[#D6001C] font-black hover:underline cursor-pointer uppercase text-xs"
+                      className="text-[#D6001C] dark:text-red-400 font-black hover:underline cursor-pointer uppercase text-xs"
                     >
                       CREATE ACCOUNT
                     </button>
@@ -846,14 +846,14 @@ export const AuthGatewayPage: React.FC = () => {
                         value={fullName}
                         onChange={(e) => handleInputChange('fullName', e.target.value, setFullName)}
                         placeholder="Full Name"
-                        className={`w-full bg-[#F8F9FC] border rounded-full px-4 py-2.5 pl-11 text-xs font-semibold text-slate-900 placeholder:text-slate-400 focus:outline-none focus:bg-white focus:ring-2 transition-all ${
-                          fieldErrors.fullName ? 'border-red-400' : 'border-slate-200 focus:border-[#D6001C]'
+                        className={`w-full bg-[#F8F9FC] dark:bg-slate-800 border rounded-full px-4 py-2.5 pl-11 text-xs font-semibold text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:bg-white dark:focus:bg-slate-800/90 focus:ring-2 transition-all ${
+                          fieldErrors.fullName ? 'border-red-400' : 'border-slate-200 dark:border-slate-700 focus:border-[#D6001C]'
                         }`}
                       />
                       <User className="w-4 h-4 text-slate-400 absolute left-4 top-3" />
                     </div>
                     {fieldErrors.fullName && (
-                      <p className="text-[10px] text-red-600 font-bold mt-1 pl-4">{fieldErrors.fullName}</p>
+                      <p className="text-[10px] text-red-600 dark:text-red-400 font-bold mt-1 pl-4">{fieldErrors.fullName}</p>
                     )}
                   </div>
 
@@ -866,14 +866,14 @@ export const AuthGatewayPage: React.FC = () => {
                         value={email}
                         onChange={(e) => handleInputChange('email', e.target.value, setEmail)}
                         placeholder="Enter Email Address"
-                        className={`w-full bg-[#F8F9FC] border rounded-full px-4 py-2.5 pl-11 text-xs font-semibold text-slate-900 placeholder:text-slate-400 focus:outline-none focus:bg-white focus:ring-2 transition-all ${
-                          fieldErrors.email ? 'border-red-400' : 'border-slate-200 focus:border-[#D6001C]'
+                        className={`w-full bg-[#F8F9FC] dark:bg-slate-800 border rounded-full px-4 py-2.5 pl-11 text-xs font-semibold text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:bg-white dark:focus:bg-slate-800/90 focus:ring-2 transition-all ${
+                          fieldErrors.email ? 'border-red-400' : 'border-slate-200 dark:border-slate-700 focus:border-[#D6001C]'
                         }`}
                       />
                       <Mail className="w-4 h-4 text-slate-400 absolute left-4 top-3" />
                     </div>
                     {fieldErrors.email && (
-                      <p className="text-[10px] text-red-600 font-bold mt-1 pl-4">{fieldErrors.email}</p>
+                      <p className="text-[10px] text-red-600 dark:text-red-400 font-bold mt-1 pl-4">{fieldErrors.email}</p>
                     )}
                   </div>
 
@@ -887,8 +887,8 @@ export const AuthGatewayPage: React.FC = () => {
                           value={phone}
                           onChange={(e) => handleInputChange('phone', e.target.value, setPhone)}
                           placeholder="Phone Number"
-                          className={`w-full bg-[#F8F9FC] border rounded-full px-3.5 py-2.5 pl-9 text-xs font-semibold text-slate-900 placeholder:text-slate-400 focus:outline-none focus:bg-white focus:ring-2 transition-all ${
-                            fieldErrors.phone ? 'border-red-400' : 'border-slate-200 focus:border-[#D6001C]'
+                          className={`w-full bg-[#F8F9FC] dark:bg-slate-800 border rounded-full px-3.5 py-2.5 pl-9 text-xs font-semibold text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:bg-white dark:focus:bg-slate-800/90 focus:ring-2 transition-all ${
+                            fieldErrors.phone ? 'border-red-400' : 'border-slate-200 dark:border-slate-700 focus:border-[#D6001C]'
                           }`}
                         />
                         <Phone className="w-3.5 h-3.5 text-slate-400 absolute left-3.5 top-3" />
@@ -903,15 +903,15 @@ export const AuthGatewayPage: React.FC = () => {
                           value={password}
                           onChange={(e) => handleInputChange('password', e.target.value, setPassword)}
                           placeholder="Password"
-                          className={`w-full bg-[#F8F9FC] border rounded-full px-3.5 py-2.5 pl-9 pr-8 text-xs font-semibold text-slate-900 placeholder:text-slate-400 focus:outline-none focus:bg-white focus:ring-2 transition-all ${
-                            fieldErrors.password ? 'border-red-400' : 'border-slate-200 focus:border-[#D6001C]'
+                          className={`w-full bg-[#F8F9FC] dark:bg-slate-800 border rounded-full px-3.5 py-2.5 pl-9 pr-8 text-xs font-semibold text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:bg-white dark:focus:bg-slate-800/90 focus:ring-2 transition-all ${
+                            fieldErrors.password ? 'border-red-400' : 'border-slate-200 dark:border-slate-700 focus:border-[#D6001C]'
                           }`}
                         />
                         <Lock className="w-3.5 h-3.5 text-slate-400 absolute left-3.5 top-3" />
                         <button
                           type="button"
                           onClick={() => setShowPassword(!showPassword)}
-                          className="absolute right-3 top-3 text-slate-400 hover:text-slate-700 cursor-pointer"
+                          className="absolute right-3 top-3 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 cursor-pointer"
                         >
                           {showPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
                         </button>
@@ -930,21 +930,21 @@ export const AuthGatewayPage: React.FC = () => {
                         value={confirmPassword}
                         onChange={(e) => handleInputChange('confirmPassword', e.target.value, setConfirmPassword)}
                         placeholder="Confirm Password"
-                        className={`w-full bg-[#F8F9FC] border rounded-full px-4 py-2.5 pl-11 pr-11 text-xs font-semibold text-slate-900 placeholder:text-slate-400 focus:outline-none focus:bg-white focus:ring-2 transition-all ${
-                          fieldErrors.confirmPassword ? 'border-red-400' : 'border-slate-200 focus:border-[#D6001C]'
+                        className={`w-full bg-[#F8F9FC] dark:bg-slate-800 border rounded-full px-4 py-2.5 pl-11 pr-11 text-xs font-semibold text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:bg-white dark:focus:bg-slate-800/90 focus:ring-2 transition-all ${
+                          fieldErrors.confirmPassword ? 'border-red-400' : 'border-slate-200 dark:border-slate-700 focus:border-[#D6001C]'
                         }`}
                       />
                       <Lock className="w-4 h-4 text-slate-400 absolute left-4 top-3" />
                       <button
                         type="button"
                         onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                        className="absolute right-4 top-3 text-slate-400 hover:text-slate-700 cursor-pointer"
+                        className="absolute right-4 top-3 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 cursor-pointer"
                       >
                         {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                       </button>
                     </div>
                     {fieldErrors.confirmPassword && (
-                      <p className="text-[10px] text-red-600 font-bold mt-1 pl-4">{fieldErrors.confirmPassword}</p>
+                      <p className="text-[10px] text-red-600 dark:text-red-400 font-bold mt-1 pl-4">{fieldErrors.confirmPassword}</p>
                     )}
                   </div>
 
@@ -969,9 +969,9 @@ export const AuthGatewayPage: React.FC = () => {
 
                   {/* Or divider */}
                   <div className="flex items-center gap-3 my-1">
-                    <div className="flex-1 h-px bg-slate-200" />
+                    <div className="flex-1 h-px bg-slate-200 dark:bg-slate-800" />
                     <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">or sign up with</span>
-                    <div className="flex-1 h-px bg-slate-200" />
+                    <div className="flex-1 h-px bg-slate-200 dark:bg-slate-800" />
                   </div>
 
                   {/* Google Sign Up Button */}
@@ -979,7 +979,7 @@ export const AuthGatewayPage: React.FC = () => {
                     type="button"
                     onClick={handleGoogleSignIn}
                     disabled={isLoadingState}
-                    className="w-full bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 font-bold rounded-full py-2.5 px-4 text-xs transition-all flex items-center justify-center gap-2.5 shadow-sm cursor-pointer disabled:opacity-50"
+                    className="w-full bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-750 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 font-bold rounded-full py-2.5 px-4 text-xs transition-all flex items-center justify-center gap-2.5 shadow-sm cursor-pointer disabled:opacity-50"
                   >
                     <svg className="w-4 h-4" viewBox="0 0 24 24">
                       <path
@@ -1004,16 +1004,16 @@ export const AuthGatewayPage: React.FC = () => {
 
                   <p className="text-[10px] text-slate-400 font-medium text-center leading-tight">
                     By clicking on 'CREATE ACCOUNT' you agree to the{' '}
-                    <span className="text-slate-700 font-bold underline cursor-pointer">Terms of Service</span> and{' '}
-                    <span className="text-slate-700 font-bold underline cursor-pointer">Privacy Policy</span>.
+                    <span className="text-slate-700 dark:text-slate-300 font-bold underline cursor-pointer">Terms of Service</span> and{' '}
+                    <span className="text-slate-700 dark:text-slate-300 font-bold underline cursor-pointer">Privacy Policy</span>.
                   </p>
 
-                  <p className="text-center text-xs text-slate-500 font-bold pt-1">
+                  <p className="text-center text-xs text-slate-500 dark:text-slate-400 font-bold pt-1">
                     Already have an account?{' '}
                     <button
                       type="button"
                       onClick={() => switchMode('login')}
-                      className="text-[#D6001C] font-black hover:underline cursor-pointer uppercase text-xs"
+                      className="text-[#D6001C] dark:text-red-400 font-black hover:underline cursor-pointer uppercase text-xs"
                     >
                       LOG IN
                     </button>
@@ -1032,8 +1032,8 @@ export const AuthGatewayPage: React.FC = () => {
                         value={email}
                         onChange={(e) => handleInputChange('email', e.target.value, setEmail)}
                         placeholder="Enter Registered Email"
-                        className={`w-full bg-[#F8F9FC] border rounded-full px-4 py-3 pl-11 text-xs font-semibold text-slate-900 placeholder:text-slate-400 focus:outline-none focus:bg-white focus:ring-2 transition-all ${
-                          fieldErrors.email ? 'border-red-400' : 'border-slate-200 focus:border-[#D6001C]'
+                        className={`w-full bg-[#F8F9FC] dark:bg-slate-800 border rounded-full px-4 py-3 pl-11 text-xs font-semibold text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:bg-white dark:focus:bg-slate-800/90 focus:ring-2 transition-all ${
+                          fieldErrors.email ? 'border-red-400' : 'border-slate-200 dark:border-slate-700 focus:border-[#D6001C]'
                         }`}
                       />
                       <Mail className="w-4 h-4 text-slate-400 absolute left-4 top-3.5" />
@@ -1052,11 +1052,11 @@ export const AuthGatewayPage: React.FC = () => {
                     )}
                   </button>
 
-                  <p className="text-center text-xs text-slate-500 font-bold">
+                  <p className="text-center text-xs text-slate-500 dark:text-slate-400 font-bold">
                     <button
                       type="button"
                       onClick={() => switchMode('login')}
-                      className="text-[#D6001C] hover:underline font-extrabold cursor-pointer"
+                      className="text-[#D6001C] dark:text-red-400 hover:underline font-extrabold cursor-pointer"
                     >
                       Back to Sign In
                     </button>
@@ -1070,23 +1070,23 @@ export const AuthGatewayPage: React.FC = () => {
                   {/* Status Icon Header */}
                   <div className="flex justify-center">
                     {verificationState === 'verified' ? (
-                      <div className="w-14 h-14 bg-emerald-100 text-emerald-600 border border-emerald-200 rounded-full flex items-center justify-center shadow-xs">
+                      <div className="w-14 h-14 bg-emerald-100 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 rounded-full flex items-center justify-center shadow-xs">
                         <CheckCircle2 className="w-7 h-7 animate-scale" />
                       </div>
                     ) : verificationState === 'checking' ? (
-                      <div className="w-14 h-14 bg-blue-50 text-blue-600 border border-blue-100 rounded-full flex items-center justify-center shadow-xs">
-                        <div className="w-6 h-6 border-3 border-blue-600 border-t-transparent rounded-full animate-spin" />
+                      <div className="w-14 h-14 bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-blue-800 rounded-full flex items-center justify-center shadow-xs">
+                        <div className="w-6 h-6 border-3 border-blue-600 dark:border-blue-400 border-t-transparent rounded-full animate-spin" />
                       </div>
                     ) : verificationState === 'unverified' ? (
-                      <div className="w-14 h-14 bg-amber-50 text-amber-600 border border-amber-200 rounded-full flex items-center justify-center shadow-xs">
+                      <div className="w-14 h-14 bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-800 rounded-full flex items-center justify-center shadow-xs">
                         <AlertCircle className="w-7 h-7" />
                       </div>
                     ) : verificationState === 'error' ? (
-                      <div className="w-14 h-14 bg-red-50 text-red-600 border border-red-200 rounded-full flex items-center justify-center shadow-xs">
+                      <div className="w-14 h-14 bg-red-50 dark:bg-red-950/60 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-800 rounded-full flex items-center justify-center shadow-xs">
                         <AlertCircle className="w-7 h-7" />
                       </div>
                     ) : (
-                      <div className="w-14 h-14 bg-red-50 text-[#D6001C] border border-red-100 rounded-full flex items-center justify-center shadow-xs">
+                      <div className="w-14 h-14 bg-red-50 dark:bg-red-950/60 text-[#D6001C] dark:text-rose-400 border border-red-100 dark:border-red-800 rounded-full flex items-center justify-center shadow-xs">
                         <Mail className="w-7 h-7 animate-bounce" />
                       </div>
                     )}
@@ -1094,14 +1094,14 @@ export const AuthGatewayPage: React.FC = () => {
 
                   {/* Header Titles */}
                   <div className="space-y-1">
-                    <h3 className="text-base font-black text-slate-900">
+                    <h3 className="text-base font-black text-slate-900 dark:text-slate-100">
                       {verificationState === 'verified'
                         ? 'Email Verified Successfully!'
                         : verificationState === 'checking'
                         ? 'Checking Verification Status…'
                         : 'Verify Your Email Address'}
                     </h3>
-                    <p className="text-xs text-slate-600 leading-relaxed max-w-xs mx-auto">
+                    <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed max-w-xs mx-auto">
                       {verificationState === 'verified'
                         ? 'Your email is confirmed. Redirecting you to sign in...'
                         : 'We sent a verification link to:'}
@@ -1109,29 +1109,29 @@ export const AuthGatewayPage: React.FC = () => {
                   </div>
 
                   {/* Target Email Capsule Display */}
-                  <div className="bg-slate-100 border border-slate-200/90 rounded-2xl p-2.5 max-w-xs mx-auto shadow-2xs">
+                  <div className="bg-slate-100 dark:bg-slate-800 border border-slate-200/90 dark:border-slate-700 rounded-2xl p-2.5 max-w-xs mx-auto shadow-2xs">
                     <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-0.5">
                       Registered Email
                     </span>
-                    <span className="text-xs font-black text-slate-900 break-all select-all">
+                    <span className="text-xs font-black text-slate-900 dark:text-slate-100 break-all select-all">
                       {user?.email || email || 'your email'}
                     </span>
                   </div>
 
                   {/* Explicit Dynamic Feedback Card */}
                   {verificationState === 'verified' && (
-                    <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-2xl p-3 text-xs font-bold flex items-center justify-center gap-2 max-w-xs mx-auto shadow-2xs animate-fade-in">
-                      <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                    <div className="bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-200 rounded-2xl p-3 text-xs font-bold flex items-center justify-center gap-2 max-w-xs mx-auto shadow-2xs animate-fade-in">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
                       <span>Email verified successfully! You can now log in.</span>
                     </div>
                   )}
 
                   {verificationState === 'unverified' && (
-                    <div className="bg-amber-50 border border-amber-200 text-amber-800 rounded-2xl p-3 text-xs font-semibold text-left flex items-start gap-2.5 max-w-xs mx-auto shadow-2xs animate-fade-in" role="alert">
-                      <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                    <div className="bg-amber-50 dark:bg-amber-950/50 border border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-200 rounded-2xl p-3 text-xs font-semibold text-left flex items-start gap-2.5 max-w-xs mx-auto shadow-2xs animate-fade-in" role="alert">
+                      <AlertCircle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
                       <div className="space-y-1">
-                        <p className="font-bold text-amber-900">Verification not detected yet</p>
-                        <p className="text-[11px] text-amber-800 leading-normal">
+                        <p className="font-bold text-amber-900 dark:text-amber-100">Verification not detected yet</p>
+                        <p className="text-[11px] text-amber-800 dark:text-amber-300 leading-normal">
                           Please make sure you clicked the verification link in your email, then click <strong>Check Again</strong> below.
                         </p>
                       </div>
@@ -1139,11 +1139,11 @@ export const AuthGatewayPage: React.FC = () => {
                   )}
 
                   {verificationState === 'error' && (
-                    <div className="bg-red-50 border border-red-200 text-red-800 rounded-2xl p-3 text-xs font-semibold text-left flex items-start gap-2.5 max-w-xs mx-auto shadow-2xs animate-fade-in" role="alert">
-                      <AlertCircle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
+                    <div className="bg-red-50 dark:bg-red-950/50 border border-red-200 dark:border-red-800 text-red-800 dark:text-red-200 rounded-2xl p-3 text-xs font-semibold text-left flex items-start gap-2.5 max-w-xs mx-auto shadow-2xs animate-fade-in" role="alert">
+                      <AlertCircle className="w-4 h-4 text-red-600 dark:text-red-400 shrink-0 mt-0.5" />
                       <div className="space-y-1">
-                        <p className="font-bold text-red-900">Couldn't check verification</p>
-                        <p className="text-[11px] text-red-800 leading-normal">
+                        <p className="font-bold text-red-900 dark:text-red-100">Couldn't check verification</p>
+                        <p className="text-[11px] text-red-800 dark:text-red-300 leading-normal">
                           We couldn't check your verification status. Please check your connection and try again.
                         </p>
                       </div>
@@ -1151,7 +1151,7 @@ export const AuthGatewayPage: React.FC = () => {
                   )}
 
                   {verificationState === 'idle' && (
-                    <p className="text-[11px] text-slate-500 leading-normal max-w-xs mx-auto">
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-normal max-w-xs mx-auto">
                       Click the link in your email, then tap <strong>I'VE VERIFIED MY EMAIL</strong> to activate your account.
                     </p>
                   )}
@@ -1202,9 +1202,9 @@ export const AuthGatewayPage: React.FC = () => {
                       type="button"
                       disabled={resendCooldown > 0 || verificationState === 'checking' || verificationState === 'verified'}
                       onClick={handleResendVerification}
-                      className="w-full bg-slate-100 hover:bg-slate-200/80 border border-slate-200 text-slate-800 font-extrabold py-2.5 rounded-full text-xs transition-colors cursor-pointer disabled:opacity-50 flex items-center justify-center gap-1.5"
+                      className="w-full bg-slate-100 dark:bg-slate-800 hover:bg-slate-200/80 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 font-extrabold py-2.5 rounded-full text-xs transition-colors cursor-pointer disabled:opacity-50 flex items-center justify-center gap-1.5"
                     >
-                      <Mail className="w-3.5 h-3.5 text-slate-600" />
+                      <Mail className="w-3.5 h-3.5 text-slate-600 dark:text-slate-400" />
                       <span>{resendCooldown > 0 ? `RESEND EMAIL (${resendCooldown}s)` : 'RESEND EMAIL'}</span>
                     </button>
 
@@ -1212,7 +1212,7 @@ export const AuthGatewayPage: React.FC = () => {
                     <button
                       type="button"
                       onClick={() => switchMode('login')}
-                      className="text-xs text-slate-500 hover:text-slate-800 font-bold underline cursor-pointer pt-1 block mx-auto transition-colors"
+                      className="text-xs text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 font-bold underline cursor-pointer pt-1 block mx-auto transition-colors"
                     >
                       Return to Sign In
                     </button>
@@ -1228,10 +1228,10 @@ export const AuthGatewayPage: React.FC = () => {
             
             {/* Display Heading & Subtitle */}
             <div className="space-y-2">
-              <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black text-slate-900 tracking-tight font-serif leading-none">
+              <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black text-slate-900 dark:text-white tracking-tight font-serif leading-none transition-colors">
                 {mode === 'register' ? 'Create Account' : 'Welcome Back'}
               </h2>
-              <h3 className="text-lg sm:text-xl font-extrabold text-slate-800">
+              <h3 className="text-lg sm:text-xl font-extrabold text-slate-800 dark:text-slate-200 transition-colors">
                 What you will get?
               </h3>
             </div>
@@ -1240,46 +1240,46 @@ export const AuthGatewayPage: React.FC = () => {
             <div className="space-y-4 pt-2 max-w-lg">
               
               <div className="flex items-start gap-3.5 group">
-                <div className="w-6 h-6 rounded-full bg-rose-100 text-[#D6001C] flex items-center justify-center shrink-0 mt-0.5 group-hover:scale-110 transition-transform">
+                <div className="w-6 h-6 rounded-full bg-rose-100 dark:bg-rose-950/60 text-[#D6001C] dark:text-rose-400 flex items-center justify-center shrink-0 mt-0.5 group-hover:scale-110 transition-transform">
                   <Utensils className="w-3.5 h-3.5" />
                 </div>
-                <p className="text-xs sm:text-sm font-semibold text-slate-600 leading-snug">
+                <p className="text-xs sm:text-sm font-semibold text-slate-600 dark:text-slate-300 leading-snug transition-colors">
                   Order campus meals the easy way from all MTU cafeterias & student food hubs.
                 </p>
               </div>
 
               <div className="flex items-start gap-3.5 group">
-                <div className="w-6 h-6 rounded-full bg-rose-100 text-[#D6001C] flex items-center justify-center shrink-0 mt-0.5 group-hover:scale-110 transition-transform">
+                <div className="w-6 h-6 rounded-full bg-rose-100 dark:bg-rose-950/60 text-[#D6001C] dark:text-rose-400 flex items-center justify-center shrink-0 mt-0.5 group-hover:scale-110 transition-transform">
                   <Clock className="w-3.5 h-3.5" />
                 </div>
-                <p className="text-xs sm:text-sm font-semibold text-slate-600 leading-snug">
+                <p className="text-xs sm:text-sm font-semibold text-slate-600 dark:text-slate-300 leading-snug transition-colors">
                   Express 15-minute hall-to-hall delivery by verified MTU student riders.
                 </p>
               </div>
 
               <div className="flex items-start gap-3.5 group">
-                <div className="w-6 h-6 rounded-full bg-rose-100 text-[#D6001C] flex items-center justify-center shrink-0 mt-0.5 group-hover:scale-110 transition-transform">
+                <div className="w-6 h-6 rounded-full bg-rose-100 dark:bg-rose-950/60 text-[#D6001C] dark:text-rose-400 flex items-center justify-center shrink-0 mt-0.5 group-hover:scale-110 transition-transform">
                   <Award className="w-3.5 h-3.5" />
                 </div>
-                <p className="text-xs sm:text-sm font-semibold text-slate-600 leading-snug">
+                <p className="text-xs sm:text-sm font-semibold text-slate-600 dark:text-slate-300 leading-snug transition-colors">
                   Secure payments with Paystack debit card, USSD transfer, or BUKKIT campus wallet.
                 </p>
               </div>
 
               <div className="flex items-start gap-3.5 group">
-                <div className="w-6 h-6 rounded-full bg-rose-100 text-[#D6001C] flex items-center justify-center shrink-0 mt-0.5 group-hover:scale-110 transition-transform">
+                <div className="w-6 h-6 rounded-full bg-rose-100 dark:bg-rose-950/60 text-[#D6001C] dark:text-rose-400 flex items-center justify-center shrink-0 mt-0.5 group-hover:scale-110 transition-transform">
                   <Users className="w-3.5 h-3.5" />
                 </div>
-                <p className="text-xs sm:text-sm font-semibold text-slate-600 leading-snug">
+                <p className="text-xs sm:text-sm font-semibold text-slate-600 dark:text-slate-300 leading-snug transition-colors">
                   Organize group orders with courtyard roommates and split delivery costs easily.
                 </p>
               </div>
 
               <div className="flex items-start gap-3.5 group">
-                <div className="w-6 h-6 rounded-full bg-rose-100 text-[#D6001C] flex items-center justify-center shrink-0 mt-0.5 group-hover:scale-110 transition-transform">
+                <div className="w-6 h-6 rounded-full bg-rose-100 dark:bg-rose-950/60 text-[#D6001C] dark:text-rose-400 flex items-center justify-center shrink-0 mt-0.5 group-hover:scale-110 transition-transform">
                   <Gift className="w-3.5 h-3.5" />
                 </div>
-                <p className="text-xs sm:text-sm font-semibold text-slate-600 leading-snug">
+                <p className="text-xs sm:text-sm font-semibold text-slate-600 dark:text-slate-300 leading-snug transition-colors">
                   Earn reward points with every meal order and unlock student food discounts in a flash.
                 </p>
               </div>
@@ -1287,7 +1287,7 @@ export const AuthGatewayPage: React.FC = () => {
             </div>
 
             {/* Subtle Campus Sub-Tag */}
-            <div className="pt-2 flex items-center gap-2 text-xs font-bold text-slate-400">
+            <div className="pt-2 flex items-center gap-2 text-xs font-bold text-slate-400 dark:text-slate-500">
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
               <span>Mountain Top University Marketplace • Prayer City, Ogun State</span>
             </div>
@@ -1299,17 +1299,17 @@ export const AuthGatewayPage: React.FC = () => {
       </div>
 
       {/* FOOTER BAR (Matches Reference Screenshot Footer Bar) */}
-      <footer className="w-full bg-white/70 backdrop-blur-md border-t border-slate-200/80 py-3.5 px-6 text-xs text-slate-500 font-semibold z-10">
+      <footer className="w-full bg-white/70 dark:bg-slate-900/80 backdrop-blur-md border-t border-slate-200/80 dark:border-slate-800 py-3.5 px-6 text-xs text-slate-500 dark:text-slate-400 font-semibold z-10 transition-colors">
         <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3">
           
           <div className="flex items-center gap-5">
-            <span className="hover:text-[#D6001C] cursor-pointer transition-colors">Explore</span>
-            <span className="hover:text-[#D6001C] cursor-pointer transition-colors">What</span>
-            <span className="hover:text-[#D6001C] cursor-pointer transition-colors">Help & feedback</span>
-            <span className="hover:text-[#D6001C] cursor-pointer transition-colors">Contact</span>
+            <span className="hover:text-[#D6001C] dark:hover:text-rose-400 cursor-pointer transition-colors">Explore</span>
+            <span className="hover:text-[#D6001C] dark:hover:text-rose-400 cursor-pointer transition-colors">What</span>
+            <span className="hover:text-[#D6001C] dark:hover:text-rose-400 cursor-pointer transition-colors">Help & feedback</span>
+            <span className="hover:text-[#D6001C] dark:hover:text-rose-400 cursor-pointer transition-colors">Contact</span>
           </div>
 
-          <div className="flex items-center gap-4 text-[11px] text-slate-400 font-medium">
+          <div className="flex items-center gap-4 text-[11px] text-slate-400 dark:text-slate-500 font-medium">
             <span>© 2026 BUKKIT. All rights reserved.</span>
           </div>
 

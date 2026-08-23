@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { ShieldCheck, XCircle, CheckCircle2, AlertTriangle, Store, Utensils } from 'lucide-react';
-import { doc, updateDoc } from 'firebase/firestore';
+import { doc, updateDoc } from "../../lib/embeddedDb";
 import { db } from '../../lib/firebase';
 import { Vendor, MenuItem } from '../../types';
 import { triggerHaptic } from '../../utils/haptics';

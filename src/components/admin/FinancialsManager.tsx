@@ -13,7 +13,7 @@ import {
   Clock,
   FileSpreadsheet
 } from 'lucide-react';
-import { collection, onSnapshot, query, where } from 'firebase/firestore';
+import { collection, onSnapshot, query, where } from "../../lib/embeddedDb";
 import { db } from '../../lib/firebase';
 import { Order, DeliveryEarning, WalletTransaction } from '../../types';
 import { toast } from 'sonner';

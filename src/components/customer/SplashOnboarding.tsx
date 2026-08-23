@@ -3,7 +3,7 @@ import { ArrowRight, Utensils, Building2, MapPin, CheckCircle2, GraduationCap } 
 import { BukkitLogo, BukkitIcon } from '../common/BukkitLogo';
 import { useMarketplaceStore } from '../../stores/useMarketplaceStore';
 import { useAuthStore } from '../../stores/useAuthStore';
-import { doc, setDoc } from 'firebase/firestore';
+import { doc, setDoc } from "../../lib/embeddedDb";
 import { db } from '../../lib/firebase';
 
 interface SplashOnboardingProps {

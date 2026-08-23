@@ -1,4 +1,4 @@
-import { doc, getDoc, setDoc, deleteDoc, collection, getDocs } from 'firebase/firestore';
+import { doc, getDoc, setDoc, deleteDoc, collection, getDocs } from "../lib/embeddedDb";
 import { db } from '../lib/firebase';
 import { University, Campus, FoodZone, Vendor, FoodCategory, MenuItem } from '../types';
 

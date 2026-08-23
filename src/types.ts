@@ -927,6 +927,7 @@ export type NotificationType =
   | 'VENDOR_ALERT'
   | 'WALLET_ALERT'
   | 'ADMIN_ALERT'
+  | 'CHAT_MESSAGE'
   | 'SYSTEM_ANNOUNCEMENT';
 
 export type OrderEventType =
@@ -956,6 +957,24 @@ export type WalletEventType =
   | 'VENDOR_PAYOUT_COMPLETED'
   | 'VENDOR_PAYOUT_FAILED'
   | 'VENDOR_SETTLEMENT_AVAILABLE';
+
+export interface PushSubscriptionRecord {
+  subscription_id: string;
+  user_id: string;
+  endpoint: string;
+  keys: {
+    p256dh: string;
+    auth: string;
+  };
+  platform: NotificationPlatform;
+  app_type: NotificationAppType;
+  device_type?: string;
+  user_agent?: string;
+  enabled: boolean;
+  created_at: string;
+  updated_at: string;
+  last_seen_at: string;
+}
 
 export interface DeviceTokenRecord {
   token_id: string;
@@ -1024,5 +1043,102 @@ export interface NotificationHealthStats {
   averageLatencyMs: number;
   lastDispatchTimestamp: string | null;
   serviceWorkerStatus: 'active' | 'inactive' | 'unknown';
+}
+
+// ==========================================
+// FOUR APK NATIVE ANDROID FLAVOR ARCHITECTURE
+// ==========================================
+export type AppFlavor = 'customer' | 'vendor' | 'rider' | 'admin';
+
+export type AppIdentifier = 'CUSTOMER_APP' | 'VENDOR_APP' | 'RIDER_APP' | 'ADMIN_APP';
+
+export interface AppFlavorConfig {
+  flavor: AppFlavor;
+  appIdentifier: AppIdentifier;
+  appName: string;
+  packageName: string;
+  allowedRoles: UserRole[];
+  deepLinkScheme: string;
+  defaultRoute: string;
+  themeColor: string;
+  notificationChannels: {
+    id: NotificationChannelId;
+    name: string;
+    description: string;
+    importance: 'high' | 'default' | 'low';
+  }[];
+}
+
+export type NotificationChannelId = 'orders' | 'deliveries' | 'messages' | 'payments' | 'account';
+
+export interface UserDeviceRecord {
+  deviceId: string;
+  platform: 'android' | 'ios' | 'web';
+  app: AppFlavor;
+  role: UserRole;
+  fcmToken: string;
+  packageName: string;
+  appVersion?: string;
+  deviceModel?: string;
+  osVersion?: string;
+  enabled: boolean;
+  permissionGranted: boolean;
+  createdAt: string;
+  updatedAt: string;
+  lastSeenAt: string;
+}
+
+// ==========================================
+// REALTIME RIDER <-> CUSTOMER DELIVERY CHAT
+// ==========================================
+export type ConversationStatus = 'active' | 'archived' | 'read_only';
+
+export interface DeliveryConversation {
+  id: string; // usually `conv_${orderId}`
+  order_id: string;
+  order_number?: string;
+  customer_id: string;
+  customer_name: string;
+  rider_id: string;
+  rider_name: string;
+  vendor_id?: string;
+  vendor_name?: string;
+  status: ConversationStatus;
+  created_at: string;
+  updated_at: string;
+  last_message?: {
+    text: string;
+    sender_id: string;
+    sender_role: 'customer' | 'rider' | 'admin' | 'system';
+    created_at: string;
+  } | null;
+  unread_customer_count: number;
+  unread_rider_count: number;
+  customer_presence?: {
+    online: boolean;
+    last_seen: string;
+    typing?: boolean;
+  };
+  rider_presence?: {
+    online: boolean;
+    last_seen: string;
+    typing?: boolean;
+  };
+}
+
+export interface ConversationMessage {
+  id: string;
+  conversation_id: string;
+  order_id: string;
+  sender_id: string;
+  sender_name: string;
+  sender_role: 'customer' | 'rider' | 'admin' | 'system';
+  receiver_id: string;
+  text: string;
+  type: 'text' | 'location' | 'status_update' | 'quick_reply';
+  status: 'sending' | 'sent' | 'delivered' | 'read' | 'failed';
+  created_at: string;
+  read_at?: string | null;
+  metadata?: Record<string, any>;
 }
 

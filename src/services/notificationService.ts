@@ -6,7 +6,7 @@ import {
   onSnapshot,
   doc,
   updateDoc
-} from 'firebase/firestore';
+} from "../lib/embeddedDb";
 import { db } from '../lib/firebase';
 import {
   NotificationRecord,
@@ -15,6 +15,8 @@ import {
   OrderEventType
 } from '../types';
 import { requestFCMToken } from '../lib/fcm';
+import { registerWebPush } from '../lib/webPushClient';
+import { isNativeAndroidApp, initNativeAndroidPush } from '../lib/capacitorPush';
 import { triggerHaptic } from '../utils/haptics';
 import { toast } from 'sonner';
 
@@ -68,6 +70,59 @@ export function playNotificationChime(severity: 'info' | 'warning' | 'critical' 
 let globalDeepLinkHandler: ((link: string) => void) | null = null;
 export function setGlobalDeepLinkHandler(handler: (link: string) => void) {
   globalDeepLinkHandler = handler;
+}
+
+// Global listener for Service Worker notification click postMessages
+if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
+  navigator.serviceWorker.addEventListener('message', (event) => {
+    if (event.data && event.data.type === 'BUKKIT_NOTIFICATION_CLICK' && event.data.deepLink) {
+      console.log('[Notification Service] SW notification click message received:', event.data.deepLink);
+      if (globalDeepLinkHandler) {
+        globalDeepLinkHandler(event.data.deepLink);
+      }
+    }
+  });
+}
+
+/**
+ * Explicit user-initiated prompt to enable all push notifications (Web Push + FCM)
+ */
+export async function enablePushNotifications(
+  userId: string,
+  appType: NotificationAppType = 'CUSTOMER'
+): Promise<boolean> {
+  let webPushSuccess = false;
+  let fcmSuccess = false;
+
+  try {
+    // 1. If native Android, init Capacitor push
+    if (isNativeAndroidApp()) {
+      await initNativeAndroidPush({
+        userId,
+        role: appType.toLowerCase() as any,
+        onDeepLinkNavigate: (link) => {
+          if (globalDeepLinkHandler) globalDeepLinkHandler(link);
+        }
+      });
+      return true;
+    }
+
+    // 2. Request Web Push
+    const webSub = await registerWebPush(userId, appType, true);
+    if (webSub) webPushSuccess = true;
+
+    // 3. Request FCM token
+    const token = await requestFCMToken(userId, true);
+    if (token) {
+      fcmSuccess = true;
+      await syncDeviceTokenWithBackend(userId, token, appType);
+    }
+
+    return webPushSuccess || fcmSuccess;
+  } catch (err) {
+    console.error('[Notification Service] Error enabling push notifications:', err);
+    return false;
+  }
 }
 
 /**
@@ -151,12 +206,15 @@ export const useNotificationStore = create<NotificationStoreState>((set, get) =>
     currentActiveUserId = userId;
     set({ isLoading: true, activeUserId: userId });
 
-    // 1. Sync FCM token with backend
-    requestFCMToken(userId).then((token) => {
-      if (token) {
-        syncDeviceTokenWithBackend(userId, token, appType);
-      }
-    });
+    // 1. Sync FCM & Web Push tokens with backend (only if permitted)
+    if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+      registerWebPush(userId, appType, false).catch(() => {});
+      requestFCMToken(userId, false).then((token) => {
+        if (token) {
+          syncDeviceTokenWithBackend(userId, token, appType);
+        }
+      });
+    }
 
     // 2. Fetch initial notification history from server API
     fetch(`/api/notifications/user/${userId}`)
@@ -328,16 +386,16 @@ export async function emitAuthoritativeOrderEvent(params: {
     });
     const result = await response.json();
 
-    // Sync generated notifications to Firestore for multi-device live listener
+    // Sync generated notifications to embedded DB for multi-device live listener
     if (result.success && Array.isArray(result.dispatchedNotifications)) {
       for (const notif of result.dispatchedNotifications) {
         try {
           await updateDoc(doc(db, 'notifications', notif.notification_id), notif).catch(async () => {
-            const { setDoc } = await import('firebase/firestore');
+            const { setDoc } = await import('../lib/embeddedDb');
             await setDoc(doc(db, 'notifications', notif.notification_id), notif);
           });
         } catch (fErr) {
-          // Non-blocking Firestore sync
+          // Non-blocking notification sync
         }
       }
     }

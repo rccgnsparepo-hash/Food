@@ -1,5 +1,5 @@
 import { getMessaging, getToken, onMessage, isSupported, Messaging } from 'firebase/messaging';
-import { doc, setDoc } from 'firebase/firestore';
+import { doc, setDoc } from "./embeddedDb";
 import { app, db } from './firebase';
 import { toast } from 'sonner';
 
@@ -46,16 +46,39 @@ export async function getFcmMessaging(): Promise<Messaging | null> {
 /**
  * Request Notification Permission and retrieve FCM Device Token
  */
-export async function requestFCMToken(userId?: string): Promise<string | null> {
+export async function requestFCMToken(userId?: string, isUserInitiated: boolean = false): Promise<string | null> {
   if (typeof window === 'undefined' || !('Notification' in window)) {
-    toast.error('Notifications are not supported in this browser.');
+    if (isUserInitiated) {
+      toast.error('Notifications are not supported in this browser.');
+    }
     return null;
   }
 
+  const isInsideIframe = typeof window !== 'undefined' && window.self !== window.top;
+
   try {
-    const permission = await Notification.requestPermission();
+    // If not user-initiated and permission is not already granted, avoid noisy prompts/errors on load
+    if (!isUserInitiated && Notification.permission !== 'granted') {
+      return null;
+    }
+
+    let permission = Notification.permission;
+    if (permission !== 'granted' && isUserInitiated) {
+      try {
+        permission = await Notification.requestPermission();
+      } catch (pErr) {
+        console.warn('[FCM] Error requesting permission:', pErr);
+      }
+    }
+
     if (permission !== 'granted') {
-      toast.warning('Notification permission was denied. You won\'t receive real-time order alerts.');
+      if (isUserInitiated) {
+        if (isInsideIframe) {
+          toast.warning('Notifications are restricted inside embedded preview. Open app in a new tab to enable browser push alerts.');
+        } else {
+          toast.warning('Notification permission is disabled in browser settings. In-app alerts remain fully active.');
+        }
+      }
       return null;
     }
 
@@ -63,7 +86,9 @@ export async function requestFCMToken(userId?: string): Promise<string | null> {
     const messaging = await getFcmMessaging();
 
     if (!messaging) {
-      toast.info('Firebase Messaging instance unavailable. Standard browser push notifications enabled.');
+      if (isUserInitiated) {
+        toast.info('Firebase Messaging instance unavailable. Standard in-app notifications are active.');
+      }
       return null;
     }
 
@@ -87,7 +112,9 @@ export async function requestFCMToken(userId?: string): Promise<string | null> {
         );
       }
 
-      toast.success('✓ Real-time Order Notifications enabled!');
+      if (isUserInitiated) {
+        toast.success('✓ Real-time Order Push Notifications enabled!');
+      }
       return token;
     } else {
       console.warn('[FCM] No registration token available.');
@@ -95,6 +122,9 @@ export async function requestFCMToken(userId?: string): Promise<string | null> {
     }
   } catch (error) {
     console.error('[FCM] Error requesting FCM token:', error);
+    if (isUserInitiated) {
+      toast.error('Could not activate push notifications in this environment.');
+    }
     return null;
   }
 }

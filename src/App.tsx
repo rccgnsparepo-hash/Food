@@ -5,7 +5,7 @@ import { useCartStore } from './stores/useCartStore';
 import { useMarketplaceStore } from './stores/useMarketplaceStore';
 import { useThemeStore } from './stores/useThemeStore';
 import { seedInitialDataIfNeeded } from './lib/seed';
-import { MenuItem } from './types';
+import { MenuItem, UserRole } from './types';
 
 import { Navbar } from './components/layout/Navbar';
 import { BottomNav } from './components/layout/BottomNav';
@@ -27,14 +27,18 @@ import { KitchenDashboard } from './components/kitchen/KitchenDashboard';
 import { AdminDashboard } from './components/admin/AdminDashboard';
 import { AuthModal } from './components/auth/AuthModal';
 import { AuthGatewayPage } from './components/auth/AuthGatewayPage';
+import { AppRoleMismatchScreen } from './components/auth/AppRoleMismatchScreen';
+import { RealtimeDeliveryChatModal } from './components/common/RealtimeDeliveryChatModal';
 import { ErrorBoundary } from './components/ui/ErrorBoundary';
 import { Toaster } from 'sonner';
-import { User, LogOut, Phone, MapPin, Shield, KeyRound, MailWarning, Bell, CheckCircle, Sun, Moon, Monitor } from 'lucide-react';
+import { User, LogOut, Phone, MapPin, Shield, KeyRound, MailWarning, Bell, CheckCircle, Sun, Moon, Monitor, Smartphone, MessageSquare } from 'lucide-react';
 import { requestFCMToken, setupForegroundFCMListener } from './lib/fcm';
 import { NetworkStatusBanner } from './components/common/NetworkStatusBanner';
 import { NotificationCenter } from './components/layout/NotificationCenter';
 import { useNotificationStore, setGlobalDeepLinkHandler } from './services/notificationService';
 import { useOrderNotificationListener } from './services/orderNotificationService';
+import { getCurrentAppFlavor, isRoleAuthorizedForFlavor, BUKKIT_FLAVORS, setDevAppFlavor } from './config/appFlavor';
+import { registerDeviceToken } from './services/fcmDeviceService';
 
 export default function App() {
   const { initAuth, user, role, setRole, logout, isInitLoading, isEmailVerified } = useAuthStore();
@@ -43,10 +47,14 @@ export default function App() {
   const { theme, setTheme, initTheme } = useThemeStore();
   const unreadCount = useNotificationStore((state) => state.unreadCount);
 
+  // Active Android Flavor Detection
+  const currentFlavor = getCurrentAppFlavor();
+  const flavorConfig = BUKKIT_FLAVORS[currentFlavor];
+
   // Real-time Push & Order Notification listener
   useOrderNotificationListener();
 
-  const [activeView, setActiveView] = useState<string>('home');
+  const [activeView, setActiveView] = useState<string>(flavorConfig.defaultRoute || 'home');
   const [targetVendorId, setTargetVendorId] = useState<string | undefined>(undefined);
   const [selectedFood, setSelectedFood] = useState<MenuItem | null>(null);
   const [showCheckout, setShowCheckout] = useState(false);
@@ -55,11 +63,55 @@ export default function App() {
   const [trackingOrderId, setTrackingOrderId] = useState<string | null>(null);
   const [fcmPermissionGranted, setFcmPermissionGranted] = useState(false);
   const [showNotificationCenter, setShowNotificationCenter] = useState<boolean>(false);
+  const [showFlavorPicker, setShowFlavorPicker] = useState(false);
+
+  // Delivery Chat Modal State
+  const [activeChat, setActiveChat] = useState<{
+    isOpen: boolean;
+    orderId: string;
+    orderNumber?: string;
+    recipientId: string;
+    recipientName: string;
+    vendorName?: string;
+    isDelivered?: boolean;
+  }>({
+    isOpen: false,
+    orderId: '',
+    recipientId: '',
+    recipientName: ''
+  });
+
+  // Open delivery chat helper
+  const handleOpenDeliveryChat = useCallback((params: {
+    orderId: string;
+    orderNumber?: string;
+    recipientId: string;
+    recipientName: string;
+    vendorName?: string;
+    isDelivered?: boolean;
+  }) => {
+    setActiveChat({
+      isOpen: true,
+      ...params
+    });
+  }, []);
 
   // Deep Link Navigator for Push Notifications and In-App Drawer clicks
   const handleNavigateToDeepLink = useCallback((link: string) => {
     if (!link) return;
-    if (link.includes('/orders/')) {
+    if (link.includes('/chat/')) {
+      const parts = link.split('/chat/');
+      const convOrOrderId = parts[1]?.split('?')[0];
+      if (convOrOrderId) {
+        const orderId = convOrOrderId.replace(/^conv_/, '');
+        setActiveChat({
+          isOpen: true,
+          orderId,
+          recipientId: role === 'rider' ? 'customer' : 'rider',
+          recipientName: role === 'rider' ? 'Customer' : 'Delivery Courier'
+        });
+      }
+    } else if (link.includes('/orders/')) {
       const parts = link.split('/orders/');
       const orderId = parts[1]?.split('?')[0];
       if (orderId) {
@@ -68,6 +120,19 @@ export default function App() {
       } else {
         setActiveView('orders');
       }
+    } else if (link.includes('/tracking/')) {
+      const parts = link.split('/tracking/');
+      const orderId = parts[1]?.split('?')[0];
+      if (orderId) {
+        setTrackingOrderId(orderId);
+        setActiveView('tracking');
+      }
+    } else if (link.includes('/deliveries/')) {
+      setActiveView('rider');
+    } else if (link.includes('/kitchen/')) {
+      setActiveView('kitchen');
+    } else if (link.includes('/admin/')) {
+      setActiveView('admin');
     } else if (link.includes('/wallet')) {
       setActiveView('wallet');
     } else if (link.includes('/menu')) {
@@ -77,7 +142,7 @@ export default function App() {
     } else if (link.includes('/profile')) {
       setActiveView('profile');
     }
-  }, []);
+  }, [role]);
 
   // Register deep link handler
   useEffect(() => {
@@ -113,11 +178,27 @@ export default function App() {
       setFcmPermissionGranted(Notification.permission === 'granted');
     }
 
-    // Setup foreground FCM notification handler
+    // Setup foreground FCM notification handler & token registration
     let unsubFcm: (() => void) | undefined;
     setupForegroundFCMListener().then((unsubFn) => {
       unsubFcm = unsubFn;
     });
+
+    // Automatically obtain and register FCM token on load/login
+    if (user?.uid) {
+      requestFCMToken(user.uid).then((token) => {
+        if (token) {
+          setFcmPermissionGranted(true);
+          registerDeviceToken({
+            userId: user.uid,
+            role: (user.active_role || user.role || role) as UserRole,
+            fcmToken: token,
+            appFlavor: currentFlavor,
+            permissionGranted: true
+          });
+        }
+      });
+    }
 
     // Listen for service worker deep link navigation messages
     const handleServiceWorkerMessage = (event: MessageEvent) => {
@@ -133,7 +214,7 @@ export default function App() {
       if (unsubFcm) unsubFcm();
       navigator.serviceWorker?.removeEventListener('message', handleServiceWorkerMessage);
     };
-  }, []);
+  }, [user?.uid]);
 
   const handleStartMealOrder = () => {
     setActiveView('home');
@@ -152,7 +233,7 @@ export default function App() {
         <BukkitLogo variant="stacked" size="xl" theme="dark" subtitleText="CAMPUS FOOD DELIVERY • PRAYER CITY" />
         <div className="mt-8 flex items-center gap-2.5 text-xs font-bold text-slate-400 bg-slate-800/80 px-4 py-2 rounded-full border border-slate-700">
           <div className="w-4 h-4 border-2 border-[#FF5A00] border-t-transparent rounded-full animate-spin"></div>
-          <span>Loading BUKKIT Marketplace...</span>
+          <span>Loading {flavorConfig.appName}...</span>
         </div>
       </div>
     );
@@ -163,6 +244,19 @@ export default function App() {
     return <AuthGatewayPage />;
   }
 
+  // 3. HARD APK ROLE LOCKING: Verify authoritative database role against active APK Flavor
+  const userAuthoritativeRole = (user.active_role || user.role || role) as UserRole;
+  const isAuthorizedForCurrentApk = isRoleAuthorizedForFlavor(userAuthoritativeRole, currentFlavor);
+
+  if (!isAuthorizedForCurrentApk) {
+    return (
+      <AppRoleMismatchScreen
+        currentFlavor={currentFlavor}
+        userRole={userAuthoritativeRole}
+      />
+    );
+  }
+
   const isGuest = user.uid.startsWith('guest_');
 
   return (
@@ -171,7 +265,7 @@ export default function App() {
       <NetworkStatusBanner />
 
       {/* 1. Splash / Onboarding Screen */}
-      {activeView === 'splash' ? (
+      {activeView === 'splash' && role === 'customer' ? (
         <SplashOnboarding onStart={handleStartMealOrder} />
       ) : (
         <div className="flex flex-col min-h-screen">
@@ -343,7 +437,7 @@ export default function App() {
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2 font-bold text-slate-200">
                             <Bell className="w-4 h-4 text-[#D6001C] dark:text-red-400" />
-                            <span>Live Order Notifications</span>
+                            <span>Native Push Notifications</span>
                           </div>
                           <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${fcmPermissionGranted ? 'bg-emerald-500/20 text-emerald-400' : 'bg-amber-500/20 text-amber-300'}`}>
                             {fcmPermissionGranted ? 'ENABLED' : 'DISABLED'}
@@ -355,13 +449,21 @@ export default function App() {
                         {!fcmPermissionGranted && (
                           <button
                             onClick={async () => {
-                              const token = await requestFCMToken(user?.uid);
-                              if (token) setFcmPermissionGranted(true);
+                              const token = await requestFCMToken(user?.uid, true);
+                              if (token) {
+                                setFcmPermissionGranted(true);
+                                registerDeviceToken({
+                                  userId: user.uid,
+                                  role: 'customer',
+                                  fcmToken: token,
+                                  appFlavor: 'customer'
+                                });
+                              }
                             }}
                             className="w-full mt-2 bg-[#D6001C] hover:bg-red-700 text-white font-extrabold py-2 rounded-xl text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-md shadow-red-500/20"
                           >
                             <Bell className="w-3.5 h-3.5" />
-                            <span>Enable Real-Time Alerts</span>
+                            <span>Enable Native Push Alerts</span>
                           </button>
                         )}
                       </div>
@@ -411,6 +513,71 @@ export default function App() {
 
         </div>
       )}
+
+      {/* Realtime Delivery Chat Modal (Rider <-> Customer) */}
+      {activeChat.isOpen && (
+        <RealtimeDeliveryChatModal
+          orderId={activeChat.orderId}
+          orderNumber={activeChat.orderNumber}
+          currentUserId={user?.uid || ''}
+          currentUserName={user?.name || 'BUKKIT User'}
+          currentUserRole={userAuthoritativeRole === 'rider' ? 'rider' : userAuthoritativeRole === 'admin' ? 'admin' : 'customer'}
+          recipientId={activeChat.recipientId}
+          recipientName={activeChat.recipientName}
+          vendorName={activeChat.vendorName}
+          isOrderDelivered={activeChat.isDelivered}
+          onClose={() => setActiveChat({ isOpen: false, orderId: '', recipientId: '', recipientName: '' })}
+        />
+      )}
+
+      {/* Dev Preview APK Flavor Switcher Pill */}
+      <div className="fixed bottom-4 right-4 z-40">
+        <div className="relative">
+          {showFlavorPicker && (
+            <div className="absolute bottom-12 right-0 mb-2 w-60 bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl p-3 space-y-2 text-xs text-white">
+              <div className="font-extrabold text-[11px] text-slate-400 uppercase tracking-wider px-1">
+                Select APK Build Flavor
+              </div>
+              <div className="space-y-1">
+                {(['customer', 'vendor', 'rider', 'admin'] as const).map((f) => {
+                  const cfg = BUKKIT_FLAVORS[f];
+                  const isCurrent = currentFlavor === f;
+                  return (
+                    <button
+                      key={f}
+                      onClick={() => {
+                        setShowFlavorPicker(false);
+                        setDevAppFlavor(f);
+                      }}
+                      className={`w-full text-left px-3 py-2 rounded-xl text-xs font-bold flex items-center justify-between transition-colors cursor-pointer ${
+                        isCurrent
+                          ? 'bg-[#FF5A00] text-white font-black'
+                          : 'hover:bg-slate-800 text-slate-300'
+                      }`}
+                    >
+                      <div className="truncate">
+                        <p>{cfg.appName}</p>
+                        <p className="text-[10px] opacity-75 font-mono">{cfg.packageName}</p>
+                      </div>
+                      {isCurrent && <span className="w-2 h-2 rounded-full bg-white ml-2" />}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          <button
+            onClick={() => setShowFlavorPicker(!showFlavorPicker)}
+            className="flex items-center gap-2 px-3 py-2 bg-slate-900/90 hover:bg-slate-900 border border-slate-700 text-white rounded-full shadow-lg text-[11px] font-bold backdrop-blur-md cursor-pointer hover:border-orange-500 transition-all"
+            title="Switch Native APK Flavor Preview"
+          >
+            <Smartphone className="w-3.5 h-3.5 text-[#FF5A00]" />
+            <span className="capitalize">{currentFlavor} APK</span>
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+          </button>
+        </div>
+      </div>
 
       {/* Food Product Detail Modal */}
       {selectedFood && (

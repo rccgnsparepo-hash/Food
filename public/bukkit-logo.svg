@@ -6,8 +6,8 @@
     </linearGradient>
     <linearGradient id="bukkitTopGlow" x1="0%" y1="0%" x2="0%" y2="100%">
       <stop offset="0%" stopColor="#FF5A00" />
-      <stop offset="65%" stopColor="#FFFFFF" />
-      <stop offset="100%" stopColor="#FFFFFF" />
+      <stop offset="50%" stopColor="#FF7A00" />
+      <stop offset="100%" stopColor="#FF4500" />
     </linearGradient>
     <filter id="bukkitDropShadow" x="-10%" y="-10%" width="130%" height="130%">
       <feDropShadow dx="0" dy="4" stdDeviation="6" floodColor="#FF5A00" floodOpacity="0.35" />
@@ -24,28 +24,28 @@
     <!-- 2. Chef's Hat atop B -->
     <g transform="translate(102, 10)">
       <!-- Hat Puffs -->
-      <path d="M 12 36 C 4 36 0 28 3 20 C 6 12 15 10 24 13 C 28 4 42 0 54 6 C 65 11 68 22 66 30 C 74 30 80 37 77 44 C 74 50 66 52 58 50 L 16 50 C 13 46 12 41 12 36 Z" fill="#FFFFFF" />
+      <path d="M 12 36 C 4 36 0 28 3 20 C 6 12 15 10 24 13 C 28 4 42 0 54 6 C 65 11 68 22 66 30 C 74 30 80 37 77 44 C 74 50 66 52 58 50 L 16 50 C 13 46 12 41 12 36 Z" fill="#FFFFFF" stroke="#0F172A" stroke-width="2" />
       <!-- Hat Brim Band -->
-      <path d="M 18 42 L 68 42 C 72 42 74 45 73 48 L 71 54 C 70 56 68 58 64 58 L 14 58 C 10 58 8 56 9 54 L 11 48 C 12 45 15 42 18 42 Z" fill="#FFFFFF" opacity="0.95" />
-      <path d="M 16 48 L 66 48" stroke="#FF5A00" stroke-width="2.5" stroke-linecap="round" opacity="0.8" />
+      <path d="M 18 42 L 68 42 C 72 42 74 45 73 48 L 71 54 C 70 56 68 58 64 58 L 14 58 C 10 58 8 56 9 54 L 11 48 C 12 45 15 42 18 42 Z" fill="#FFFFFF" stroke="#0F172A" stroke-width="1.5" />
+      <path d="M 16 48 L 66 48" stroke="#FF5A00" stroke-width="3" stroke-linecap="round" />
     </g>
 
     <!-- 3. Slanted Capital 'B' with Lightning/Speed Slice Cutout -->
     <!-- Main Outer Body of 'B' -->
-    <path d="M 108 58 C 104 58 100 62 98 67 L 76 150 C 74 156 79 160 85 160 L 145 160 C 168 160 186 148 189 128 C 191 114 184 103 172 97 C 180 91 184 81 182 71 C 179 58 165 58 148 58 L 108 58 Z" fill="url(#bukkitTopGlow)" filter="url(#bukkitDropShadow)" />
+    <path d="M 108 58 C 104 58 100 62 98 67 L 76 150 C 74 156 79 160 85 160 L 145 160 C 168 160 186 148 189 128 C 191 114 184 103 172 97 C 180 91 184 81 182 71 C 179 58 165 58 148 58 L 108 58 Z" fill="url(#bukkitTopGlow)" stroke="#FF4500" stroke-width="2" filter="url(#bukkitDropShadow)" />
 
     <!-- Top Counter of 'B' -->
-    <path d="M 122 74 L 144 74 C 153 74 159 78 158 85 C 157 91 150 94 141 94 L 117 94 L 122 74 Z" fill="#000000" />
+    <path d="M 122 74 L 144 74 C 153 74 159 78 158 85 C 157 91 150 94 141 94 L 117 94 L 122 74 Z" fill="#FFFFFF" />
 
     <!-- Bottom Counter of 'B' -->
-    <path d="M 112 108 L 143 108 C 154 108 161 113 159 123 C 157 132 148 138 137 138 L 105 138 L 112 108 Z" fill="#000000" />
+    <path d="M 112 108 L 143 108 C 154 108 161 113 159 123 C 157 132 148 138 137 138 L 105 138 L 112 108 Z" fill="#FFFFFF" />
 
     <!-- Inner Lightning/Speed Notch in Vertical Spine -->
-    <polygon points="104,80 120,80 110,104 124,104 98,144 106,108 94,108" fill="#000000" />
+    <polygon points="104,80 120,80 110,104 124,104 98,144 106,108 94,108" fill="#FFFFFF" />
   </g>
 
   <!-- BUKKIT SLANTED WORDMARK -->
   <g transform="translate(230, 142) skewX(-14)">
-    <text x="0" y="0" font-family="'Inter', 'Arial Black', 'Helvetica Neue', sans-serif" font-weight="900" font-size="108" fill="#FFFFFF" letter-spacing="4">BUKKIT</text>
+    <text x="0" y="0" font-family="'Inter', 'Arial Black', 'Helvetica Neue', sans-serif" font-weight="900" font-size="108" fill="#FF5A00" letter-spacing="4">BUKKIT</text>
   </g>
 </svg>

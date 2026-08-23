@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Clock, TrendingUp, Eye, ArrowRight, FileText, Download, Star, Sparkles } from 'lucide-react';
-import { collection, query, where, onSnapshot } from 'firebase/firestore';
+import { collection, query, where, onSnapshot } from "../../lib/embeddedDb";
 import { db } from '../../lib/firebase';
 import { Order } from '../../types';
 import { useAuthStore } from '../../stores/useAuthStore';

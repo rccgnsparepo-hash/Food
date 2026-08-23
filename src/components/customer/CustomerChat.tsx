@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Send, X, MessageSquare, User, Bike } from 'lucide-react';
-import { collection, query, where, onSnapshot, addDoc } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, addDoc } from "../../lib/embeddedDb";
 import { db } from '../../lib/firebase';
 import { ChatMessage, UserRole } from '../../types';
 import { dialogVariants, overlayVariants } from '../../utils/motion';

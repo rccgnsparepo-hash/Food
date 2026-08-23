@@ -20,7 +20,7 @@ import {
   Phone,
   MapPin
 } from 'lucide-react';
-import { collection, onSnapshot, query, orderBy, doc, updateDoc } from 'firebase/firestore';
+import { collection, onSnapshot, query, orderBy, doc, updateDoc } from "../../lib/embeddedDb";
 import { db } from '../../lib/firebase';
 import { Order, OrderStatus, UserProfile } from '../../types';
 import { useAuthStore } from '../../stores/useAuthStore';

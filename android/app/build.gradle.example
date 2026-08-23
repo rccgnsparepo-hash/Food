@@ -1,0 +1,111 @@
+// ==============================================================================
+// BUKKIT Android Gradle Multi-Flavor Configuration Reference
+// ONE SHARED CODEBASE -> FOUR ANDROID PRODUCT FLAVORS -> ONE SHARED BACKEND
+// ==============================================================================
+
+apply plugin: 'com.android.application'
+apply plugin: 'com.google.gms.google-services'
+
+android {
+    namespace "com.faratech.bukkit"
+    compileSdk 34
+
+    defaultConfig {
+        minSdk 24
+        targetSdk 34
+        versionCode 100
+        versionName "1.0.0"
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    signingConfigs {
+        release {
+            storeFile file("bukkit-release-key.jks")
+            storePassword System.getenv("BUKKIT_KEYSTORE_PASSWORD")
+            keyAlias "bukkit-key"
+            keyPassword System.getenv("BUKKIT_KEY_PASSWORD")
+        }
+    }
+
+    flavorDimensions "appVariant"
+
+    productFlavors {
+        customer {
+            dimension "appVariant"
+            applicationId "com.faratech.bukkit.customer"
+            versionNameSuffix "-customer"
+            manifestPlaceholders = [
+                appName: "BUKKIT",
+                deepLinkScheme: "bukkit",
+                appVariant: "customer",
+                fcmDefaultChannel: "bukkit_order_updates"
+            ]
+            buildConfigField "String", "FLAVOR_NAME", "\"customer\""
+            buildConfigField "String", "ALLOWED_ROLE", "\"customer\""
+        }
+
+        vendor {
+            dimension "appVariant"
+            applicationId "com.faratech.bukkit.vendor"
+            versionNameSuffix "-vendor"
+            manifestPlaceholders = [
+                appName: "BUKKIT Kitchen",
+                deepLinkScheme: "bukkit-vendor",
+                appVariant: "vendor",
+                fcmDefaultChannel: "bukkit_kitchen_orders"
+            ]
+            buildConfigField "String", "FLAVOR_NAME", "\"vendor\""
+            buildConfigField "String", "ALLOWED_ROLE", "\"kitchen\""
+        }
+
+        rider {
+            dimension "appVariant"
+            applicationId "com.faratech.bukkit.rider"
+            versionNameSuffix "-rider"
+            manifestPlaceholders = [
+                appName: "BUKKIT Rider",
+                deepLinkScheme: "bukkit-rider",
+                appVariant: "rider",
+                fcmDefaultChannel: "bukkit_delivery_dispatches"
+            ]
+            buildConfigField "String", "FLAVOR_NAME", "\"rider\""
+            buildConfigField "String", "ALLOWED_ROLE", "\"rider\""
+        }
+
+        admin {
+            dimension "appVariant"
+            applicationId "com.faratech.bukkit.admin"
+            versionNameSuffix "-admin"
+            manifestPlaceholders = [
+                appName: "BUKKIT Admin",
+                deepLinkScheme: "bukkit-admin",
+                appVariant: "admin",
+                fcmDefaultChannel: "bukkit_ops_alerts"
+            ]
+            buildConfigField "String", "FLAVOR_NAME", "\"admin\""
+            buildConfigField "String", "ALLOWED_ROLE", "\"admin\""
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            signingConfig signingConfigs.release
+        }
+        debug {
+            applicationIdSuffix ".debug"
+            debuggable true
+        }
+    }
+}
+
+dependencies {
+    implementation platform('com.google.firebase:firebase-bom:33.1.0')
+    implementation 'com.google.firebase:firebase-messaging'
+    implementation 'com.google.firebase:firebase-analytics'
+    implementation 'androidx.core:core-ktx:1.13.1'
+    implementation 'androidx.appcompat:appcompat:1.7.0'
+    implementation 'com.google.android.material:material:1.12.0'
+}
