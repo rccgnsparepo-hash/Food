@@ -26,9 +26,14 @@ on:
         options:
           - debug
           - release
+      release_tag:
+        description: 'GitHub Release Tag (Leave blank for auto v1.0.<build_number>)'
+        required: false
+        default: ''
+        type: string
 
 permissions:
-  contents: read
+  contents: write
   packages: write
 
 jobs:
