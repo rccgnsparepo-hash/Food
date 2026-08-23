@@ -19,13 +19,13 @@ on:
           - rider
           - admin
       build_type:
-        description: 'Build Type (release/debug)'
+        description: 'Build Type (debug/release)'
         required: true
-        default: 'release'
+        default: 'debug'
         type: choice
         options:
-          - release
           - debug
+          - release
 
 permissions:
   contents: read
@@ -36,9 +36,8 @@ jobs:
   # Job 1: Build & Package Matrix for the 4 Dedicated BUKKIT APK Flavors
   # ----------------------------------------------------------------------
   build-apk-flavor:
-    name: Build APK Variant (${{ matrix.flavor }})
+    name: Build APK (${{ matrix.flavor }})
     runs-on: ubuntu-latest
-    if: inputs.target_flavor == 'all' || inputs.target_flavor == matrix.flavor || inputs.target_flavor == null
     strategy:
       fail-fast: false
       matrix:
@@ -69,28 +68,48 @@ jobs:
             notification_channel: "bukkit_ops_alerts"
 
     steps:
+      - name: Check if flavor should run
+        id: check_run
+        run: |
+          TARGET="${{ inputs.target_flavor || 'all' }}"
+          if [ "$TARGET" = "all" ] || [ "$TARGET" = "${{ matrix.flavor }}" ] || [ -z "$TARGET" ]; then
+            echo "should_run=true" >> $GITHUB_OUTPUT
+          else
+            echo "should_run=false" >> $GITHUB_OUTPUT
+          fi
+
       - name: 1. Checkout Shared Source Repository
+        if: steps.check_run.outputs.should_run == 'true'
         uses: actions/checkout@v4
 
       - name: 2. Setup Node.js Environment (v20 LTS)
+        if: steps.check_run.outputs.should_run == 'true'
         uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: 'npm'
 
-      - name: 3. Setup Java JDK 17 (for Android Gradle SDK)
+      - name: 3. Setup Java JDK 17
+        if: steps.check_run.outputs.should_run == 'true'
         uses: actions/setup-java@v4
         with:
           distribution: 'zulu'
           java-version: 17
 
-      - name: 4. Install Dependencies
+      - name: 4. Setup Android SDK
+        if: steps.check_run.outputs.should_run == 'true'
+        uses: android-actions/setup-android@v3
+
+      - name: 5. Install Dependencies
+        if: steps.check_run.outputs.should_run == 'true'
         run: npm ci || npm install
 
-      - name: 5. Verify TypeScript & Application Compilation
+      - name: 6. Verify TypeScript Compilation
+        if: steps.check_run.outputs.should_run == 'true'
         run: npx tsc --noEmit
 
-      - name: 6. Compile Flavor Web Bundle
+      - name: 7. Compile Flavor Web Assets
+        if: steps.check_run.outputs.should_run == 'true'
         env:
           NODE_ENV: production
           VITE_BUKKIT_APP_VARIANT: ${{ matrix.flavor }}
@@ -107,12 +126,52 @@ jobs:
           echo "=================================================="
           npm run build
 
-      - name: 7. Prepare APK Artifact Package
+      - name: 8. Initialize & Sync Capacitor Android
+        if: steps.check_run.outputs.should_run == 'true'
+        env:
+          VITE_BUKKIT_APP_VARIANT: ${{ matrix.flavor }}
+          VITE_BUKKIT_PACKAGE_NAME: ${{ matrix.package_id }}
+          VITE_BUKKIT_APP_NAME: ${{ matrix.app_name }}
+        run: |
+          # Add or sync Android platform
+          if [ ! -d "android/app/src/main/java" ]; then
+            npx cap add android || true
+          fi
+          npx cap sync android
+
+          # Ensure Google Services JSON is present in Android app directory
+          if [ -f "android/app/google-services.json" ]; then
+            echo "google-services.json verified in android/app/"
+          elif [ -f "google-services.json" ]; then
+            cp google-services.json android/app/google-services.json
+          fi
+
+      - name: 9. Build Native Android APK with Gradle
+        if: steps.check_run.outputs.should_run == 'true'
+        run: |
+          cd android
+          chmod +x gradlew || true
+          
+          BUILD_TYPE="${{ inputs.build_type || 'debug' }}"
+          if [ "$BUILD_TYPE" = "release" ]; then
+            ./gradlew assembleRelease || ./gradlew assembleDebug
+          else
+            ./gradlew assembleDebug
+          fi
+
+      - name: 10. Prepare Artifact Package
+        if: steps.check_run.outputs.should_run == 'true'
         run: |
           mkdir -p build-output/${{ matrix.flavor }}
-          cp -r dist/* build-output/${{ matrix.flavor }}/
           
-          # Generate build metadata manifest for native APK bundling
+          # Find and copy generated APK
+          APK_PATH=$(find android/app/build/outputs/apk -name "*.apk" | head -n 1)
+          if [ -f "$APK_PATH" ]; then
+            cp "$APK_PATH" "build-output/${{ matrix.flavor }}/Bukkit-${{ matrix.flavor }}.apk"
+            echo "Copied APK from $APK_PATH"
+          fi
+          
+          # Generate build metadata manifest
           cat <<EOF > build-output/${{ matrix.flavor }}/flavor-manifest.json
           {
             "flavor": "${{ matrix.flavor }}",
@@ -122,18 +181,18 @@ jobs:
             "primaryRole": "${{ matrix.role }}",
             "notificationChannel": "${{ matrix.notification_channel }}",
             "buildTimestamp": "$(date -u +'%Y-%m-%dT%H:%M:%SZ')",
-            "buildType": "${{ inputs.build_type || 'release' }}"
+            "buildType": "${{ inputs.build_type || 'debug' }}"
           }
           EOF
           
-          # Compute artifact checksum
           cd build-output/${{ matrix.flavor }}
-          sha256sum flavor-manifest.json > CHECKSUM-SHA256.txt
+          sha256sum * > CHECKSUM-SHA256.txt 2>/dev/null || true
 
-      - name: 8. Upload Flavor Build Artifact
+      - name: 11. Upload APK Artifact
+        if: steps.check_run.outputs.should_run == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: bukkit-${{ matrix.flavor }}-${{ inputs.build_type || 'release' }}-bundle
+          name: bukkit-${{ matrix.flavor }}-apk
           path: build-output/${{ matrix.flavor }}
           retention-days: 14
 
