@@ -132,16 +132,26 @@ jobs:
           VITE_BUKKIT_PACKAGE_NAME: ${{ matrix.package_id }}
           VITE_BUKKIT_APP_NAME: ${{ matrix.app_name }}
         run: |
-          # Add or sync Android platform
-          if [ ! -d "android/app/src/main/java" ]; then
-            npx cap add android || true
+          # If android directory only has app/ and no gradlew, remove the partial folder so cap add android can generate a full clean Android project with Gradle wrapper
+          if [ ! -f "android/gradlew" ]; then
+            echo "Gradle wrapper not present in android/. Generating full Capacitor Android project..."
+            # Save google-services.json if present
+            if [ -f "android/app/google-services.json" ]; then
+              cp android/app/google-services.json /tmp/google-services.json
+            fi
+            rm -rf android
+            npx cap add android
+            if [ -f "/tmp/google-services.json" ]; then
+              mkdir -p android/app
+              cp /tmp/google-services.json android/app/google-services.json
+            fi
           fi
+          
+          # Sync Capacitor with the built assets
           npx cap sync android
 
-          # Ensure Google Services JSON is present in Android app directory
-          if [ -f "android/app/google-services.json" ]; then
-            echo "google-services.json verified in android/app/"
-          elif [ -f "google-services.json" ]; then
+          # Double check google-services.json is inside android/app/
+          if [ -f "google-services.json" ] && [ ! -f "android/app/google-services.json" ]; then
             cp google-services.json android/app/google-services.json
           fi
 
@@ -149,7 +159,7 @@ jobs:
         if: steps.check_run.outputs.should_run == 'true'
         run: |
           cd android
-          chmod +x gradlew || true
+          chmod +x gradlew
           
           BUILD_TYPE="${{ inputs.build_type || 'debug' }}"
           if [ "$BUILD_TYPE" = "release" ]; then
