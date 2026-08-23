@@ -82,12 +82,11 @@ jobs:
         if: steps.check_run.outputs.should_run == 'true'
         uses: actions/checkout@v4
 
-      - name: 2. Setup Node.js Environment (v20 LTS)
+      - name: 2. Setup Node.js Environment (v22 LTS)
         if: steps.check_run.outputs.should_run == 'true'
         uses: actions/setup-node@v4
         with:
-          node-version: 20
-          cache: 'npm'
+          node-version: 22
 
       - name: 3. Setup Java JDK 17
         if: steps.check_run.outputs.should_run == 'true'
@@ -102,7 +101,7 @@ jobs:
 
       - name: 5. Install Dependencies
         if: steps.check_run.outputs.should_run == 'true'
-        run: npm ci || npm install
+        run: npm install --no-audit --no-fund
 
       - name: 6. Verify TypeScript Compilation
         if: steps.check_run.outputs.should_run == 'true'
