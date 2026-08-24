@@ -2,7 +2,7 @@ name: BUKKIT Multi-Flavor Android APK CI/CD
 
 on:
   push:
-    branches: [ main, master ]
+    branches: [ main, master, dev, develop ]
   pull_request:
     branches: [ main, master ]
   workflow_dispatch:
@@ -92,6 +92,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
+          cache: 'npm'
 
       - name: 3. Setup Android SDK
         if: steps.check_run.outputs.should_run == 'true'
@@ -130,37 +131,66 @@ jobs:
           echo "=================================================="
           npm run build
 
-      - name: 8. Initialize & Sync Capacitor Android
+      - name: 8. Initialize & Configure Capacitor Android Project
         if: steps.check_run.outputs.should_run == 'true'
         env:
           VITE_BUKKIT_APP_VARIANT: ${{ matrix.flavor }}
           VITE_BUKKIT_PACKAGE_NAME: ${{ matrix.package_id }}
           VITE_BUKKIT_APP_NAME: ${{ matrix.app_name }}
         run: |
-          # If android directory only has app/ and no gradlew, remove the partial folder so cap add android can generate a full clean Android project with Gradle wrapper
+          # 1. Clean previous native project to ensure fresh configuration
           if [ ! -f "android/gradlew" ]; then
-            echo "Gradle wrapper not present in android/. Generating full Capacitor Android project..."
-            # Save google-services.json if present
-            if [ -f "android/app/google-services.json" ]; then
-              cp android/app/google-services.json /tmp/google-services.json
-            fi
+            echo "Generating fresh Capacitor Android project for ${{ matrix.flavor }}..."
             rm -rf android
             npx cap add android
-            if [ -f "/tmp/google-services.json" ]; then
-              mkdir -p android/app
-              cp /tmp/google-services.json android/app/google-services.json
-            fi
+          else
+            echo "Existing Android project found. Updating..."
           fi
-          
-          # Sync Capacitor with the built assets
+
+          # 2. Sync web assets into Android project
           npx cap sync android
 
-          # Generate crisp branded launcher icons for this flavor
+          # 3. Setup Google Services JSON in android/app/
+          if [ -f "google-services.json" ]; then
+            mkdir -p android/app
+            cp google-services.json android/app/google-services.json
+            echo "Copied google-services.json to android/app/"
+          elif [ -f "android/app/google-services.json" ]; then
+            echo "google-services.json already present in android/app/"
+          fi
+
+          # 4. Inject Google Services Gradle Plugin into android/build.gradle if missing
+          if [ -f "android/build.gradle" ]; then
+            if ! grep -q "com.google.gms:google-services" android/build.gradle; then
+              echo "Injecting Google Services classpath into android/build.gradle..."
+              sed -i '/dependencies {/a \        classpath "com.google.gms:google-services:4.4.2"' android/build.gradle
+            fi
+          fi
+
+          # 5. Inject Google Services plugin into android/app/build.gradle if missing
+          if [ -f "android/app/build.gradle" ]; then
+            if ! grep -q "com.google.gms.google-services" android/app/build.gradle; then
+              echo "Injecting Google Services plugin into android/app/build.gradle..."
+              echo "apply plugin: 'com.google.gms.google-services'" >> android/app/build.gradle
+            fi
+          fi
+
+          # 6. Apply Flavor-specific Branding (Icons, Colors, Strings)
           node scripts/generate-flavor-icons.js ${{ matrix.flavor }}
 
-          # Double check google-services.json is inside android/app/
-          if [ -f "google-services.json" ] && [ ! -f "android/app/google-services.json" ]; then
-            cp google-services.json android/app/google-services.json
+          # 7. Ensure AndroidManifest.xml includes deep links and permissions
+          MANIFEST_PATH="android/app/src/main/AndroidManifest.xml"
+          if [ -f "$MANIFEST_PATH" ]; then
+            echo "Verifying Android Manifest permissions and intent filters..."
+            # Ensure POST_NOTIFICATIONS permission
+            if ! grep -q "POST_NOTIFICATIONS" "$MANIFEST_PATH"; then
+              sed -i '/<manifest/a \    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />\n    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />\n    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />\n    <uses-permission android:name="android.permission.VIBRATE" />' "$MANIFEST_PATH"
+            fi
+            
+            # Ensure Deep Link Scheme Intent Filter
+            if ! grep -q "${{ matrix.scheme }}" "$MANIFEST_PATH"; then
+              sed -i '/<\/activity>/i \            <intent-filter>\n                <action android:name="android.intent.action.VIEW" />\n                <category android:name="android.intent.category.DEFAULT" />\n                <category android:name="android.intent.category.BROWSABLE" />\n                <data android:scheme="${{ matrix.scheme }}" />\n            </intent-filter>' "$MANIFEST_PATH"
+            fi
           fi
 
       - name: 9. Build Native Android APK with Gradle
@@ -168,18 +198,15 @@ jobs:
         env:
           JAVA_HOME: ${{ env.JAVA_HOME }}
         run: |
-          echo "Using Java Home: $JAVA_HOME"
-          java -version
-          javac -version
-          
+          echo "Building APK for ${{ matrix.flavor }} with Java: $JAVA_HOME"
           cd android
           chmod +x gradlew
           
           BUILD_TYPE="${{ inputs.build_type || 'debug' }}"
           if [ "$BUILD_TYPE" = "release" ]; then
-            ./gradlew assembleRelease -Dorg.gradle.java.home="$JAVA_HOME" || ./gradlew assembleDebug -Dorg.gradle.java.home="$JAVA_HOME"
+            ./gradlew assembleRelease --no-daemon --stacktrace || ./gradlew assembleDebug --no-daemon --stacktrace
           else
-            ./gradlew assembleDebug -Dorg.gradle.java.home="$JAVA_HOME"
+            ./gradlew assembleDebug --no-daemon --stacktrace
           fi
 
       - name: 10. Prepare Artifact Package
@@ -187,14 +214,18 @@ jobs:
         run: |
           mkdir -p build-output/${{ matrix.flavor }}
           
-          # Find and copy generated APK
+          # Find generated APK
           APK_PATH=$(find android/app/build/outputs/apk -name "*.apk" | head -n 1)
-          if [ -f "$APK_PATH" ]; then
+          if [ -n "$APK_PATH" ] && [ -f "$APK_PATH" ]; then
             cp "$APK_PATH" "build-output/${{ matrix.flavor }}/Bukkit-${{ matrix.flavor }}.apk"
-            echo "Copied APK from $APK_PATH"
+            echo "Successfully packaged APK from $APK_PATH to Bukkit-${{ matrix.flavor }}.apk"
+          else
+            echo "WARNING: No APK found in android/app/build/outputs/apk!"
+            ls -laR android/app/build/outputs/ || true
+            exit 1
           fi
           
-          # Generate build metadata manifest
+          # Generate metadata manifest
           cat <<EOF > build-output/${{ matrix.flavor }}/flavor-manifest.json
           {
             "flavor": "${{ matrix.flavor }}",
@@ -226,6 +257,7 @@ jobs:
     name: Publish GitHub Release & Summary
     needs: [ build-apk-flavor ]
     runs-on: ubuntu-latest
+    if: always() && !cancelled()
     permissions:
       contents: write
       packages: write
@@ -236,29 +268,45 @@ jobs:
       - name: 2. Download All APK Artifacts
         uses: actions/download-artifact@v4
         with:
-          path: downloaded-artifacts
+          pattern: bukkit-*-apk
+          path: release-files
+          merge-multiple: true
+        continue-on-error: true
 
-      - name: 3. Organize APK Packages for Release
+      - name: 3. Verify Gathered Release Files
         id: prep_release
         run: |
           mkdir -p release-files
-          
-          # Copy all generated APKs into release-files
-          find downloaded-artifacts -type f -name "*.apk" -exec cp {} release-files/ \;
-          find downloaded-artifacts -type f -name "*-manifest.json" -exec cp {} release-files/ \;
-          
-          echo "Listing gathered APK files:"
-          ls -la release-files/
+          echo "Gathered release files:"
+          ls -la release-files/ || true
           
           APK_COUNT=$(ls -1 release-files/*.apk 2>/dev/null | wc -l)
+          echo "Found $APK_COUNT APKs ready for distribution."
           echo "apk_count=$APK_COUNT" >> $GITHUB_OUTPUT
 
-      - name: 4. Publish GitHub Release (with APK Assets)
-        if: (github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')) || github.event_name == 'workflow_dispatch'
+      - name: 4. Determine Tag and Release Name
+        id: release_meta
+        run: |
+          RUN_NUM="${{ github.run_number }}"
+          INPUT_TAG="${{ inputs.release_tag }}"
+          
+          if [ -n "$INPUT_TAG" ]; then
+            TAG="$INPUT_TAG"
+            TITLE="BUKKIT Release $INPUT_TAG"
+          else
+            TAG="v1.0.${RUN_NUM}"
+            TITLE="BUKKIT Multi-Flavor APKs (Build #${RUN_NUM})"
+          fi
+          
+          echo "tag_name=$TAG" >> $GITHUB_OUTPUT
+          echo "release_title=$TITLE" >> $GITHUB_OUTPUT
+
+      - name: 5. Publish GitHub Release (with APK Assets)
+        if: steps.prep_release.outputs.apk_count != '0' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ inputs.release_tag != '' && inputs.release_tag || format('v1.0.{0}', github.run_number) }}
-          name: ${{ inputs.release_tag != '' && format('BUKKIT Release {0}', inputs.release_tag) || format('BUKKIT Multi-Flavor APKs (Build #{0})', github.run_number) }}
+          tag_name: ${{ steps.release_meta.outputs.tag_name }}
+          name: ${{ steps.release_meta.outputs.release_title }}
           body: |
             ## 📱 BUKKIT Native Android APKs (Build #${{ github.run_number }})
 
@@ -274,7 +322,7 @@ jobs:
             ---
             - **Build Type**: `${{ inputs.build_type || 'debug' }}`
             - **Commit**: `${{ github.sha }}`
-            - **Branch**: `${{ github.ref_name }}`
+            - **Trigger**: `${{ github.event_name }}`
           files: |
             release-files/*
           draft: false
@@ -282,8 +330,9 @@ jobs:
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        continue-on-error: true
 
-      - name: 5. Output Pipeline Summary
+      - name: 6. Output Pipeline Summary
         run: |
           echo "### 🚀 BUKKIT 4-APK Native Architecture Build & Release" >> $GITHUB_STEP_SUMMARY
           echo "| Flavor | Application ID | Target Role | Deep Link Scheme | Notification Channel |" >> $GITHUB_STEP_SUMMARY
@@ -293,5 +342,4 @@ jobs:
           echo "| **Rider** | \`com.faratech.bukkit.rider\` | Delivery Courier | \`bukkit-rider://\` | \`bukkit_delivery_dispatches\` |" >> $GITHUB_STEP_SUMMARY
           echo "| **Admin** | \`com.faratech.bukkit.admin\` | Ops / Admin Console | \`bukkit-admin://\` | \`bukkit_ops_alerts\` |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "All APK variants have been generated, attached as artifacts, and published to GitHub Releases." >> $GITHUB_STEP_SUMMARY
-
+          echo "Status: Complete. Generated APKs attached to artifacts and GitHub Releases." >> $GITHUB_STEP_SUMMARY
