@@ -17,6 +17,7 @@ import {
 import { requestFCMToken } from '../lib/fcm';
 import { registerWebPush } from '../lib/webPushClient';
 import { isNativeAndroidApp, initNativeAndroidPush } from '../lib/capacitorPush';
+import { apiFetch } from '../lib/apiConfig';
 import { triggerHaptic } from '../utils/haptics';
 import { toast } from 'sonner';
 
@@ -141,7 +142,7 @@ export async function syncDeviceTokenWithBackend(
         ? 'IOS'
         : 'WEB';
 
-    await fetch('/api/notifications/register-token', {
+    await apiFetch('/api/notifications/register-token', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -217,7 +218,7 @@ export const useNotificationStore = create<NotificationStoreState>((set, get) =>
     }
 
     // 2. Fetch initial notification history from server API
-    fetch(`/api/notifications/user/${userId}`)
+    apiFetch(`/api/notifications/user/${userId}`)
       .then((res) => res.json())
       .then((data) => {
         if (data.success && Array.isArray(data.notifications)) {
@@ -314,7 +315,7 @@ export const useNotificationStore = create<NotificationStoreState>((set, get) =>
     });
 
     try {
-      await fetch(`/api/notifications/${notificationId}/read`, { method: 'PATCH' });
+      await apiFetch(`/api/notifications/${notificationId}/read`, { method: 'PATCH' });
       await updateDoc(doc(db, 'notifications', notificationId), {
         status: 'read',
         read_at: new Date().toISOString()
@@ -333,7 +334,7 @@ export const useNotificationStore = create<NotificationStoreState>((set, get) =>
 
     if (!activeUid) return;
     try {
-      await fetch('/api/notifications/read-all', {
+      await apiFetch('/api/notifications/read-all', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId: activeUid })
@@ -345,7 +346,7 @@ export const useNotificationStore = create<NotificationStoreState>((set, get) =>
     const activeUid = get().activeUserId;
     if (!activeUid) return;
     try {
-      const res = await fetch(`/api/notifications/user/${activeUid}`);
+      const res = await apiFetch(`/api/notifications/user/${activeUid}`);
       const data = await res.json();
       if (data.success && Array.isArray(data.notifications)) {
         const list: NotificationRecord[] = data.notifications;
@@ -379,7 +380,7 @@ export async function emitAuthoritativeOrderEvent(params: {
   metadata?: Record<string, any>;
 }) {
   try {
-    const response = await fetch('/api/notifications/order-event', {
+    const response = await apiFetch('/api/notifications/order-event', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(params)

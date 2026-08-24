@@ -1,6 +1,7 @@
 import { doc, setDoc } from './embeddedDb';
 import { db } from './firebase';
 import { toast } from 'sonner';
+import { apiFetch } from './apiConfig';
 import { NotificationAppType, PushSubscriptionRecord } from '../types';
 
 /**
@@ -96,7 +97,7 @@ export async function registerWebPush(
 
     if (!subscription) {
       // 1. Fetch VAPID Public Key from authoritative server
-      const keyRes = await fetch('/api/webpush/vapid-public-key');
+      const keyRes = await apiFetch('/api/webpush/vapid-public-key');
       const keyData = await keyRes.json();
       if (!keyData.success || !keyData.publicKey) {
         throw new Error('Could not retrieve VAPID Public Key from server');
@@ -132,7 +133,7 @@ export async function registerWebPush(
         : 'Browser';
 
       // 3. Register subscription on Authoritative Backend
-      await fetch('/api/webpush/subscribe', {
+      await apiFetch('/api/webpush/subscribe', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -205,7 +206,7 @@ export async function unsubscribeWebPush(userId?: string): Promise<boolean> {
       const endpoint = subscription.endpoint;
       await subscription.unsubscribe();
 
-      await fetch('/api/webpush/unsubscribe', {
+      await apiFetch('/api/webpush/unsubscribe', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

@@ -21,6 +21,7 @@ import { NotificationRecord } from '../../types';
 import { useNotificationStore, enablePushNotifications } from '../../services/notificationService';
 import { useAuthStore } from '../../stores/useAuthStore';
 import { triggerHaptic } from '../../utils/haptics';
+import { apiFetch } from '../../lib/apiConfig';
 import { toast } from 'sonner';
 
 interface NotificationCenterProps {
@@ -74,7 +75,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
   const handleTestWebPush = async () => {
     try {
       toast.loading('Dispatching background Web Push...');
-      const res = await fetch('/api/webpush/test-send', {
+      const res = await apiFetch('/api/webpush/test-send', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -110,7 +111,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
     setIsSimulating(true);
     triggerHaptic(30);
     try {
-      await fetch('/api/notifications/test-dispatch', {
+      await apiFetch('/api/notifications/test-dispatch', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

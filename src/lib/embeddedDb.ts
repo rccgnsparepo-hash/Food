@@ -1,8 +1,11 @@
 /**
  * BUKKIT Embedded Database Engine
  * High-performance, zero-external-dependency embedded document database
- * with real-time reactive event listeners and localStorage persistence.
+ * with real-time reactive event listeners, localStorage persistence,
+ * and automatic multi-device bi-directional Cloud synchronization.
  */
+
+import { apiFetch, apiUrl } from './apiConfig';
 
 type ListenerCallback = (snapshot: any) => void;
 
@@ -19,12 +22,13 @@ class EmbeddedDatabase {
   private memoryStore: Record<string, Record<string, any>> = {};
   private listeners: Map<string, Set<ListenerCallback>> = new Map();
   private storageKey = 'bukkit_embedded_db_v1';
-  private syncQueue: Set<string> = new Set();
-  private isServerSyncAvailable = true;
+  private syncInterval: any = null;
+  private isSyncing = false;
 
   constructor() {
     this.loadFromLocalStorage();
     this.initBackgroundSync();
+    this.startPeriodicSync();
   }
 
   private loadFromLocalStorage() {
@@ -50,24 +54,62 @@ class EmbeddedDatabase {
     }
   }
 
+  public async pullServerUpdates(): Promise<void> {
+    if (typeof window === 'undefined' || this.isSyncing) return;
+    this.isSyncing = true;
+
+    try {
+      const res = await apiFetch('/api/db/dump', {
+        headers: { 'Accept': 'application/json' }
+      });
+      if (res.ok) {
+        const serverData = await res.json();
+        if (serverData && serverData.store) {
+          let hasChanges = false;
+
+          for (const [colName, colData] of Object.entries(serverData.store)) {
+            if (!this.memoryStore[colName]) {
+              this.memoryStore[colName] = {};
+            }
+            if (colData && typeof colData === 'object') {
+              for (const [docId, docVal] of Object.entries(colData as Record<string, any>)) {
+                const currentVal = this.memoryStore[colName][docId];
+                // Check if new or updated
+                if (!currentVal || JSON.stringify(currentVal) !== JSON.stringify(docVal)) {
+                  this.memoryStore[colName][docId] = docVal;
+                  hasChanges = true;
+                  this.notify(`${colName}/${docId}`);
+                }
+              }
+            }
+          }
+
+          if (hasChanges) {
+            this.persistLocal();
+            this.notifyAllListeners();
+          }
+        }
+      }
+    } catch (e) {
+      // Graceful network offline handling
+    } finally {
+      this.isSyncing = false;
+    }
+  }
+
   private initBackgroundSync() {
     if (typeof window === 'undefined') return;
-    // Initial fetch from server to merge state
-    fetch('/api/db/dump')
-      .then((res) => (res.ok ? res.json() : null))
-      .then((serverData) => {
-        if (serverData && serverData.store) {
-          for (const [colName, colData] of Object.entries(serverData.store)) {
-            if (!this.memoryStore[colName]) this.memoryStore[colName] = {};
-            Object.assign(this.memoryStore[colName], colData as any);
-          }
-          this.persistLocal();
-          this.notifyAllListeners();
-        }
-      })
-      .catch(() => {
-        // Server sync endpoint will fallback gracefully
-      });
+    this.pullServerUpdates();
+  }
+
+  private startPeriodicSync() {
+    if (typeof window === 'undefined') return;
+    if (this.syncInterval) clearInterval(this.syncInterval);
+
+    // Sync from server every 2.5 seconds for instant multi-device / multi-APK updates
+    this.syncInterval = setInterval(() => {
+      this.pullServerUpdates();
+    }, 2500);
   }
 
   private notify(pathKey: string) {
@@ -75,7 +117,13 @@ class EmbeddedDatabase {
     const docListeners = this.listeners.get(pathKey);
     if (docListeners) {
       const snap = this.getDocSnapByPath(pathKey);
-      docListeners.forEach((cb) => cb(snap));
+      docListeners.forEach((cb) => {
+        try {
+          cb(snap);
+        } catch (e) {
+          console.warn('Listener invocation error:', e);
+        }
+      });
     }
 
     // Notify collection-level listeners
@@ -84,7 +132,13 @@ class EmbeddedDatabase {
     const colListeners = this.listeners.get(colName);
     if (colListeners) {
       const snap = this.getCollectionSnap(colName);
-      colListeners.forEach((cb) => cb(snap));
+      colListeners.forEach((cb) => {
+        try {
+          cb(snap);
+        } catch (e) {
+          console.warn('Collection listener invocation error:', e);
+        }
+      });
     }
   }
 
@@ -96,11 +150,11 @@ class EmbeddedDatabase {
 
   private syncToServer(colName: string, id: string, data: any, isDelete = false) {
     if (typeof window === 'undefined') return;
-    const url = `/api/db/${colName}/${id}`;
+    const endpoint = `/api/db/${colName}/${id}`;
     if (isDelete) {
-      fetch(url, { method: 'DELETE' }).catch(() => {});
+      apiFetch(endpoint, { method: 'DELETE' }).catch(() => {});
     } else {
-      fetch(url, {
+      apiFetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
@@ -458,4 +512,3 @@ export const Timestamp = {
     toISOString: () => new Date(ms).toISOString(),
   }),
 };
-

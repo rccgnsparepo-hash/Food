@@ -21,6 +21,7 @@ import { cleanFirestoreData } from './orderLifecycleService';
 import { recordAuditLog } from './auditLogService';
 import { triggerHaptic } from '../utils/haptics';
 import { toast } from 'sonner';
+import { apiFetch } from '../lib/apiConfig';
 
 export interface ProcessOrderCancellationRefundParams {
   orderId: string;
@@ -201,7 +202,7 @@ export async function processOrderCancellationRefund(
 
     // 8. Trigger server-side FCM dispatch if requested
     if (notifyCustomer) {
-      fetch('/api/fcm/send-status-update', {
+      apiFetch('/api/fcm/send-status-update', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

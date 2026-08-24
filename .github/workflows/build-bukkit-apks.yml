@@ -155,6 +155,9 @@ jobs:
           # Sync Capacitor with the built assets
           npx cap sync android
 
+          # Generate crisp branded launcher icons for this flavor
+          node scripts/generate-flavor-icons.js ${{ matrix.flavor }}
+
           # Double check google-services.json is inside android/app/
           if [ -f "google-services.json" ] && [ ! -f "android/app/google-services.json" ]; then
             cp google-services.json android/app/google-services.json
@@ -217,16 +220,72 @@ jobs:
           retention-days: 14
 
   # ----------------------------------------------------------------------
-  # Job 2: Release Summary & Verification
+  # Job 2: Release Summary & GitHub Release Publisher
   # ----------------------------------------------------------------------
-  build-summary:
-    name: Multi-Flavor Build Pipeline Summary
+  publish-release:
+    name: Publish GitHub Release & Summary
     needs: [ build-apk-flavor ]
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
     steps:
-      - name: Output Pipeline Summary
+      - name: 1. Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: 2. Download All APK Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: downloaded-artifacts
+
+      - name: 3. Organize APK Packages for Release
+        id: prep_release
         run: |
-          echo "### BUKKIT 4-APK Native Architecture Build Matrix" >> $GITHUB_STEP_SUMMARY
+          mkdir -p release-files
+          
+          # Copy all generated APKs into release-files
+          find downloaded-artifacts -type f -name "*.apk" -exec cp {} release-files/ \;
+          find downloaded-artifacts -type f -name "*-manifest.json" -exec cp {} release-files/ \;
+          
+          echo "Listing gathered APK files:"
+          ls -la release-files/
+          
+          APK_COUNT=$(ls -1 release-files/*.apk 2>/dev/null | wc -l)
+          echo "apk_count=$APK_COUNT" >> $GITHUB_OUTPUT
+
+      - name: 4. Publish GitHub Release (with APK Assets)
+        if: (github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')) || github.event_name == 'workflow_dispatch'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ inputs.release_tag != '' && inputs.release_tag || format('v1.0.{0}', github.run_number) }}
+          name: ${{ inputs.release_tag != '' && format('BUKKIT Release {0}', inputs.release_tag) || format('BUKKIT Multi-Flavor APKs (Build #{0})', github.run_number) }}
+          body: |
+            ## 📱 BUKKIT Native Android APKs (Build #${{ github.run_number }})
+
+            Download the ready-to-install Android APKs below:
+
+            | Flavor | Application ID | Target User / Role | APK Package |
+            | :--- | :--- | :--- | :--- |
+            | **Customer** | `com.faratech.bukkit.customer` | Customer Ordering | 📦 `Bukkit-customer.apk` |
+            | **Vendor / Kitchen** | `com.faratech.bukkit.vendor` | Merchant Kitchen Operations | 📦 `Bukkit-vendor.apk` |
+            | **Rider** | `com.faratech.bukkit.rider` | Courier Dispatch & GPS Tracking | 📦 `Bukkit-rider.apk` |
+            | **Admin** | `com.faratech.bukkit.admin` | Platform Admin Console | 📦 `Bukkit-admin.apk` |
+
+            ---
+            - **Build Type**: `${{ inputs.build_type || 'debug' }}`
+            - **Commit**: `${{ github.sha }}`
+            - **Branch**: `${{ github.ref_name }}`
+          files: |
+            release-files/*
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 5. Output Pipeline Summary
+        run: |
+          echo "### 🚀 BUKKIT 4-APK Native Architecture Build & Release" >> $GITHUB_STEP_SUMMARY
           echo "| Flavor | Application ID | Target Role | Deep Link Scheme | Notification Channel |" >> $GITHUB_STEP_SUMMARY
           echo "| :--- | :--- | :--- | :--- | :--- |" >> $GITHUB_STEP_SUMMARY
           echo "| **Customer** | \`com.faratech.bukkit.customer\` | Customer | \`bukkit://\` | \`bukkit_order_updates\` |" >> $GITHUB_STEP_SUMMARY
@@ -234,4 +293,5 @@ jobs:
           echo "| **Rider** | \`com.faratech.bukkit.rider\` | Delivery Courier | \`bukkit-rider://\` | \`bukkit_delivery_dispatches\` |" >> $GITHUB_STEP_SUMMARY
           echo "| **Admin** | \`com.faratech.bukkit.admin\` | Ops / Admin Console | \`bukkit-admin://\` | \`bukkit_ops_alerts\` |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "All four APK variants verified and archived successfully." >> $GITHUB_STEP_SUMMARY
+          echo "All APK variants have been generated, attached as artifacts, and published to GitHub Releases." >> $GITHUB_STEP_SUMMARY
+

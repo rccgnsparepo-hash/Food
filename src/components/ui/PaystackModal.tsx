@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { ShieldCheck, CreditCard, Lock, CheckCircle2, AlertCircle } from 'lucide-react';
+import { apiFetch } from '../../lib/apiConfig';
 
 interface PaystackModalProps {
   amount: number;
@@ -29,7 +30,7 @@ export const PaystackModal: React.FC<PaystackModalProps> = ({
 
     try {
       // Call Paystack backend API endpoint
-      const response = await fetch('/api/paystack/initialize', {
+      const response = await apiFetch('/api/paystack/initialize', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, amount, orderId })
@@ -38,7 +39,7 @@ export const PaystackModal: React.FC<PaystackModalProps> = ({
 
       setTimeout(async () => {
         // Verify payment
-        const verifyRes = await fetch('/api/paystack/verify', {
+        const verifyRes = await apiFetch('/api/paystack/verify', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ reference: data.data.reference })

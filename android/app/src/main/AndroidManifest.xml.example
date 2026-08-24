@@ -1,14 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- Permissions -->
+    <!-- Network and Internet Permissions -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    
     <!-- Android 13+ Push Notification Runtime Permission -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    
     <!-- Location permissions for Rider tracking & Campus Geofencing -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    
     <!-- Vibration for order dispatch haptic alerts -->
     <uses-permission android:name="android.permission.VIBRATE" />
 
@@ -18,7 +21,7 @@
         android:label="${appName}"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
-        android:theme="@style/Theme.BUKKIT">
+        android:theme="@style/AppTheme">
 
         <activity
             android:name=".MainActivity"
@@ -40,16 +43,7 @@
             </intent-filter>
         </activity>
 
-        <!-- FCM Firebase Messaging Push Service -->
-        <service
-            android:name=".services.BukkitFirebaseMessagingService"
-            android:exported="false">
-            <intent-filter>
-                <action android:name="com.google.firebase.MESSAGING_EVENT" />
-            </intent-filter>
-        </service>
-
-        <!-- Default FCM Notification Channel -->
+        <!-- Default FCM Notification Channel for Capacitor Push Notifications -->
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_channel_id"
             android:value="${fcmDefaultChannel}" />

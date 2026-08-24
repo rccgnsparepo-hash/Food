@@ -45,20 +45,50 @@ export const KitchenDashboard: React.FC = () => {
   const userVendorId = user?.vendor_id || user?.kitchen_profile?.vendor_id;
   const isAdmin = user?.role === 'admin' || user?.role === 'super_admin' || user?.active_role === 'admin' || user?.active_role === 'super_admin';
 
-  // Find vendor associated with this kitchen user or use first available vendor
+  // Find vendor associated with this kitchen user or use user UID
   const [activeVendorId, setActiveVendorId] = useState<string>(() => {
     if (userVendorId) return userVendorId;
-    const matched = vendors.find(v => v.owner_uid === user?.uid || v.email === user?.email);
-    return matched ? matched.id : vendors[0]?.id || 'vendor_mama_cass';
+    if (user?.uid) {
+      const matched = vendors.find(v => v.owner_uid === user?.uid || v.email?.toLowerCase() === user?.email?.toLowerCase() || v.id === user?.uid);
+      return matched ? matched.id : user.uid;
+    }
+    return vendors[0]?.id || 'vendor_mama_cass';
   });
 
   useEffect(() => {
     if (userVendorId && !isAdmin) {
       setActiveVendorId(userVendorId);
+    } else if (user?.uid) {
+      const matched = vendors.find(v => v.owner_uid === user?.uid || v.email?.toLowerCase() === user?.email?.toLowerCase() || v.id === user?.uid);
+      if (matched) {
+        setActiveVendorId(matched.id);
+      } else if (!isAdmin) {
+        setActiveVendorId(user.uid);
+      }
     }
-  }, [userVendorId, isAdmin]);
+  }, [userVendorId, isAdmin, user?.uid, user?.email, vendors]);
 
-  const currentVendor = vendors.find(v => v.id === activeVendorId) || vendors[0];
+  const currentVendor = vendors.find(v => v.id === activeVendorId || v.owner_uid === user?.uid) || (user?.uid ? {
+    id: activeVendorId,
+    name: user.name || 'Campus Kitchen',
+    slogan: 'Fresh, hot meals served daily on campus!',
+    rating: 5.0,
+    total_ratings: 1,
+    estimated_delivery_time: '15-25 min',
+    cover_image_url: 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=800&auto=format&fit=crop',
+    logo_url: 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=200&auto=format&fit=crop',
+    opening_time: '07:30',
+    closing_time: '21:00',
+    is_active: true,
+    is_open: true,
+    is_verified: true,
+    food_zone_id: 'zone_central',
+    university_id: user.university_id || 'uni_mtu',
+    campus_id: user.campus_id || 'campus_mtu_main',
+    owner_uid: user.uid,
+    email: user.email || '',
+    phone: user.phone || ''
+  } as any : vendors[0]);
   const vendorMenu = menuItems.filter(m => m.vendor_id === activeVendorId || m.restaurant_id === activeVendorId);
   const currentZone = foodZones.find(z => z.id === currentVendor?.food_zone_id);
 
@@ -109,21 +139,32 @@ export const KitchenDashboard: React.FC = () => {
     }
   }, [currentVendor?.id]);
 
-  // Real-time Orders Listener for this Vendor
+  // Real-time Orders Listener for this Vendor (supporting all ID and name mappings)
   useEffect(() => {
-    if (!activeVendorId) return;
     setIsLoadingOrders(true);
 
     try {
-      const q = query(
-        collection(db, 'orders'),
-        where('vendor_id', '==', activeVendorId)
-      );
+      const q = query(collection(db, 'orders'));
 
       const unsub = onSnapshot(q, (snapshot) => {
         const ords: Order[] = [];
         snapshot.forEach((d) => {
-          ords.push({ id: d.id, ...d.data() } as Order);
+          const data = d.data() as any;
+          const matchesVendorId =
+            data.vendor_id === activeVendorId ||
+            data.restaurant_id === activeVendorId ||
+            data.vendorId === activeVendorId ||
+            data.restaurantId === activeVendorId ||
+            data.vendor_id === user?.uid ||
+            data.restaurant_id === user?.uid;
+
+          const matchesVendorName =
+            currentVendor &&
+            (data.vendor_name === currentVendor.name || data.restaurant_name === currentVendor.name);
+
+          if (matchesVendorId || matchesVendorName) {
+            ords.push({ id: d.id, ...data } as Order);
+          }
         });
         ords.sort((a, b) => new Date(b.created_at || '').getTime() - new Date(a.created_at || '').getTime());
         setLiveOrders(ords);
@@ -138,7 +179,7 @@ export const KitchenDashboard: React.FC = () => {
       console.warn('Orders query catch:', e);
       setIsLoadingOrders(false);
     }
-  }, [activeVendorId]);
+  }, [activeVendorId, currentVendor?.name, user?.uid]);
 
   // Toggle Stand Open/Closed in Firestore
   const handleToggleStoreOpen = async () => {

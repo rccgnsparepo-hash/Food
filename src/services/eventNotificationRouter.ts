@@ -1,5 +1,6 @@
 import { Order, OrderStatus, UserRole, NotificationChannelId } from '../types';
 import { getActiveDevicesForUsers } from './fcmDeviceService';
+import { apiFetch } from '../lib/apiConfig';
 
 export interface NotificationPayload {
   channelId: NotificationChannelId;
@@ -251,7 +252,7 @@ export async function routeOrderEventNotification(order: Order, status: OrderSta
       customerName: (order as any).customer_name
     });
 
-    const response = await fetch('/api/fcm/dispatch-order-event', {
+    const response = await apiFetch('/api/fcm/dispatch-order-event', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({

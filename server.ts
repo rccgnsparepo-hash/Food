@@ -1,4 +1,5 @@
 import express from 'express';
+import cors from 'cors';
 import path from 'path';
 import { createServer as createViteServer } from 'vite';
 import { getOrCreateUser, checkUserExists, getVendorsList, createSqlOrder, getUserOrders } from './src/db/helpers.ts';
@@ -31,6 +32,7 @@ async function startServer() {
   const app = express();
   const PORT = 3000;
 
+  app.use(cors());
   app.use(express.json());
 
   // Health check API

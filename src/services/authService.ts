@@ -201,6 +201,12 @@ export async function resolveAuthoritativeUserProfile(uid: string): Promise<User
       getDoc(doc(db, 'admin_profiles', uid)).catch(() => null)
     ]);
 
+    const isKitchenRole = activeRole === 'kitchen' || activeRole === 'kitchen_manager' || activeRole === 'kitchen_staff' || roles.includes('kitchen');
+    let resolvedVendorId = userData.vendor_id || (kitchenSnap?.exists() ? kitchenSnap.data()?.vendor_id : undefined);
+    if (!resolvedVendorId && isKitchenRole) {
+      resolvedVendorId = uid;
+    }
+
     const profile: UserProfile = {
       id: uid,
       uid,
@@ -226,7 +232,7 @@ export async function resolveAuthoritativeUserProfile(uid: string): Promise<User
       university_id: userData.university_id || 'uni_mtu',
       campus_id: userData.campus_id || 'campus_mtu_main',
       preferred_zone_id: userData.preferred_zone_id,
-      vendor_id: userData.vendor_id || (kitchenSnap?.exists() ? kitchenSnap.data()?.vendor_id : undefined),
+      vendor_id: resolvedVendorId,
       customer_profile: custSnap?.exists() ? custSnap.data() as any : undefined,
       rider_profile: riderSnap?.exists() ? riderSnap.data() as any : undefined,
       kitchen_profile: kitchenSnap?.exists() ? kitchenSnap.data() as any : undefined,

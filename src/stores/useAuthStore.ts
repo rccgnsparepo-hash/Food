@@ -340,6 +340,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       set({ isEmailVerified: userCred.user.emailVerified });
 
       const now = new Date().toISOString();
+      const effectiveVendorId = (role === 'kitchen' || role === 'kitchen_manager' || role === 'kitchen_staff')
+        ? (vendorId || createdUid)
+        : undefined;
+
       const newProfile: UserProfile = {
         id: createdUid,
         uid: createdUid,
@@ -357,7 +361,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         permissions: getRolePermissions(role),
         university_id: universityId || 'uni_mtu',
         campus_id: campusId || 'campus_mtu_main',
-        vendor_id: (role === 'kitchen' || role === 'kitchen_manager' || role === 'kitchen_staff') ? (vendorId || 'vendor_mtu_canteen') : undefined,
+        vendor_id: effectiveVendorId,
         avatar_url: `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(fullName)}`,
         created_at: now,
         updated_at: now,
@@ -388,10 +392,36 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         newProfile.rider_profile = riderProf;
         subProfilePromise = setDoc(doc(db, 'rider_profiles', createdUid), cleanFirestoreData(riderProf)).catch(e => console.warn('Rider profile sync:', e));
       } else if (role === 'kitchen' || role === 'kitchen_manager' || role === 'kitchen_staff') {
+        const vendorDocData = {
+          id: effectiveVendorId,
+          name: fullName.trim() || 'Campus Kitchen',
+          slogan: 'Fresh, hot meals served daily on campus!',
+          rating: 5.0,
+          total_ratings: 1,
+          estimated_delivery_time: '15-25 min',
+          cover_image_url: 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=800&auto=format&fit=crop',
+          logo_url: 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=200&auto=format&fit=crop',
+          opening_time: '07:30',
+          closing_time: '21:00',
+          is_active: true,
+          is_open: true,
+          is_verified: true,
+          food_zone_id: 'zone_central',
+          university_id: universityId || 'uni_mtu',
+          campus_id: campusId || 'campus_mtu_main',
+          owner_uid: createdUid,
+          email: cleanEmail,
+          phone: phone.trim(),
+          delivery_fee: 350,
+          min_order: 500,
+          created_at: now,
+          updated_at: now
+        };
+
         const kitchenProf: KitchenStaffProfile = {
           user_id: createdUid,
-          vendor_id: vendorId || 'rest_ronalds',
-          vendor_name: "Ronald's Food House",
+          vendor_id: effectiveVendorId!,
+          vendor_name: fullName.trim() || 'Campus Kitchen',
           role: role as any,
           permissions: getRolePermissions(role),
           shift_status: 'on_duty',
@@ -399,7 +429,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           updated_at: now
         };
         newProfile.kitchen_profile = kitchenProf;
-        subProfilePromise = setDoc(doc(db, 'kitchen_staff_profiles', createdUid), cleanFirestoreData(kitchenProf)).catch(e => console.warn('Kitchen profile sync:', e));
+        subProfilePromise = Promise.all([
+          setDoc(doc(db, 'kitchen_staff_profiles', createdUid), cleanFirestoreData(kitchenProf)).catch(e => console.warn('Kitchen profile sync:', e)),
+          setDoc(doc(db, 'vendors', effectiveVendorId!), cleanFirestoreData(vendorDocData)).catch(e => console.warn('Vendor doc sync:', e))
+        ]);
       } else if (role === 'admin' || role === 'super_admin') {
         const adminProf: AdminProfile = {
           user_id: createdUid,
@@ -523,7 +556,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
             permissions: getRolePermissions(targetRole),
             university_id: 'uni_mtu',
             campus_id: 'campus_mtu_main',
-            vendor_id: (targetRole === 'kitchen' || targetRole === 'kitchen_manager' || targetRole === 'kitchen_staff') ? 'vendor_mtu_canteen' : undefined,
+            vendor_id: (targetRole === 'kitchen' || targetRole === 'kitchen_manager' || targetRole === 'kitchen_staff') ? result.user.uid : undefined,
             avatar_url: result.user.photoURL || `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(result.user.email || 'user')}`,
             created_at: profile?.created_at || now,
             updated_at: now,
@@ -553,10 +586,36 @@ export const useAuthStore = create<AuthState>((set, get) => ({
             profile.rider_profile = riderProf;
             subProfilePromise = setDoc(doc(db, 'rider_profiles', result.user.uid), cleanFirestoreData(riderProf)).catch(() => {});
           } else if (targetRole === 'kitchen' || targetRole === 'kitchen_manager' || targetRole === 'kitchen_staff') {
+            const vendorDocData = {
+              id: result.user.uid,
+              name: fullName || 'Campus Kitchen',
+              slogan: 'Fresh, hot meals served daily on campus!',
+              rating: 5.0,
+              total_ratings: 1,
+              estimated_delivery_time: '15-25 min',
+              cover_image_url: 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=800&auto=format&fit=crop',
+              logo_url: 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=200&auto=format&fit=crop',
+              opening_time: '07:30',
+              closing_time: '21:00',
+              is_active: true,
+              is_open: true,
+              is_verified: true,
+              food_zone_id: 'zone_central',
+              university_id: 'uni_mtu',
+              campus_id: 'campus_mtu_main',
+              owner_uid: result.user.uid,
+              email: result.user.email || '',
+              phone: result.user.phoneNumber || '+234 810 000 1122',
+              delivery_fee: 350,
+              min_order: 500,
+              created_at: now,
+              updated_at: now
+            };
+
             const kitchenProf: KitchenStaffProfile = {
               user_id: result.user.uid,
-              vendor_id: 'rest_ronalds',
-              vendor_name: "Ronald's Food House",
+              vendor_id: result.user.uid,
+              vendor_name: fullName || 'Campus Kitchen',
               role: targetRole as any,
               permissions: getRolePermissions(targetRole),
               shift_status: 'on_duty',
@@ -564,7 +623,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
               updated_at: now
             };
             profile.kitchen_profile = kitchenProf;
-            subProfilePromise = setDoc(doc(db, 'kitchen_staff_profiles', result.user.uid), cleanFirestoreData(kitchenProf)).catch(() => {});
+            subProfilePromise = Promise.all([
+              setDoc(doc(db, 'kitchen_staff_profiles', result.user.uid), cleanFirestoreData(kitchenProf)).catch(() => {}),
+              setDoc(doc(db, 'vendors', result.user.uid), cleanFirestoreData(vendorDocData)).catch(() => {})
+            ]);
           } else if (targetRole === 'admin' || targetRole === 'super_admin') {
             const adminProf: AdminProfile = {
               user_id: result.user.uid,

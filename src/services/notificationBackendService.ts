@@ -152,12 +152,22 @@ export function unregisterDeviceToken(fcmTokenOrTokenId: string): boolean {
 }
 
 /**
- * Get active tokens for a specific user ID
+ * Get active tokens for a specific user ID or vendor ID
  */
 export function getTokensForUser(userId: string): DeviceTokenRecord[] {
   const results: DeviceTokenRecord[] = [];
+  const cleanId = (userId || '').trim().toLowerCase();
+  
   for (const tok of activeDeviceTokens.values()) {
-    if (tok.user_id === userId && tok.active) {
+    if (!tok.active) continue;
+    const tokUserId = (tok.user_id || '').trim().toLowerCase();
+    
+    if (
+      tokUserId === cleanId ||
+      tok.device_id?.toLowerCase().includes(cleanId) ||
+      (tok.app_type === 'VENDOR' && cleanId.includes(tokUserId)) ||
+      (tok.app_type === 'VENDOR' && tokUserId.includes(cleanId))
+    ) {
       results.push(tok);
     }
   }

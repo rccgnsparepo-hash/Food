@@ -24,6 +24,7 @@ import {
   NotificationAppType,
   NotificationSeverity
 } from '../../types';
+import { apiFetch } from '../../lib/apiConfig';
 import { triggerHaptic } from '../../utils/haptics';
 import { toast } from 'sonner';
 
@@ -47,8 +48,8 @@ export const NotificationHub: React.FC = () => {
     setIsLoading(true);
     try {
       const [healthRes, tokensRes] = await Promise.all([
-        fetch('/api/notifications/health'),
-        fetch('/api/notifications/tokens')
+        apiFetch('/api/notifications/health'),
+        apiFetch('/api/notifications/tokens')
       ]);
 
       const healthData = await healthRes.json();
@@ -76,7 +77,7 @@ export const NotificationHub: React.FC = () => {
     try {
       let response;
       if (targetRole === 'ADMIN') {
-        response = await fetch('/api/notifications/admin-alert', {
+        response = await apiFetch('/api/notifications/admin-alert', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -87,7 +88,7 @@ export const NotificationHub: React.FC = () => {
           })
         });
       } else {
-        response = await fetch('/api/notifications/order-event', {
+        response = await apiFetch('/api/notifications/order-event', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({

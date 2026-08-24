@@ -18,6 +18,7 @@ import { processOrderCancellationRefund } from './refundService';
 import { recordRiderEarningsOnDelivery } from './earningsService';
 import { toast } from 'sonner';
 import { emitAuthoritativeOrderEvent } from './notificationService';
+import { apiFetch } from '../lib/apiConfig';
 import { OrderEventType } from '../types';
 
 /**
@@ -268,7 +269,7 @@ export async function createAuthoritativeOrder(
   });
 
   // 3. Asynchronously sync to backend Cloud SQL
-  fetch('/api/orders', {
+  apiFetch('/api/orders', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({

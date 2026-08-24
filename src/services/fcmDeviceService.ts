@@ -2,6 +2,7 @@ import { doc, setDoc, updateDoc, getDoc, collection, getDocs, query, where } fro
 import { db } from '../lib/firebase';
 import { AppFlavor, UserDeviceRecord, UserRole } from '../types';
 import { getCurrentAppFlavor, BUKKIT_FLAVORS } from '../config/appFlavor';
+import { apiFetch } from '../lib/apiConfig';
 
 const DEVICE_ID_KEY = 'bukkit_native_device_id';
 
@@ -74,7 +75,7 @@ export async function registerDeviceToken(params: {
 
     // Also notify the server backend about device registration
     try {
-      await fetch('/api/fcm/register-device', {
+      await apiFetch('/api/fcm/register-device', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -126,7 +127,7 @@ export async function deactivateDeviceToken(userId: string): Promise<void> {
     });
 
     try {
-      await fetch('/api/fcm/deactivate-device', {
+      await apiFetch('/api/fcm/deactivate-device', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId, deviceId })

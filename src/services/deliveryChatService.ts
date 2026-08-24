@@ -16,6 +16,7 @@ import {
 } from "../lib/embeddedDb";
 import { db } from '../lib/firebase';
 import { ConversationMessage, DeliveryConversation, UserRole } from '../types';
+import { apiFetch } from '../lib/apiConfig';
 
 /**
  * Generate standardized conversation ID for an order
@@ -150,7 +151,7 @@ export async function sendDeliveryMessage(params: {
 
   // Trigger server push notification if recipient is offline / in background
   try {
-    fetch('/api/chat/send-message-push', {
+    apiFetch('/api/chat/send-message-push', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({

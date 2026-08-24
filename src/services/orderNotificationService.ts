@@ -5,6 +5,7 @@ import { Order, OrderStatus } from '../types';
 import { useAuthStore } from '../stores/useAuthStore';
 import { triggerHaptic } from '../utils/haptics';
 import { toast } from 'sonner';
+import { apiFetch } from '../lib/apiConfig';
 
 /**
  * Format human-friendly notification details based on Order Status
@@ -70,7 +71,7 @@ export function getOrderStatusNotificationDetails(status: OrderStatus, vendorNam
  */
 export async function sendFcmServerStatusDispatch(orderId: string, status: OrderStatus, vendorName: string, userId: string) {
   try {
-    const response = await fetch('/api/fcm/send-status-update', {
+    const response = await apiFetch('/api/fcm/send-status-update', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
