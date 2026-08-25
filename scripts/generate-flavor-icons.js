@@ -72,7 +72,6 @@ if (fs.existsSync(resDir)) {
     <color name="colorPrimary">${config.primaryColor}</color>
     <color name="colorPrimaryDark">${config.primaryColor}</color>
     <color name="colorAccent">${config.secondaryColor}</color>
-    <color name="ic_launcher_background">${config.primaryColor}</color>
 </resources>`;
     fs.writeFileSync(path.join(valuesDir, 'colors.xml'), colorsXml, 'utf8');
 
