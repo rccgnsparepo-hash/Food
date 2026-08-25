@@ -1,0 +1,46 @@
+{
+  "name": "BUKKIT - MTU Campus Food Delivery",
+  "short_name": "BUKKIT",
+  "description": "Fast, reliable campus food delivery for Mountain Top University students, kitchens, and riders.",
+  "start_url": "/",
+  "id": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#ffffff",
+  "theme_color": "#16a34a",
+  "icons": [
+    {
+      "src": "/bukkit-icon.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/bukkit-logo.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ],
+  "categories": ["food", "shopping", "productivity"],
+  "shortcuts": [
+    {
+      "name": "Live Orders",
+      "short_name": "Orders",
+      "url": "/orders",
+      "icons": [{ "src": "/bukkit-icon.svg", "sizes": "192x192" }]
+    },
+    {
+      "name": "Food Vendors",
+      "short_name": "Vendors",
+      "url": "/vendors",
+      "icons": [{ "src": "/bukkit-icon.svg", "sizes": "192x192" }]
+    },
+    {
+      "name": "Digital Wallet",
+      "short_name": "Wallet",
+      "url": "/wallet",
+      "icons": [{ "src": "/bukkit-icon.svg", "sizes": "192x192" }]
+    }
+  ]
+}

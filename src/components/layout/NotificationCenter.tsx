@@ -53,10 +53,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
   }, [isOpen]);
 
   const handleEnablePush = async () => {
-    if (!user?.uid) {
-      toast.info('Please sign in to link push notifications to your account.');
-      return;
-    }
+    const targetUid = user?.uid || 'guest_user';
     const appType =
       role === 'rider'
         ? 'RIDER'
@@ -66,7 +63,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
         ? 'ADMIN'
         : 'CUSTOMER';
 
-    const success = await enablePushNotifications(user.uid, appType);
+    const success = await enablePushNotifications(targetUid, appType);
     if (typeof window !== 'undefined' && 'Notification' in window) {
       setPushStatus(Notification.permission as any);
     }

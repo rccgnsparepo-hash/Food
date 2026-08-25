@@ -41,7 +41,7 @@ export const BUKKIT_ANDROID_NOTIFICATION_CHANNELS = [
     visibility: 1,
     vibration: true,
     lights: true,
-    lightColor: '#eab308'
+    lightColor: '#d97706'
   },
   {
     id: 'bukkit_delivery_dispatches',
@@ -59,7 +59,9 @@ export const BUKKIT_ANDROID_NOTIFICATION_CHANNELS = [
     description: 'System health anomalies, payment alerts, and vendor queue surges',
     importance: 4, // IMPORTANCE_DEFAULT
     visibility: 1,
-    vibration: true
+    vibration: true,
+    lights: true,
+    lightColor: '#7c3aed'
   },
   {
     id: 'messages',
@@ -71,37 +73,39 @@ export const BUKKIT_ANDROID_NOTIFICATION_CHANNELS = [
   }
 ];
 
-let isInitialized = false;
+let listenersRegistered = false;
 
 /**
  * Initialize Native Android Push Notifications & Deep Link Routing safely
  */
 export async function initNativeAndroidPush(params: {
-  userId: string;
-  role: UserRole;
+  userId?: string;
+  role?: UserRole;
   appFlavor?: AppFlavor;
   onDeepLinkNavigate?: (route: string) => void;
 }): Promise<boolean> {
+  console.log('[PUSH] Enable clicked');
+
   // Guard 1: Verify native environment
   if (!isNativeAndroidApp()) {
-    console.log('[Native Push] Non-native environment detected. Skipping Capacitor push registration.');
+    console.log('[PUSH] Non-native environment detected. Skipping Capacitor push registration.');
     return false;
   }
 
   // Guard 2: Verify PushNotifications plugin is available in native bridge
   try {
     if (typeof PushNotifications === 'undefined' || !Capacitor.isPluginAvailable('PushNotifications')) {
-      console.warn('[Native Push] Capacitor PushNotifications plugin not available in runtime.');
-      toast.info('Push Notifications Notice', {
-        description: 'Push notification service is initializing in background.'
+      console.warn('[PUSH ERROR] Capacitor PushNotifications plugin not available in runtime.');
+      toast.info('Notifications Initializing', {
+        description: 'Push notification engine is starting in background.'
       });
       return false;
     }
   } catch (checkErr) {
-    console.warn('[Native Push] Plugin availability check note:', checkErr);
+    console.warn('[PUSH ERROR] Plugin availability check note:', checkErr);
   }
 
-  const { userId, role, appFlavor = 'customer', onDeepLinkNavigate } = params;
+  const { userId = 'guest_user', role = 'customer', appFlavor = 'customer', onDeepLinkNavigate } = params;
 
   try {
     // 1. Safe Creation of Notification Channels on Android
@@ -118,63 +122,77 @@ export async function initNativeAndroidPush(params: {
           lightColor: channel.lightColor
         });
       } catch (cErr) {
-        // Individual channel failure should never crash the setup
-        console.warn(`[Native Push] Channel registration note for ${channel.id}:`, cErr);
+        console.warn(`[PUSH] Channel registration note for ${channel.id}:`, cErr);
       }
     }
 
-    // 2. Request Android 13+ POST_NOTIFICATIONS Runtime Permission safely
-    let permStatus: { receive: string } = { receive: 'prompt' };
+    // 2. Check and Request Android 13+ POST_NOTIFICATIONS Runtime Permission safely
+    let permStatus = { receive: 'prompt' };
     try {
+      console.log('[PUSH] Checking existing permission status...');
       permStatus = await PushNotifications.checkPermissions();
-      if (permStatus.receive === 'prompt' || permStatus.receive === 'prompt-with-rationale' || permStatus.receive === 'default') {
+      console.log('[PUSH] Permission status:', permStatus?.receive);
+
+      if (permStatus?.receive === 'prompt' || permStatus?.receive === 'prompt-with-rationale' || permStatus?.receive === 'default') {
+        console.log('[PUSH] Requesting native Android POST_NOTIFICATIONS permission...');
         permStatus = await PushNotifications.requestPermissions();
+        console.log('[PUSH] Permission request completed. New status:', permStatus?.receive);
       }
-    } catch (pErr) {
-      console.warn('[Native Push] Permissions request note (falling back to granted):', pErr);
+    } catch (pErr: any) {
+      console.warn('[PUSH ERROR] Permission request error (falling back):', pErr?.message || pErr);
       permStatus = { receive: 'granted' };
     }
 
     if (permStatus?.receive !== 'granted') {
-      console.warn('[Native Push] Notification permission was not granted by user.');
-      toast.error('Notification Permission Required', {
-        description: 'Please allow notification permissions in your Android device settings to receive real-time order alerts.'
-      });
+      console.warn('[PUSH] Permission not granted. User status:', permStatus?.receive);
+      if (permStatus?.receive === 'denied') {
+        toast.error('Notification Permission Denied', {
+          description: 'Please enable notifications for BUKKIT in your device Settings to receive live updates.'
+        });
+      }
       return false;
     }
 
-    // 3. Setup Listeners safely (remove previous listeners to prevent bridge collisions)
-    if (!isInitialized) {
+    // 3. Setup Native Event Listeners safely
+    if (!listenersRegistered) {
       try {
         await PushNotifications.removeAllListeners().catch(() => {});
 
-        // Token Registration Listener
+        // Registration Success Callback
         await PushNotifications.addListener('registration', async (token: Token) => {
-          try {
-            console.log('[Native Push] Native FCM Registration Token acquired:', token?.value);
-            if (token?.value && userId) {
+          console.log('[PUSH] Registration callback received');
+          console.log('[PUSH] Token received:', token?.value ? `${token.value.slice(0, 10)}...` : 'empty');
+
+          if (token?.value) {
+            console.log('[PUSH] Saving token...');
+            try {
               await registerDeviceToken({
                 userId,
                 role,
                 fcmToken: token.value,
                 appFlavor,
                 permissionGranted: true
-              }).catch((rErr) => console.warn('[Native Push] Device token sync note:', rErr));
+              });
+              console.log('[PUSH] Token saved');
+              console.log('[PUSH] Push registration complete');
+            } catch (saveErr) {
+              console.warn('[PUSH ERROR] Token persistence note:', saveErr);
             }
-          } catch (tokErr) {
-            console.warn('[Native Push] Registration handler note:', tokErr);
           }
         });
 
-        // Registration Error Listener
+        // Registration Error Callback
         await PushNotifications.addListener('registrationError', (error: any) => {
-          console.warn('[Native Push] FCM native registration note:', error);
+          console.warn('[PUSH ERROR] FCM native registration callback received error:', error?.error || error);
+          toast.error('Push Registration Notice', {
+            description: 'Could not register push token with FCM. Please verify network connection.'
+          });
         });
 
         // Foreground Notification Listener
         await PushNotifications.addListener('pushNotificationReceived', (notification: PushNotificationSchema) => {
           try {
-            console.log('[Native Push] Foreground push received:', notification);
+            console.log('[PUSH] Foreground notification received:', notification);
             const title = notification.title || 'BUKKIT Alert';
             const body = notification.body || 'New order status update received';
 
@@ -190,21 +208,21 @@ export async function initNativeAndroidPush(params: {
                           onDeepLinkNavigate(notification.data.deepLink);
                         }
                       } catch (navErr) {
-                        console.warn('[Native Push] Navigation error:', navErr);
+                        console.warn('[PUSH ERROR] Navigation error:', navErr);
                       }
                     }
                   }
                 : undefined
             });
           } catch (nErr) {
-            console.warn('[Native Push] Foreground notification display note:', nErr);
+            console.warn('[PUSH ERROR] Foreground notification display note:', nErr);
           }
         });
 
-        // Notification Action (Click / Deep Link) Listener
+        // Notification Action (Tap/Click) Listener
         await PushNotifications.addListener('pushNotificationActionPerformed', (action: ActionPerformed) => {
           try {
-            console.log('[Native Push] User clicked notification:', action);
+            console.log('[PUSH] User clicked notification:', action);
             const data = action.notification.data || {};
             const deepLink = data.deepLink || data.deep_link || data.url;
 
@@ -212,16 +230,16 @@ export async function initNativeAndroidPush(params: {
               onDeepLinkNavigate(deepLink);
             }
           } catch (aErr) {
-            console.warn('[Native Push] Action perform handler note:', aErr);
+            console.warn('[PUSH ERROR] Action perform handler note:', aErr);
           }
         });
 
-        // Native Deep Link URL Schemes (e.g. bukkit://orders/123)
+        // Custom URL Scheme Deep Links
         try {
           if (typeof App !== 'undefined' && Capacitor.isPluginAvailable('App')) {
             await App.addListener('appUrlOpen', (event) => {
               try {
-                console.log('[Native Push] App opened via custom URL Scheme:', event.url);
+                console.log('[PUSH] App opened via custom URL Scheme:', event.url);
                 const urlObj = new URL(event.url);
                 const path = urlObj.pathname || urlObj.host;
                 if (path && onDeepLinkNavigate) {
@@ -229,25 +247,27 @@ export async function initNativeAndroidPush(params: {
                   onDeepLinkNavigate(cleanRoute);
                 }
               } catch (err) {
-                console.warn('[Native Push] Deep link parsing fallback:', err);
+                console.warn('[PUSH ERROR] Deep link parsing fallback:', err);
               }
             });
           }
         } catch (appErr) {
-          console.warn('[Native Push] App listener registration note:', appErr);
+          console.warn('[PUSH ERROR] App listener registration note:', appErr);
         }
 
-        isInitialized = true;
+        listenersRegistered = true;
       } catch (lErr) {
-        console.warn('[Native Push] Listener registration note:', lErr);
+        console.warn('[PUSH ERROR] Listener registration error:', lErr);
       }
     }
 
-    // 4. Register with FCM on native Android safely
+    // 4. Register with FCM on native Android
+    console.log('[PUSH] Registering FCM...');
     try {
       await PushNotifications.register();
-    } catch (regErr) {
-      console.warn('[Native Push] FCM register call note (non-fatal):', regErr);
+      console.log('[PUSH] PushNotifications.register() dispatched successfully');
+    } catch (regErr: any) {
+      console.warn('[PUSH ERROR] FCM register call error (non-fatal):', regErr?.message || regErr);
     }
 
     toast.success('Push Notifications Enabled!', {
@@ -256,7 +276,7 @@ export async function initNativeAndroidPush(params: {
 
     return true;
   } catch (err: any) {
-    console.error('[Native Push] Capacitor Push setup error handled safely:', err);
+    console.error('[PUSH ERROR] Capacitor Push setup error handled safely:', err);
     toast.info('Notifications Configured', {
       description: 'In-app notification alerts are active for your session.'
     });

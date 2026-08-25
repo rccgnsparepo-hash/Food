@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">BUKKIT</string>
+    <string name="title_activity_main">BUKKIT</string>
+    <string name="package_name">com.faratech.bukkit.customer</string>
+    <string name="custom_url_scheme">bukkit</string>
+    <string name="default_notification_channel_id">bukkit_order_updates</string>
+</resources>

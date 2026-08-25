@@ -150,12 +150,10 @@ jobs:
           npx cap sync android
 
           # 3. Setup Google Services JSON in android/app/
+          mkdir -p android/app
           if [ -f "google-services.json" ]; then
-            mkdir -p android/app
             cp google-services.json android/app/google-services.json
             echo "Copied google-services.json to android/app/"
-          elif [ -f "android/app/google-services.json" ]; then
-            echo "google-services.json already present in android/app/"
           fi
 
           # 4. Inject Google Services Gradle Plugin into android/build.gradle if missing
@@ -166,11 +164,19 @@ jobs:
             fi
           fi
 
-          # 5. Inject Google Services plugin into android/app/build.gradle if missing
-          if [ -f "android/app/build.gradle" ]; then
-            if ! grep -q "com.google.gms.google-services" android/app/build.gradle; then
-              echo "Injecting Google Services plugin into android/app/build.gradle..."
-              echo "apply plugin: 'com.google.gms.google-services'" >> android/app/build.gradle
+          # 5. Configure flavor-specific applicationId and Firebase dependencies in android/app/build.gradle
+          APP_GRADLE="android/app/build.gradle"
+          if [ -f "$APP_GRADLE" ]; then
+            # Update applicationId to matrix package_id
+            sed -i 's/applicationId "[^"]*"/applicationId "${{ matrix.package_id }}"/g' "$APP_GRADLE"
+            
+            # Ensure Firebase dependencies are present
+            if ! grep -q "firebase-bom" "$APP_GRADLE"; then
+              sed -i '/dependencies {/a \    implementation platform("com.google.firebase:firebase-bom:33.10.0")\n    implementation "com.google.firebase:firebase-messaging"\n    implementation "com.google.firebase:firebase-common"' "$APP_GRADLE"
+            fi
+            
+            if ! grep -q "com.google.gms.google-services" "$APP_GRADLE"; then
+              echo "apply plugin: 'com.google.gms.google-services'" >> "$APP_GRADLE"
             fi
           fi
 

@@ -4,7 +4,7 @@ import path from 'path';
 /**
  * Script to configure native Android resources for each BUKKIT flavor.
  * Generates AAPT2-compliant Android Adaptive Icons, Vector Drawables,
- * colors.xml, and strings.xml.
+ * colors.xml, strings.xml, and notification status-bar icons.
  */
 
 const FLAVORS = {
@@ -93,7 +93,7 @@ if (fs.existsSync(resDir)) {
 </resources>`;
     fs.writeFileSync(path.join(valuesDir, 'ic_launcher_background.xml'), bgXml, 'utf8');
 
-    // 4. Configure valid Android Vector Drawable for ic_launcher_foreground.xml
+    // 4. Configure valid Android Vector Drawable for ic_launcher_foreground.xml & ic_stat_bukkit.xml
     const drawableV24Dir = path.join(resDir, 'drawable-v24');
     const drawableDir = path.join(resDir, 'drawable');
     if (!fs.existsSync(drawableV24Dir)) fs.mkdirSync(drawableV24Dir, { recursive: true });
@@ -113,6 +113,21 @@ if (fs.existsSync(resDir)) {
     fs.writeFileSync(path.join(drawableDir, 'ic_launcher_foreground.xml'), foregroundVectorXml, 'utf8');
     fs.writeFileSync(path.join(drawableV24Dir, 'ic_launcher_foreground.xml'), foregroundVectorXml, 'utf8');
 
+    // Notification Status Bar Silhouette Icon (Monochrome vector required by Android notification manager)
+    const notificationIconXml = `<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="${config.vectorPath}" />
+</vector>`;
+
+    fs.writeFileSync(path.join(drawableDir, 'ic_stat_bukkit.xml'), notificationIconXml, 'utf8');
+    fs.writeFileSync(path.join(drawableV24Dir, 'ic_stat_bukkit.xml'), notificationIconXml, 'utf8');
+
     // 5. Configure mipmap-anydpi-v26/ic_launcher.xml & ic_launcher_round.xml
     const mipmapAnyDpi = path.join(resDir, 'mipmap-anydpi-v26');
     if (!fs.existsSync(mipmapAnyDpi)) fs.mkdirSync(mipmapAnyDpi, { recursive: true });
@@ -126,7 +141,7 @@ if (fs.existsSync(resDir)) {
     fs.writeFileSync(path.join(mipmapAnyDpi, 'ic_launcher.xml'), adaptiveIconXml, 'utf8');
     fs.writeFileSync(path.join(mipmapAnyDpi, 'ic_launcher_round.xml'), adaptiveIconXml, 'utf8');
 
-    console.log(`[Flavor Customizer] Successfully generated valid Android AAPT2 resources for ${config.name}.`);
+    console.log(`[Flavor Customizer] Successfully generated valid Android AAPT2 resources and notification icons for ${config.name}.`);
   } catch (err) {
     console.warn('[Flavor Customizer] Resource configuration notice:', err.message);
   }

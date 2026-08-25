@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 160" width="100%" height="100%" fill="none">
+  <g transform="translate(10, 10)">
+    <!-- Speed streaks -->
+    <path d="M 45 74 L 105 74 C 109 74 112 77 112 81 C 112 85 109 88 105 88 L 45 88 C 40.5 88 37 84.5 37 81 C 37 77.5 40.5 74 45 74 Z" fill="#EA580C" />
+    <path d="M 16 98 L 98 98 C 102 98 105 101 105 105 C 105 109 102 112 98 112 L 16 112 C 11.5 112 8 108.5 8 105 C 8 101.5 11.5 98 16 98 Z" fill="#EA580C" />
+    <path d="M 42 122 L 92 122 C 96 122 99 125 99 129 C 99 133 96 136 92 136 L 42 136 C 37.5 136 34 132.5 34 129 C 34 125.5 37.5 122 42 122 Z" fill="#EA580C" />
+
+    <!-- Hat -->
+    <g transform="translate(94, 14)">
+      <path d="M 12 34 C 4 34 0 26 3 18 C 6 10 15 8 24 11 C 28 3 42 -1 54 5 C 65 10 68 20 66 28 C 74 28 80 35 77 42 C 74 48 66 50 58 48 L 16 48 C 13 44 12 39 12 34 Z" fill="#FFFFFF" stroke="#0F172A" stroke-width="1.5" />
+      <path d="M 18 40 L 68 40 C 72 40 74 43 73 46 L 71 52 C 70 54 68 56 64 56 L 14 56 C 10 56 8 54 9 52 L 11 46 C 12 43 15 40 18 40 Z" fill="#FFFFFF" stroke="#0F172A" stroke-width="1" />
+      <path d="M 16 46 L 66 46" stroke="#EA580C" stroke-width="2.5" stroke-linecap="round" />
+    </g>
+
+    <!-- 'B' Body -->
+    <path d="M 104 64 C 100 64 96 68 94 73 L 74 152 C 72 158 77 162 83 162 L 140 162 C 162 162 178 150 181 131 C 183 118 176 108 165 102 C 173 96 177 86 175 77 C 172 64 159 64 142 64 L 104 64 Z" fill="#EA580C" stroke="#EA580C" stroke-width="1.5" />
+    <!-- Cutouts -->
+    <path d="M 118 78 L 138 78 C 146 78 152 82 151 88 C 150 94 144 97 136 97 L 113 97 L 118 78 Z" fill="#FFFFFF" />
+    <path d="M 108 111 L 137 111 C 147 111 154 116 152 125 C 150 134 142 139 132 139 L 102 139 L 108 111 Z" fill="#FFFFFF" />
+    <polygon points="100,84 115,84 105,106 119,106 94,144 102,110 91,110" fill="#FFFFFF" />
+  </g>
+
+  <!-- Wordmark -->
+  <g transform="translate(210, 120)">
+    <text x="0" y="0" font-family="'Inter', 'Arial Black', sans-serif" font-weight="900" font-style="italic" font-size="82" fill="#0F172A" letter-spacing="2">BUKKIT</text>
+    <rect x="350" y="-70" width="130" height="36" rx="6" fill="#EA580C" />
+    <text x="415" y="-46" font-family="'Inter', sans-serif" font-weight="900" font-size="18" fill="#FFFFFF" text-anchor="middle" letter-spacing="1">OFFICIAL</text>
+    <text x="0" y="24" font-family="'Inter', sans-serif" font-weight="800" font-size="14" fill="#64748B" letter-spacing="3">CAMPUS FOOD NETWORK • OFFICIAL RECEIPT</text>
+  </g>
+</svg>
