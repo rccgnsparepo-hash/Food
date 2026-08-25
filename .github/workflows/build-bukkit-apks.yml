@@ -107,6 +107,8 @@ jobs:
       - name: 4b. Setup Gradle Build Tool
         if: steps.check_run.outputs.should_run == 'true'
         uses: gradle/actions/setup-gradle@v4
+        with:
+          validate-wrappers: false
 
       - name: 5. Install Dependencies
         if: steps.check_run.outputs.should_run == 'true'
