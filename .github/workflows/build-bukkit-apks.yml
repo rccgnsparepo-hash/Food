@@ -104,6 +104,10 @@ jobs:
           distribution: 'temurin'
           java-version: '21'
 
+      - name: 4b. Setup Gradle Build Tool
+        if: steps.check_run.outputs.should_run == 'true'
+        uses: gradle/actions/setup-gradle@v4
+
       - name: 5. Install Dependencies
         if: steps.check_run.outputs.should_run == 'true'
         run: npm install --no-audit --no-fund
@@ -205,13 +209,29 @@ jobs:
         run: |
           echo "Building APK for ${{ matrix.flavor }} with Java: $JAVA_HOME"
           cd android
+          
+          # 1. Verify Gradle wrapper jar integrity and restore from official repository if corrupted or missing
+          WRAPPER_JAR="gradle/wrapper/gradle-wrapper.jar"
+          if [ ! -s "$WRAPPER_JAR" ] || ! python3 -c "import zipfile, sys; sys.exit(0 if zipfile.is_zipfile('$WRAPPER_JAR') else 1)" 2>/dev/null; then
+            echo "Gradle wrapper jar is missing or corrupted. Restoring valid gradle-wrapper.jar..."
+            mkdir -p gradle/wrapper
+            curl -sSL -o "$WRAPPER_JAR" "https://raw.githubusercontent.com/gradle/gradle/v8.14.3/gradle/wrapper/gradle-wrapper.jar" || \
+            curl -sSL -o "$WRAPPER_JAR" "https://repo1.maven.org/maven2/org/gradle/gradle-wrapper/8.14.3/gradle-wrapper-8.14.3.jar" || true
+          fi
+
           chmod +x gradlew
           
           BUILD_TYPE="${{ inputs.build_type || 'debug' }}"
+          GRADLE_CMD="./gradlew"
+          if ! $GRADLE_CMD -v >/dev/null 2>&1; then
+            echo "Wrapper execution check failed, falling back to system gradle command..."
+            GRADLE_CMD="gradle"
+          fi
+
           if [ "$BUILD_TYPE" = "release" ]; then
-            ./gradlew assembleRelease --no-daemon --stacktrace || ./gradlew assembleDebug --no-daemon --stacktrace
+            $GRADLE_CMD assembleRelease --no-daemon --stacktrace || $GRADLE_CMD assembleDebug --no-daemon --stacktrace
           else
-            ./gradlew assembleDebug --no-daemon --stacktrace
+            $GRADLE_CMD assembleDebug --no-daemon --stacktrace
           fi
 
       - name: 10. Prepare Artifact Package
