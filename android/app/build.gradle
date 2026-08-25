@@ -4,7 +4,7 @@ android {
     namespace = "com.faratech.bukkit"
     compileSdk = rootProject.ext.compileSdkVersion
     defaultConfig {
-        applicationId = (project.hasProperty('applicationId') ? project.property('applicationId') : "com.faratech.bukkit")
+        applicationId = "com.faratech.bukkit.customer"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 100

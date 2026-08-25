@@ -141,6 +141,16 @@ if (fs.existsSync(resDir)) {
     fs.writeFileSync(path.join(mipmapAnyDpi, 'ic_launcher.xml'), adaptiveIconXml, 'utf8');
     fs.writeFileSync(path.join(mipmapAnyDpi, 'ic_launcher_round.xml'), adaptiveIconXml, 'utf8');
 
+    // 6. Ensure android/app/build.gradle has the exact applicationId for this flavor
+    const appGradlePath = path.resolve('android/app/build.gradle');
+    if (fs.existsSync(appGradlePath)) {
+      let gradleContent = fs.readFileSync(appGradlePath, 'utf8');
+      gradleContent = gradleContent.replace(/applicationId\s*=\s*\(?[^)\n]*\)?/g, `applicationId = "${config.packageId}"`);
+      gradleContent = gradleContent.replace(/applicationId\s+"[^"]+"/g, `applicationId "${config.packageId}"`);
+      fs.writeFileSync(appGradlePath, gradleContent, 'utf8');
+      console.log(`[Flavor Customizer] Updated android/app/build.gradle applicationId to: ${config.packageId}`);
+    }
+
     console.log(`[Flavor Customizer] Successfully generated valid Android AAPT2 resources and notification icons for ${config.name}.`);
   } catch (err) {
     console.warn('[Flavor Customizer] Resource configuration notice:', err.message);

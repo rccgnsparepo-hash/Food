@@ -174,8 +174,9 @@ jobs:
           # 5. Configure flavor-specific applicationId and Firebase dependencies in android/app/build.gradle
           APP_GRADLE="android/app/build.gradle"
           if [ -f "$APP_GRADLE" ]; then
-            # Update applicationId to matrix package_id
-            sed -i 's/applicationId "[^"]*"/applicationId "${{ matrix.package_id }}"/g' "$APP_GRADLE"
+            echo "Setting applicationId to ${{ matrix.package_id }} in $APP_GRADLE..."
+            sed -i -E 's/applicationId\s*=\s*\(?[^)\n]*\)?/applicationId = "${{ matrix.package_id }}"/g' "$APP_GRADLE"
+            sed -i -E 's/applicationId\s+"[^"]+"/applicationId "${{ matrix.package_id }}"/g' "$APP_GRADLE"
             
             # Ensure Firebase dependencies are present
             if ! grep -q "firebase-bom" "$APP_GRADLE"; then
@@ -187,7 +188,7 @@ jobs:
             fi
           fi
 
-          # 6. Apply Flavor-specific Branding (Icons, Colors, Strings)
+          # 6. Apply Flavor-specific Branding (Icons, Colors, Strings, and Gradle ID)
           node scripts/generate-flavor-icons.js ${{ matrix.flavor }}
 
           # 7. Ensure AndroidManifest.xml includes deep links and permissions
@@ -210,7 +211,7 @@ jobs:
         env:
           JAVA_HOME: ${{ env.JAVA_HOME }}
         run: |
-          echo "Building APK for ${{ matrix.flavor }} with Java: $JAVA_HOME"
+          echo "Building APK for ${{ matrix.flavor }} (Package: ${{ matrix.package_id }}) with Java: $JAVA_HOME"
           cd android
           
           # 1. Verify Gradle wrapper jar integrity and restore from official repository if corrupted or missing
@@ -232,9 +233,9 @@ jobs:
           fi
 
           if [ "$BUILD_TYPE" = "release" ]; then
-            $GRADLE_CMD assembleRelease --no-daemon --stacktrace || $GRADLE_CMD assembleDebug --no-daemon --stacktrace
+            $GRADLE_CMD assembleRelease -PapplicationId="${{ matrix.package_id }}" --no-daemon --stacktrace || $GRADLE_CMD assembleDebug -PapplicationId="${{ matrix.package_id }}" --no-daemon --stacktrace
           else
-            $GRADLE_CMD assembleDebug --no-daemon --stacktrace
+            $GRADLE_CMD assembleDebug -PapplicationId="${{ matrix.package_id }}" --no-daemon --stacktrace
           fi
 
       - name: 10. Prepare Artifact Package
