@@ -269,6 +269,22 @@ export const useNotificationStore = create<NotificationStoreState>((set, get) =>
                 );
                 triggerHapticNotification();
 
+                // Native Desktop & Electron Notification Dispatch
+                if (typeof window !== 'undefined') {
+                  try {
+                    if ((window as any).electronAPI?.showNotification) {
+                      (window as any).electronAPI.showNotification({
+                        title: item.title,
+                        body: item.body
+                      });
+                    } else if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+                      new Notification(item.title, { body: item.body });
+                    }
+                  } catch (e) {
+                    // Non-blocking notification dispatch
+                  }
+                }
+
                 toast.info(`🔔 ${item.title}`, {
                   description: item.body,
                   duration: 6000,

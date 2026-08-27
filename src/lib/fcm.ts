@@ -6,10 +6,15 @@ import { toast } from 'sonner';
 let messagingInstance: Messaging | null = null;
 
 /**
- * Register Service Worker for FCM Background Messages
+ * Register and wait for Service Worker to become ACTIVE for FCM & Web Push
  */
 export async function registerFcmServiceWorker(): Promise<ServiceWorkerRegistration | null> {
   if (typeof window === 'undefined' || !('serviceWorker' in navigator)) {
+    return null;
+  }
+
+  const isElectron = Boolean((window as any).electronAPI) || window.location.protocol === 'file:';
+  if (isElectron) {
     return null;
   }
 
@@ -17,10 +22,37 @@ export async function registerFcmServiceWorker(): Promise<ServiceWorkerRegistrat
     const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js', {
       scope: '/'
     });
-    console.log('[FCM] Service Worker registered successfully:', registration.scope);
+
+    // Wait until service worker is ready & active
+    await navigator.serviceWorker.ready;
+
+    // If registration.active is not immediately present, wait for state transition
+    if (!registration.active) {
+      await new Promise<void>((resolve) => {
+        const sw = registration.installing || registration.waiting;
+        if (!sw) {
+          resolve();
+          return;
+        }
+        if (sw.state === 'activated') {
+          resolve();
+          return;
+        }
+        const stateChangeHandler = () => {
+          if (sw.state === 'activated' || registration.active) {
+            sw.removeEventListener('statechange', stateChangeHandler);
+            resolve();
+          }
+        };
+        sw.addEventListener('statechange', stateChangeHandler);
+        setTimeout(resolve, 3000); // 3s fallback timeout
+      });
+    }
+
+    console.log('[FCM] Service Worker active and ready:', registration.scope);
     return registration;
   } catch (error) {
-    console.warn('[FCM] Service Worker registration failed:', error);
+    console.warn('[FCM] Service Worker registration notice:', error);
     return null;
   }
 }
@@ -32,13 +64,16 @@ export async function getFcmMessaging(): Promise<Messaging | null> {
   if (messagingInstance) return messagingInstance;
 
   try {
+    const isElectron = Boolean((window as any).electronAPI) || (typeof window !== 'undefined' && window.location.protocol === 'file:');
+    if (isElectron) return null;
+
     const supported = await isSupported();
     if (supported) {
       messagingInstance = getMessaging(app);
       return messagingInstance;
     }
   } catch (error) {
-    console.warn('[FCM] Firebase Messaging is not supported in this browser:', error);
+    console.warn('[FCM] Firebase Messaging is not supported in this environment:', error);
   }
   return null;
 }
@@ -50,6 +85,21 @@ export async function requestFCMToken(userId?: string, isUserInitiated: boolean 
   if (typeof window === 'undefined' || !('Notification' in window)) {
     if (isUserInitiated) {
       toast.error('Notifications are not supported in this browser.');
+    }
+    return null;
+  }
+
+  const isElectron = Boolean((window as any).electronAPI) || window.location.protocol === 'file:';
+  if (isElectron) {
+    if (isUserInitiated) {
+      try {
+        if (Notification.permission !== 'granted') {
+          await Notification.requestPermission();
+        }
+        toast.success('✓ Desktop Notifications are active.');
+      } catch (e) {
+        // Non-blocking
+      }
     }
     return null;
   }
@@ -91,8 +141,12 @@ export async function requestFCMToken(userId?: string, isUserInitiated: boolean 
     }
 
     const swRegistration = await registerFcmServiceWorker();
-    const messaging = await getFcmMessaging();
+    if (!swRegistration || !swRegistration.active) {
+      console.warn('[FCM] Active Service Worker not ready yet. Skipping token request for now.');
+      return null;
+    }
 
+    const messaging = await getFcmMessaging();
     if (!messaging) {
       if (isUserInitiated) {
         toast.info('Firebase Messaging instance unavailable. Standard in-app notifications are active.');
@@ -100,9 +154,9 @@ export async function requestFCMToken(userId?: string, isUserInitiated: boolean 
       return null;
     }
 
-    // Retrieve FCM token
+    // Retrieve FCM token with active service worker
     const token = await getToken(messaging, {
-      serviceWorkerRegistration: swRegistration || undefined
+      serviceWorkerRegistration: swRegistration
     });
 
     if (token) {
@@ -110,14 +164,18 @@ export async function requestFCMToken(userId?: string, isUserInitiated: boolean 
 
       // Save token to Firestore user profile if logged in
       if (userId) {
-        await setDoc(
-          doc(db, 'users', userId),
-          {
-            fcm_token: token,
-            fcm_updated_at: new Date().toISOString()
-          },
-          { merge: true }
-        );
+        try {
+          await setDoc(
+            doc(db, 'users', userId),
+            {
+              fcm_token: token,
+              fcm_updated_at: new Date().toISOString()
+            },
+            { merge: true }
+          );
+        } catch (dbErr) {
+          console.warn('[FCM] Failed to update user fcm_token in Firestore:', dbErr);
+        }
       }
 
       if (isUserInitiated) {
@@ -128,8 +186,8 @@ export async function requestFCMToken(userId?: string, isUserInitiated: boolean 
       console.warn('[FCM] No registration token available.');
       return null;
     }
-  } catch (error) {
-    console.error('[FCM] Error requesting FCM token:', error);
+  } catch (error: any) {
+    console.warn('[FCM] Token acquisition notice:', error?.message || error);
     if (isUserInitiated) {
       toast.error('Could not activate push notifications in this environment.');
     }
@@ -143,28 +201,36 @@ export async function requestFCMToken(userId?: string, isUserInitiated: boolean 
 export async function setupForegroundFCMListener(
   onNotification?: (title: string, body: string, data?: any) => void
 ) {
-  const messaging = await getFcmMessaging();
-  if (!messaging) return () => {};
+  try {
+    const messaging = await getFcmMessaging();
+    if (!messaging) return () => {};
 
-  const unsubscribe = onMessage(messaging, (payload) => {
-    console.log('[FCM] Foreground message received:', payload);
-    const title = payload.notification?.title || payload.data?.title || 'Order Update';
-    const body = payload.notification?.body || payload.data?.body || 'Your order status has changed!';
+    const unsubscribe = onMessage(messaging, (payload) => {
+      console.log('[FCM] Foreground message received:', payload);
+      const title = payload.notification?.title || payload.data?.title || 'Order Update';
+      const body = payload.notification?.body || payload.data?.body || 'Your order status has changed!';
 
-    if (onNotification) {
-      onNotification(title, body, payload.data);
-    } else {
-      // Default foreground behavior: show toast and trigger native browser Notification if permitted
-      toast.info(`🔔 ${title}: ${body}`);
-      if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
-        new Notification(title, {
-          body,
-          icon: '/favicon.ico',
-          tag: payload.data?.orderId || 'bukkit-order'
-        });
+      if (onNotification) {
+        onNotification(title, body, payload.data);
+      } else {
+        toast.info(`🔔 ${title}: ${body}`);
+        if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+          try {
+            new Notification(title, {
+              body,
+              icon: '/bukkit-icon.svg',
+              tag: payload.data?.orderId || 'bukkit-order'
+            });
+          } catch (nErr) {
+            // Non-blocking
+          }
+        }
       }
-    }
-  });
+    });
 
-  return unsubscribe;
+    return unsubscribe;
+  } catch (err) {
+    console.warn('[FCM] Error initializing foreground listener:', err);
+    return () => {};
+  }
 }

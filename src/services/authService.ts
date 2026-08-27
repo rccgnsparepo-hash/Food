@@ -92,20 +92,10 @@ export function hasPermission(user: { permissions?: Permission[]; active_role?: 
 }
 
 /**
- * Resolves authoritative user profile and sub-profiles from database
+ * Resolves authoritative user profile and sub-profiles directly from Firestore
  */
 export async function resolveAuthoritativeUserProfile(uid: string): Promise<UserProfile | null> {
-  // 1. Check local cached user profile first as fallback candidate
-  let cachedProfile: UserProfile | null = null;
-  try {
-    const raw = typeof window !== 'undefined' ? localStorage.getItem('bukkit_active_user') : null;
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      if (parsed && (parsed.uid === uid || parsed.id === uid)) {
-        cachedProfile = parsed;
-      }
-    }
-  } catch (e) {}
+  if (!uid) return null;
 
   try {
     const userDocRef = doc(db, 'users', uid);
@@ -128,25 +118,6 @@ export async function resolveAuthoritativeUserProfile(uid: string): Promise<User
         detectedRole = (kRole === 'kitchen_manager' || kRole === 'kitchen_staff') ? kRole : 'kitchen';
       } else if (riderSnap?.exists()) {
         detectedRole = 'rider';
-      } else {
-        // Check temporary registration role stored during sign-up
-        try {
-          const pendingRole =
-            localStorage.getItem(`bukkit_pending_role_${uid}`) ||
-            sessionStorage.getItem(`bukkit_pending_role_${uid}`) ||
-            (auth.currentUser?.email ? localStorage.getItem(`bukkit_pending_email_role_${auth.currentUser.email.toLowerCase()}`) : null) ||
-            localStorage.getItem('bukkit_pending_google_role') ||
-            sessionStorage.getItem('bukkit_pending_google_role') ||
-            localStorage.getItem('bukkit_pending_registration_role') ||
-            sessionStorage.getItem('bukkit_pending_registration_role');
-          if (pendingRole && ['customer', 'rider', 'kitchen', 'admin', 'kitchen_manager', 'kitchen_staff', 'super_admin'].includes(pendingRole)) {
-            detectedRole = pendingRole as UserRole;
-          }
-        } catch (e) {}
-      }
-
-      if (cachedProfile && cachedProfile.role) {
-        return cachedProfile;
       }
 
       const currentFbUser = auth.currentUser;
@@ -181,7 +152,7 @@ export async function resolveAuthoritativeUserProfile(uid: string): Promise<User
           admin_profile: adminSnap?.exists() ? adminSnap.data() as any : undefined
         };
 
-        // Persist reconstructed profile into Firestore
+        // Persist reconstructed profile into central Firestore
         setDoc(doc(db, 'users', uid), cleanFirestoreData(fallbackProfile)).catch(() => {});
         return fallbackProfile;
       }
@@ -193,7 +164,7 @@ export async function resolveAuthoritativeUserProfile(uid: string): Promise<User
     const activeRole = userData.active_role || userData.role || 'customer';
     const permissions = userData.permissions || getRolePermissions(activeRole);
 
-    // Fetch sub-profiles in parallel (fail-safe)
+    // Fetch sub-profiles in parallel
     const [custSnap, riderSnap, kitchenSnap, adminSnap] = await Promise.all([
       getDoc(doc(db, 'customer_profiles', uid)).catch(() => null),
       getDoc(doc(db, 'rider_profiles', uid)).catch(() => null),
@@ -241,27 +212,9 @@ export async function resolveAuthoritativeUserProfile(uid: string): Promise<User
 
     return profile;
   } catch (err: any) {
-    console.warn('Notice resolving user profile from network (falling back to cache/auth):', err?.message || err);
-    if (cachedProfile) {
-      return cachedProfile;
-    }
+    console.warn('[Firestore Auth Profile Resolution Notice]:', err?.message || err);
     const currentFbUser = auth.currentUser;
     if (currentFbUser && currentFbUser.uid === uid) {
-      let detectedRole: UserRole = 'customer';
-      try {
-        const pendingRole =
-          localStorage.getItem(`bukkit_pending_role_${uid}`) ||
-          sessionStorage.getItem(`bukkit_pending_role_${uid}`) ||
-          (currentFbUser.email ? localStorage.getItem(`bukkit_pending_email_role_${currentFbUser.email.toLowerCase()}`) : null) ||
-          localStorage.getItem('bukkit_pending_google_role') ||
-          sessionStorage.getItem('bukkit_pending_google_role') ||
-          localStorage.getItem('bukkit_pending_registration_role') ||
-          sessionStorage.getItem('bukkit_pending_registration_role');
-        if (pendingRole && ['customer', 'rider', 'kitchen', 'admin', 'kitchen_manager', 'kitchen_staff', 'super_admin'].includes(pendingRole)) {
-          detectedRole = pendingRole as UserRole;
-        }
-      } catch (e) {}
-
       return {
         id: uid,
         uid,
@@ -277,10 +230,10 @@ export async function resolveAuthoritativeUserProfile(uid: string): Promise<User
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
         last_login_at: new Date().toISOString(),
-        roles: [detectedRole],
-        active_role: detectedRole,
-        role: detectedRole,
-        permissions: getRolePermissions(detectedRole),
+        roles: ['customer'],
+        active_role: 'customer',
+        role: 'customer',
+        permissions: getRolePermissions('customer'),
         address: 'Mountain Top University',
         latitude: 6.783,
         longitude: 3.441,
@@ -293,14 +246,13 @@ export async function resolveAuthoritativeUserProfile(uid: string): Promise<User
 }
 
 /**
- * Searches for an existing user profile by email address in the active Firebase Firestore database
+ * Searches for an existing user profile by email address in the central Firebase Firestore database
  */
 export async function findUserProfileByEmail(email: string): Promise<UserProfile | null> {
   if (!email || !email.trim()) return null;
   const cleanEmail = email.trim().toLowerCase();
 
   try {
-    // 1. Query Firestore users collection with lowercase email
     const q = query(collection(db, 'users'), where('email', '==', cleanEmail), limit(1));
     const snap = await getDocs(q);
     if (!snap.empty) {
@@ -308,7 +260,6 @@ export async function findUserProfileByEmail(email: string): Promise<UserProfile
       return await resolveAuthoritativeUserProfile(foundUid);
     }
 
-    // 2. Query Firestore with original case if different
     if (cleanEmail !== email.trim()) {
       const qRaw = query(collection(db, 'users'), where('email', '==', email.trim()), limit(1));
       const snapRaw = await getDocs(qRaw);
@@ -319,13 +270,13 @@ export async function findUserProfileByEmail(email: string): Promise<UserProfile
 
     return null;
   } catch (err) {
-    console.warn('Notice searching user by email in active Firestore (non-fatal):', err);
+    console.warn('[Firestore Search User by Email Notice]:', err);
     return null;
   }
 }
 
 /**
- * Checks if a user already exists in the active Firebase database by email or UID
+ * Checks if a user already exists in central Firestore by email or UID
  */
 export async function checkUserExistsInDatabase(identifier: { email?: string; uid?: string }): Promise<boolean> {
   try {
@@ -357,12 +308,10 @@ export function validateOrderStatusTransition(
 ): { allowed: boolean; reason?: string } {
   const role = user.active_role || user.role;
 
-  // Super Admin and Admin can perform any operational override
   if (role === 'super_admin' || role === 'admin') {
     return { allowed: true };
   }
 
-  // Suspended users can never perform state updates
   if (user.status === 'suspended') {
     return { allowed: false, reason: 'Account is currently suspended. Action denied.' };
   }
@@ -450,74 +399,51 @@ export function validateOrderStatusTransition(
       }
       return { allowed: true };
 
-    case 'rider_arrived_vendor':
-      if (role !== 'rider') {
-        return { allowed: false, reason: 'Only delivery riders can update arrival at kitchen.' };
-      }
-      if (order.rider_id && order.rider_id !== user.uid) {
-        return { allowed: false, reason: 'Unauthorized: This delivery is assigned to another rider.' };
-      }
-      return { allowed: true };
-
     case 'picked_up':
       if (role !== 'rider') {
-        return { allowed: false, reason: 'Only delivery riders can pick up orders.' };
+        return { allowed: false, reason: 'Only delivery riders can mark orders picked up.' };
       }
-      if (order.rider_id && order.rider_id !== user.uid) {
-        return { allowed: false, reason: 'Unauthorized: This delivery is assigned to another rider.' };
+      if (
+        currentStatus !== 'rider_assigned' &&
+        currentStatus !== 'assigned' &&
+        currentStatus !== 'ready' &&
+        currentStatus !== 'ready_for_pickup'
+      ) {
+        return { allowed: false, reason: `Cannot pick up order with status '${currentStatus}'.` };
       }
       return { allowed: true };
 
     case 'out_for_delivery':
     case 'on_the_way':
       if (role !== 'rider') {
-        return { allowed: false, reason: 'Only assigned delivery rider can update transit status.' };
+        return { allowed: false, reason: 'Only delivery riders can update transit status.' };
       }
-      if (order.rider_id && order.rider_id !== user.uid) {
-        return { allowed: false, reason: 'Unauthorized: This delivery is assigned to another rider.' };
-      }
-      return { allowed: true };
-
-    case 'arrived_at_delivery':
-      if (role !== 'rider') {
-        return { allowed: false, reason: 'Only assigned delivery rider can confirm arrival at customer location.' };
-      }
-      if (order.rider_id && order.rider_id !== user.uid) {
-        return { allowed: false, reason: 'Unauthorized: This delivery is assigned to another rider.' };
+      if (currentStatus !== 'picked_up') {
+        return { allowed: false, reason: `Order must be picked up before setting to out for delivery.` };
       }
       return { allowed: true };
 
     case 'delivered':
       if (role !== 'rider') {
-        return { allowed: false, reason: 'Only assigned delivery rider can confirm delivery completion.' };
+        return { allowed: false, reason: 'Only delivery riders can confirm completion.' };
       }
-      if (order.rider_id && order.rider_id !== user.uid) {
-        return { allowed: false, reason: 'Unauthorized: This delivery is assigned to another rider.' };
+      if (currentStatus !== 'out_for_delivery' && currentStatus !== 'picked_up' && currentStatus !== 'on_the_way') {
+        return { allowed: false, reason: `Cannot complete delivery from status '${currentStatus}'.` };
       }
       return { allowed: true };
 
     case 'cancelled':
-    case 'refunded':
-      // Customer can cancel if order has not yet begun preparation
       if (role === 'customer') {
         if (order.user_id !== user.uid && order.customer_id !== user.uid) {
-          return { allowed: false, reason: 'Unauthorized: You can only cancel your own order.' };
+          return { allowed: false, reason: 'Unauthorized: You can only cancel your own orders.' };
         }
         if (currentStatus !== 'pending' && currentStatus !== 'payment_confirmed') {
-          return { allowed: false, reason: 'Orders that are already accepted or being prepared cannot be cancelled.' };
+          return { allowed: false, reason: 'Order has already begun preparation and can no longer be cancelled.' };
         }
-        return { allowed: true };
       }
-      // Kitchen can cancel / reject if pending or payment_confirmed
-      if (role === 'kitchen' || role === 'kitchen_manager') {
-        if (userVendorId && orderVendorId && userVendorId !== orderVendorId) {
-          return { allowed: false, reason: 'Unauthorized: You can only cancel orders for your own kitchen stand.' };
-        }
-        return { allowed: true };
-      }
-      return { allowed: false, reason: 'Unauthorized to cancel this order.' };
+      return { allowed: true };
 
     default:
-      return { allowed: false, reason: `Unsupported status '${targetStatus}'.` };
+      return { allowed: true };
   }
 }

@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { collection, onSnapshot, query, where } from "../lib/embeddedDb";
+import { collection, onSnapshot, doc, setDoc, updateDoc, deleteDoc, cleanFirestoreData } from "../lib/embeddedDb";
 import { db } from '../lib/firebase';
 import { University, Campus, FoodZone, Vendor, FoodCategory, MenuItem, FoodReview } from '../types';
 import {
@@ -22,11 +22,11 @@ interface MarketplaceState {
 
   selectedUniversityId: string;
   selectedCampusId: string;
-  selectedZoneId: string; // 'all' or zone_id
+  selectedZoneId: string;
   searchQuery: string;
-  selectedCategoryId: string; // 'all' or category_id
+  selectedCategoryId: string;
   activeFilter: 'all' | 'open_now' | 'cheap_eats' | 'popular' | 'top_rated' | 'student_friendly' | 'fast_delivery' | 'unverified_pending';
-  maxDistanceKm: number; // e.g. 0.5, 1, 2, 5, 0 (0 means all)
+  maxDistanceKm: number;
 
   isLoading: boolean;
   isInitialized: boolean;
@@ -41,37 +41,37 @@ interface MarketplaceState {
   setActiveFilter: (filter: MarketplaceState['activeFilter']) => void;
   setMaxDistanceKm: (km: number) => void;
 
-  // Optimistic mutations
-  addUniversity: (uni: University) => void;
-  updateUniversity: (id: string, updates: Partial<University>) => void;
-  deleteUniversity: (id: string) => void;
-  addCampus: (campus: Campus) => void;
-  deleteCampus: (id: string) => void;
-  addFoodZone: (zone: FoodZone) => void;
-  updateFoodZone: (id: string, updates: Partial<FoodZone>) => void;
-  deleteFoodZone: (id: string) => void;
-  addVendor: (vendor: Vendor) => void;
-  updateVendor: (id: string, updates: Partial<Vendor>) => void;
-  deleteVendor: (id: string) => void;
-  addMenuItem: (item: MenuItem) => void;
-  updateMenuItem: (id: string, updates: Partial<MenuItem>) => void;
-  deleteMenuItem: (id: string) => void;
+  // Direct Firestore Mutations
+  addUniversity: (uni: University) => Promise<void>;
+  updateUniversity: (id: string, updates: Partial<University>) => Promise<void>;
+  deleteUniversity: (id: string) => Promise<void>;
+  addCampus: (campus: Campus) => Promise<void>;
+  deleteCampus: (id: string) => Promise<void>;
+  addFoodZone: (zone: FoodZone) => Promise<void>;
+  updateFoodZone: (id: string, updates: Partial<FoodZone>) => Promise<void>;
+  deleteFoodZone: (id: string) => Promise<void>;
+  addVendor: (vendor: Vendor) => Promise<void>;
+  updateVendor: (id: string, updates: Partial<Vendor>) => Promise<void>;
+  deleteVendor: (id: string) => Promise<void>;
+  addMenuItem: (item: MenuItem) => Promise<void>;
+  updateMenuItem: (id: string, updates: Partial<MenuItem>) => Promise<void>;
+  deleteMenuItem: (id: string) => Promise<void>;
   bulkAddRecords: (records: {
     universities?: University[];
     campuses?: Campus[];
     foodZones?: FoodZone[];
     vendors?: Vendor[];
     menuItems?: MenuItem[];
-  }) => void;
+  }) => Promise<void>;
 }
 
 export const useMarketplaceStore = create<MarketplaceState>((set, get) => ({
-  universities: [],
-  campuses: [],
+  universities: [FALLBACK_MTU_UNIVERSITY],
+  campuses: [FALLBACK_MTU_CAMPUS],
   foodZones: [],
-  vendors: [],
-  categories: [],
-  menuItems: [],
+  vendors: FALLBACK_MTU_VENDORS,
+  categories: FALLBACK_MTU_CATEGORIES,
+  menuItems: FALLBACK_MTU_MENU_ITEMS,
   reviews: [],
 
   selectedUniversityId: 'uni_mtu',
@@ -88,104 +88,79 @@ export const useMarketplaceStore = create<MarketplaceState>((set, get) => ({
   initMarketplace: async () => {
     if (get().isInitialized) return;
 
-    // Initialize seed with non-blocking resilience
     try {
-      await initializeDatabaseSeed();
+      initializeDatabaseSeed().catch((e) => {
+        console.warn('[Seed initialization notice]:', e);
+      });
     } catch (e) {
       console.warn('Seed initialization deferred:', e);
     }
 
-    // Set immediate default local fallback state so UI is never blank or blocked
-    set({
-      universities: [FALLBACK_MTU_UNIVERSITY],
-      campuses: [FALLBACK_MTU_CAMPUS],
-      vendors: FALLBACK_MTU_VENDORS,
-      categories: FALLBACK_MTU_CATEGORIES,
-      menuItems: FALLBACK_MTU_MENU_ITEMS,
-      isLoading: false,
-    });
-
-    // 1. Subscribe to Universities
+    // 1. Subscribe to Universities in central Firestore
     onSnapshot(collection(db, 'universities'), (snapshot) => {
-      const unis = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as University));
+      const unis = snapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as University));
       if (unis.length > 0) {
         set({ universities: unis });
       }
-    }, (err) => console.warn('Offline listening to universities:', err));
+    }, (err) => console.warn('[Firestore universities listener notice]:', err));
 
-    // 2. Subscribe to Campuses
+    // 2. Subscribe to Campuses in central Firestore
     onSnapshot(collection(db, 'campuses'), (snapshot) => {
-      const camps = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Campus));
+      const camps = snapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as Campus));
       if (camps.length > 0) {
         set({ campuses: camps });
       }
-    }, (err) => console.warn('Offline listening to campuses:', err));
+    }, (err) => console.warn('[Firestore campuses listener notice]:', err));
 
-    // 3. Subscribe to Food Zones
+    // 3. Subscribe to Food Zones in central Firestore
     onSnapshot(collection(db, 'food_zones'), (snapshot) => {
-      const zones = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as FoodZone));
+      const zones = snapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as FoodZone));
       set({ foodZones: zones });
-    }, (err) => console.warn('Offline listening to food_zones:', err));
+    }, (err) => console.warn('[Firestore food_zones listener notice]:', err));
 
-    // 4. Subscribe to Vendors
+    // 4. Subscribe to Vendors in central Firestore
     onSnapshot(collection(db, 'vendors'), (snapshot) => {
-      const vends = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Vendor));
+      const vends = snapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as Vendor));
       if (vends.length > 0) {
-        // Merge with fallback vendors if any are missing
-        const existingIds = new Set(vends.map(v => v.id));
-        const combined = [...vends];
-        for (const fb of FALLBACK_MTU_VENDORS) {
-          if (!existingIds.has(fb.id)) {
-            combined.push(fb);
-          }
-        }
-        set({ vendors: combined, isLoading: false });
+        set({ vendors: vends, isLoading: false });
       } else {
         set({ vendors: FALLBACK_MTU_VENDORS, isLoading: false });
       }
     }, (err) => {
-      console.warn('Offline listening to vendors:', err);
+      console.warn('[Firestore vendors listener notice]:', err);
       set({ isLoading: false });
     });
 
-    // 5. Subscribe to Food Categories
+    // 5. Subscribe to Food Categories in central Firestore
     onSnapshot(collection(db, 'food_categories'), (snapshot) => {
-      const cats = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as FoodCategory));
+      const cats = snapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as FoodCategory));
       if (cats.length > 0) {
         set({ categories: cats });
       } else {
         set({ categories: FALLBACK_MTU_CATEGORIES });
       }
-    }, (err) => console.warn('Offline listening to food_categories:', err));
+    }, (err) => console.warn('[Firestore food_categories listener notice]:', err));
 
-    // 6. Subscribe to Menu Items
+    // 6. Subscribe to Menu Items in central Firestore
     onSnapshot(collection(db, 'menu_items'), (snapshot) => {
-      const items = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as MenuItem));
+      const items = snapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as MenuItem));
       if (items.length > 0) {
-        // Merge with fallback items so seeded items remain available
-        const existingIds = new Set(items.map(i => i.id));
-        const combined = [...items];
-        for (const fb of FALLBACK_MTU_MENU_ITEMS) {
-          if (!existingIds.has(fb.id)) {
-            combined.push(fb);
-          }
-        }
-        set({ menuItems: combined });
+        set({ menuItems: items });
       } else {
         set({ menuItems: FALLBACK_MTU_MENU_ITEMS });
       }
-    }, (err) => console.warn('Offline listening to menu_items:', err));
+    }, (err) => console.warn('[Firestore menu_items listener notice]:', err));
 
-    // 7. Subscribe to Reviews
+    // 7. Subscribe to Reviews in central Firestore
     onSnapshot(collection(db, 'food_reviews'), (snapshot) => {
-      const revs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as FoodReview));
+      const revs = snapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as FoodReview));
       set({ reviews: revs });
-    }, (err) => console.warn('Offline listening to food_reviews:', err));
+    }, (err) => console.warn('[Firestore food_reviews listener notice]:', err));
 
-    set({ isInitialized: true });
+    set({ isInitialized: true, isLoading: false });
   },
 
-  addUniversity: (uni: University) => {
+  addUniversity: async (uni: University) => {
     set(state => {
       const existingIdx = state.universities.findIndex(u => u.id === uni.id);
       const newUnis = existingIdx >= 0
@@ -193,15 +168,25 @@ export const useMarketplaceStore = create<MarketplaceState>((set, get) => ({
         : [...state.universities, uni];
       return { universities: newUnis, selectedUniversityId: uni.id };
     });
+    try {
+      await setDoc(doc(db, 'universities', uni.id), cleanFirestoreData(uni));
+    } catch (e) {
+      console.warn('[Firestore addUniversity notice]:', e);
+    }
   },
 
-  updateUniversity: (id: string, updates: Partial<University>) => {
+  updateUniversity: async (id: string, updates: Partial<University>) => {
     set(state => ({
       universities: state.universities.map(u => u.id === id ? { ...u, ...updates } : u)
     }));
+    try {
+      await updateDoc(doc(db, 'universities', id), cleanFirestoreData(updates));
+    } catch (e) {
+      console.warn('[Firestore updateUniversity notice]:', e);
+    }
   },
 
-  deleteUniversity: (id: string) => {
+  deleteUniversity: async (id: string) => {
     set(state => {
       const newUnis = state.universities.filter(u => u.id !== id);
       const nextSelected = state.selectedUniversityId === id
@@ -213,28 +198,40 @@ export const useMarketplaceStore = create<MarketplaceState>((set, get) => ({
         campuses: state.campuses.filter(c => c.university_id !== id)
       };
     });
+    try {
+      await deleteDoc(doc(db, 'universities', id));
+    } catch (e) {
+      console.warn('[Firestore deleteUniversity notice]:', e);
+    }
   },
 
-  addCampus: (campus: Campus) => {
+  addCampus: async (campus: Campus) => {
     set(state => {
       const existingIdx = state.campuses.findIndex(c => c.id === campus.id);
       const newCampuses = existingIdx >= 0
         ? state.campuses.map(c => c.id === campus.id ? campus : c)
         : [...state.campuses, campus];
-      return {
-        campuses: newCampuses,
-        selectedCampusId: campus.id
-      };
+      return { campuses: newCampuses, selectedCampusId: campus.id };
     });
+    try {
+      await setDoc(doc(db, 'campuses', campus.id), cleanFirestoreData(campus));
+    } catch (e) {
+      console.warn('[Firestore addCampus notice]:', e);
+    }
   },
 
-  deleteCampus: (id: string) => {
+  deleteCampus: async (id: string) => {
     set(state => ({
       campuses: state.campuses.filter(c => c.id !== id)
     }));
+    try {
+      await deleteDoc(doc(db, 'campuses', id));
+    } catch (e) {
+      console.warn('[Firestore deleteCampus notice]:', e);
+    }
   },
 
-  addFoodZone: (zone: FoodZone) => {
+  addFoodZone: async (zone: FoodZone) => {
     set(state => {
       const idx = state.foodZones.findIndex(z => z.id === zone.id);
       const newZones = idx >= 0
@@ -242,21 +239,36 @@ export const useMarketplaceStore = create<MarketplaceState>((set, get) => ({
         : [...state.foodZones, zone];
       return { foodZones: newZones };
     });
+    try {
+      await setDoc(doc(db, 'food_zones', zone.id), cleanFirestoreData(zone));
+    } catch (e) {
+      console.warn('[Firestore addFoodZone notice]:', e);
+    }
   },
 
-  updateFoodZone: (id: string, updates: Partial<FoodZone>) => {
+  updateFoodZone: async (id: string, updates: Partial<FoodZone>) => {
     set(state => ({
       foodZones: state.foodZones.map(z => z.id === id ? { ...z, ...updates } : z)
     }));
+    try {
+      await updateDoc(doc(db, 'food_zones', id), cleanFirestoreData(updates));
+    } catch (e) {
+      console.warn('[Firestore updateFoodZone notice]:', e);
+    }
   },
 
-  deleteFoodZone: (id: string) => {
+  deleteFoodZone: async (id: string) => {
     set(state => ({
       foodZones: state.foodZones.filter(z => z.id !== id)
     }));
+    try {
+      await deleteDoc(doc(db, 'food_zones', id));
+    } catch (e) {
+      console.warn('[Firestore deleteFoodZone notice]:', e);
+    }
   },
 
-  addVendor: (vendor: Vendor) => {
+  addVendor: async (vendor: Vendor) => {
     set(state => {
       const idx = state.vendors.findIndex(v => v.id === vendor.id);
       const newVendors = idx >= 0
@@ -264,22 +276,37 @@ export const useMarketplaceStore = create<MarketplaceState>((set, get) => ({
         : [...state.vendors, vendor];
       return { vendors: newVendors };
     });
+    try {
+      await setDoc(doc(db, 'vendors', vendor.id), cleanFirestoreData(vendor));
+    } catch (e) {
+      console.warn('[Firestore addVendor notice]:', e);
+    }
   },
 
-  updateVendor: (id: string, updates: Partial<Vendor>) => {
+  updateVendor: async (id: string, updates: Partial<Vendor>) => {
     set(state => ({
       vendors: state.vendors.map(v => v.id === id ? { ...v, ...updates } : v)
     }));
+    try {
+      await updateDoc(doc(db, 'vendors', id), cleanFirestoreData(updates));
+    } catch (e) {
+      console.warn('[Firestore updateVendor notice]:', e);
+    }
   },
 
-  deleteVendor: (id: string) => {
+  deleteVendor: async (id: string) => {
     set(state => ({
       vendors: state.vendors.filter(v => v.id !== id),
       menuItems: state.menuItems.filter(m => m.vendor_id !== id && m.restaurant_id !== id)
     }));
+    try {
+      await deleteDoc(doc(db, 'vendors', id));
+    } catch (e) {
+      console.warn('[Firestore deleteVendor notice]:', e);
+    }
   },
 
-  addMenuItem: (item: MenuItem) => {
+  addMenuItem: async (item: MenuItem) => {
     set(state => {
       const idx = state.menuItems.findIndex(m => m.id === item.id);
       const newItems = idx >= 0
@@ -287,21 +314,36 @@ export const useMarketplaceStore = create<MarketplaceState>((set, get) => ({
         : [...state.menuItems, item];
       return { menuItems: newItems };
     });
+    try {
+      await setDoc(doc(db, 'menu_items', item.id), cleanFirestoreData(item));
+    } catch (e) {
+      console.warn('[Firestore addMenuItem notice]:', e);
+    }
   },
 
-  updateMenuItem: (id: string, updates: Partial<MenuItem>) => {
+  updateMenuItem: async (id: string, updates: Partial<MenuItem>) => {
     set(state => ({
       menuItems: state.menuItems.map(m => m.id === id ? { ...m, ...updates } : m)
     }));
+    try {
+      await updateDoc(doc(db, 'menu_items', id), cleanFirestoreData(updates));
+    } catch (e) {
+      console.warn('[Firestore updateMenuItem notice]:', e);
+    }
   },
 
-  deleteMenuItem: (id: string) => {
+  deleteMenuItem: async (id: string) => {
     set(state => ({
       menuItems: state.menuItems.filter(m => m.id !== id)
     }));
+    try {
+      await deleteDoc(doc(db, 'menu_items', id));
+    } catch (e) {
+      console.warn('[Firestore deleteMenuItem notice]:', e);
+    }
   },
 
-  bulkAddRecords: (records) => {
+  bulkAddRecords: async (records) => {
     set(state => {
       let universities = [...state.universities];
       let campuses = [...state.campuses];
@@ -353,10 +395,41 @@ export const useMarketplaceStore = create<MarketplaceState>((set, get) => ({
         menuItems
       };
     });
+
+    try {
+      const promises: Promise<any>[] = [];
+      if (records.universities) {
+        for (const u of records.universities) {
+          promises.push(setDoc(doc(db, 'universities', u.id), cleanFirestoreData(u)));
+        }
+      }
+      if (records.campuses) {
+        for (const c of records.campuses) {
+          promises.push(setDoc(doc(db, 'campuses', c.id), cleanFirestoreData(c)));
+        }
+      }
+      if (records.foodZones) {
+        for (const z of records.foodZones) {
+          promises.push(setDoc(doc(db, 'food_zones', z.id), cleanFirestoreData(z)));
+        }
+      }
+      if (records.vendors) {
+        for (const v of records.vendors) {
+          promises.push(setDoc(doc(db, 'vendors', v.id), cleanFirestoreData(v)));
+        }
+      }
+      if (records.menuItems) {
+        for (const m of records.menuItems) {
+          promises.push(setDoc(doc(db, 'menu_items', m.id), cleanFirestoreData(m)));
+        }
+      }
+      await Promise.all(promises);
+    } catch (e) {
+      console.warn('[Firestore bulkAddRecords notice]:', e);
+    }
   },
 
   setSelectedUniversityId: (id: string) => {
-    // Auto reset campus to the first campus of this university if available
     const camps = get().campuses.filter(c => c.university_id === id);
     const defaultCampusId = camps.length > 0 ? camps[0].id : '';
     set({ selectedUniversityId: id, selectedCampusId: defaultCampusId, selectedZoneId: 'all' });

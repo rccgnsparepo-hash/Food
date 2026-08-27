@@ -23,8 +23,12 @@ export function urlBase64ToUint8Array(base64String: string): Uint8Array {
  * Check if Web Push and Service Worker are supported in the current environment
  */
 export function isWebPushSupported(): boolean {
+  if (typeof window === 'undefined') return false;
+  // Electron environment uses Native System Notification
+  if (Boolean((window as any).electronAPI) || window.location.protocol === 'file:') {
+    return typeof Notification !== 'undefined';
+  }
   return (
-    typeof window !== 'undefined' &&
     'serviceWorker' in navigator &&
     'PushManager' in window &&
     'Notification' in window
@@ -35,7 +39,9 @@ export function isWebPushSupported(): boolean {
  * Get current active Web Push Subscription if any
  */
 export async function getExistingWebPushSubscription(): Promise<PushSubscription | null> {
-  if (!isWebPushSupported()) return null;
+  if (!isWebPushSupported() || typeof navigator === 'undefined' || !('serviceWorker' in navigator)) {
+    return null;
+  }
 
   try {
     const registration = await navigator.serviceWorker.getRegistration();
@@ -55,6 +61,28 @@ export async function registerWebPush(
   role: NotificationAppType = 'CUSTOMER',
   isUserInitiated: boolean = false
 ): Promise<PushSubscription | null> {
+  if (typeof window === 'undefined') return null;
+
+  const isElectron = Boolean((window as any).electronAPI) || window.location.protocol === 'file:';
+
+  // 1. Electron Desktop Native Notification handling
+  if (isElectron) {
+    try {
+      if (typeof Notification !== 'undefined' && Notification.permission !== 'granted') {
+        const perm = await Notification.requestPermission();
+        if (perm === 'granted' && isUserInitiated) {
+          toast.success('✓ Desktop Notifications enabled successfully!');
+        }
+      } else if (isUserInitiated) {
+        toast.success('✓ Desktop Notifications are active.');
+      }
+      return null;
+    } catch (e) {
+      console.warn('[WebPush Client] Electron notification permission notice:', e);
+      return null;
+    }
+  }
+
   if (!isWebPushSupported()) {
     if (isUserInitiated) {
       toast.error('Web Push Notifications are not supported on this browser or platform.');
@@ -107,7 +135,8 @@ export async function registerWebPush(
       // 1. Fetch VAPID Public Key from authoritative server
       const keyResult = await apiFetchJson<{ success: boolean; publicKey: string }>('/api/webpush/vapid-public-key');
       if (!keyResult.ok || !keyResult.data?.success || !keyResult.data?.publicKey) {
-        throw new Error(keyResult.error || 'Could not retrieve VAPID Public Key from server');
+        console.warn('[WebPush Client] VAPID Key unavailable:', keyResult.error);
+        return null;
       }
 
       const applicationServerKey = urlBase64ToUint8Array(keyResult.data.publicKey);
@@ -177,7 +206,7 @@ export async function registerWebPush(
         try {
           await setDoc(doc(db, 'users', userId, 'pushSubscriptions', subId), subRecord, { merge: true });
         } catch (e) {
-          // Embedded DB fallback
+          // Non-blocking
         }
       }
 
@@ -203,7 +232,7 @@ export async function registerWebPush(
  * Unsubscribe from Web Push
  */
 export async function unsubscribeWebPush(userId?: string): Promise<boolean> {
-  if (!isWebPushSupported()) return false;
+  if (!isWebPushSupported() || typeof navigator === 'undefined' || !('serviceWorker' in navigator)) return false;
 
   try {
     const registration = await navigator.serviceWorker.ready;

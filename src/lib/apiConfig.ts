@@ -1,13 +1,14 @@
 import { Capacitor } from '@capacitor/core';
+import { auth } from './firebase';
 
 /**
- * Authoritative Backend Production Base URL for Native Android APKs & Cloud Sync
+ * Authoritative Backend Production Base URL for Native Android APKs, Electron Desktop EXE & Cloud Sync
  */
 export const DEFAULT_PRODUCTION_BACKEND_URL =
-  'https://ais-dev-nxj4dis7zld3t6vcse6vjb-915023145069.europe-west2.run.app';
+  'https://ais-pre-nxj4dis7zld3t6vcse6vjb-915023145069.europe-west2.run.app';
 
 /**
- * Resolve the appropriate API Base URL for Web and Native Android APKs
+ * Resolve the appropriate API Base URL for Web, Desktop EXE and Native Android APKs
  */
 export function getApiBaseUrl(): string {
   if (typeof window === 'undefined') return '';
@@ -18,17 +19,47 @@ export function getApiBaseUrl(): string {
     return envUrl.replace(/\/+$/, '');
   }
 
-  // 2. Native Capacitor App (Android / iOS)
+  // 2. Localhost or standard HTTP origin (e.g. Vite dev or local Express backend on port 3000)
+  if (
+    typeof window.location !== 'undefined' &&
+    window.location.origin &&
+    window.location.origin.startsWith('http') &&
+    (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+  ) {
+    return window.location.origin;
+  }
+
+  // 3. Web Browser with active HTTP/HTTPS origin
+  if (
+    typeof window.location !== 'undefined' &&
+    window.location.origin &&
+    window.location.origin.startsWith('http') &&
+    window.location.protocol !== 'file:' &&
+    window.location.protocol !== 'capacitor:' &&
+    window.location.protocol !== 'ionic:'
+  ) {
+    return '';
+  }
+
+  // 4. Native Capacitor App (Android / iOS) or Electron Desktop App loaded from file://
+  const isElectron =
+    typeof navigator !== 'undefined' &&
+    (/electron/i.test(navigator.userAgent) || Boolean((window as any).electronAPI));
+
   if (
     Capacitor.isNativePlatform() ||
     window.location.protocol === 'capacitor:' ||
     window.location.protocol === 'ionic:' ||
-    window.location.protocol === 'file:'
+    window.location.protocol === 'file:' ||
+    isElectron
   ) {
+    // If running in local desktop server test
+    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+      return 'http://localhost:3000';
+    }
     return DEFAULT_PRODUCTION_BACKEND_URL;
   }
 
-  // 3. Standard Web Browser Environment (all ports & hosts) - Relative URLs talk directly to current server
   return '';
 }
 
@@ -42,11 +73,33 @@ export function apiUrl(endpoint: string): string {
 }
 
 /**
- * Standardized API fetch wrapper ensuring proper URLs and headers across Web and Native APKs
+ * Standardized API fetch wrapper ensuring proper URLs, Bearer Auth headers, and error handling across Web, Desktop EXE and Native APKs
  */
 export async function apiFetch(endpoint: string, init?: RequestInit): Promise<Response> {
   const fullUrl = apiUrl(endpoint);
-  return fetch(fullUrl, init);
+  const headers = new Headers(init?.headers || {});
+  
+  // Ensure JSON acceptance
+  if (!headers.has('Accept')) {
+    headers.set('Accept', 'application/json, text/plain, */*');
+  }
+
+  // Attach Firebase Auth Bearer token if user is signed in
+  if (!headers.has('Authorization') && auth?.currentUser) {
+    try {
+      const token = await auth.currentUser.getIdToken();
+      if (token) {
+        headers.set('Authorization', `Bearer ${token}`);
+      }
+    } catch {
+      // Non-blocking token retrieval
+    }
+  }
+
+  return fetch(fullUrl, {
+    ...init,
+    headers
+  });
 }
 
 /**
@@ -84,7 +137,6 @@ export async function apiFetchJson<T = any>(
 
     return { ok: true, status: res.status, data: text as any };
   } catch (err: any) {
-    return { ok: false, status: 0, error: err.message || 'Network request failed' };
+    return { ok: false, status: 0, error: err?.message || 'Network request failed' };
   }
 }
-
