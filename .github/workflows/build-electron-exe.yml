@@ -56,8 +56,9 @@ jobs:
         shell: pwsh
         run: |
           Write-Host "Installing dependencies on Windows runner..."
-          npm install --no-audit --no-fund --legacy-peer-deps
-          npm install --save-optional --no-save @rollup/rollup-win32-x64-msvc @esbuild/win32-x64
+          npm install --no-audit --no-fund --legacy-peer-deps --include=optional
+          Write-Host "Ensuring Windows platform-specific binaries are resolved..."
+          npm install --no-save --save-optional @rollup/rollup-win32-x64-msvc @esbuild/win32-x64 lightningcss-win32-x64-msvc @tailwindcss/oxide-win32-x64-msvc || true
 
       - name: 4. Ensure Electron & Electron-Builder Tools
         shell: pwsh
