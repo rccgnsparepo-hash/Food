@@ -122,30 +122,41 @@ export async function registerWebPush(
       return null;
     }
 
+    // Fetch authoritative VAPID Public Key from server
+    const keyResult = await apiFetchJson<{ success: boolean; publicKey: string }>('/api/webpush/vapid-public-key');
+    if (!keyResult.ok || !keyResult.data?.success || !keyResult.data?.publicKey) {
+      console.warn('[WebPush Client] VAPID Key unavailable:', keyResult.error);
+      return null;
+    }
+
+    const applicationServerKey = urlBase64ToUint8Array(keyResult.data.publicKey);
+
     // Register or get active service worker
     const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js', {
       scope: '/'
     });
     await navigator.serviceWorker.ready;
 
-    // Check if already subscribed
+    // Check existing subscription
     let subscription = await registration.pushManager.getSubscription();
 
     if (!subscription) {
-      // 1. Fetch VAPID Public Key from authoritative server
-      const keyResult = await apiFetchJson<{ success: boolean; publicKey: string }>('/api/webpush/vapid-public-key');
-      if (!keyResult.ok || !keyResult.data?.success || !keyResult.data?.publicKey) {
-        console.warn('[WebPush Client] VAPID Key unavailable:', keyResult.error);
-        return null;
+      try {
+        subscription = await registration.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: applicationServerKey as any
+        });
+      } catch (subErr) {
+        console.warn('[WebPush Client] Initial subscribe failed, attempting clean retry:', subErr);
+        const existing = await registration.pushManager.getSubscription();
+        if (existing) {
+          await existing.unsubscribe().catch(() => {});
+        }
+        subscription = await registration.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: applicationServerKey as any
+        });
       }
-
-      const applicationServerKey = urlBase64ToUint8Array(keyResult.data.publicKey);
-
-      // 2. Subscribe to PushManager
-      subscription = await registration.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: applicationServerKey as any
-      });
     }
 
     if (subscription) {

@@ -1,14 +1,14 @@
 import webpush from 'web-push';
 import { PushSubscriptionRecord, NotificationAppType } from '../types.ts';
 
-// Default generated VAPID Keypair for BUKKIT PWA & Web Push
-// Can be customized via environment variables VAPID_PUBLIC_KEY and VAPID_PRIVATE_KEY
+// Deterministic, RFC 8292 compliant VAPID Keypair for BUKKIT PWA & Web Push
+// Can be overridden via environment variables VAPID_PUBLIC_KEY and VAPID_PRIVATE_KEY
 const DEFAULT_VAPID_PUBLIC_KEY =
   process.env.VAPID_PUBLIC_KEY ||
-  'BCr18e6jW58b-Z4d9x7-bNq3B2F0rU2g9lZ5s1E7K3t4R0p8L6v2Q5z9X1m7W3j2Y8n0K4v6T1q9Z2x5V8c4B7M=';
+  'BPxivn5IjNTybe5RKOPhjXJ5xoiOJxA7S2PgPBj3XRq9EPGJgUZx-pyRb6_eWbs5wsosT8I0FZsXc3-JTP03QD8';
 const DEFAULT_VAPID_PRIVATE_KEY =
   process.env.VAPID_PRIVATE_KEY ||
-  'eQ9b3F0rU2g9lZ5s1E7K3t4R0p8L6v2Q5z9X1m7W3j0=';
+  '0xYl8oKvUB-Ue4texbUDaBt3GTXIj1ah7Mdg8BRVp_w';
 const VAPID_EMAIL = process.env.VAPID_EMAIL || 'mailto:support@bukkit.mtu.edu.ng';
 
 // In-memory web push subscriptions storage (associated with users and devices)
@@ -22,26 +22,18 @@ export function initVapidKeys() {
   if (isVapidConfigured) return;
 
   try {
-    // If environment variables provided, use them; otherwise use generated pair
-    if (process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
-      activePublicKey = process.env.VAPID_PUBLIC_KEY;
-      activePrivateKey = process.env.VAPID_PRIVATE_KEY;
-    } else {
-      const generated = webpush.generateVAPIDKeys();
-      activePublicKey = generated.publicKey;
-      activePrivateKey = generated.privateKey;
-    }
+    activePublicKey = process.env.VAPID_PUBLIC_KEY || DEFAULT_VAPID_PUBLIC_KEY;
+    activePrivateKey = process.env.VAPID_PRIVATE_KEY || DEFAULT_VAPID_PRIVATE_KEY;
 
     webpush.setVapidDetails(VAPID_EMAIL, activePublicKey, activePrivateKey);
     isVapidConfigured = true;
-    console.log('[WebPush Server] VAPID push service initialized successfully');
+    console.log('[WebPush Server] VAPID push service initialized successfully with persistent keys');
   } catch (err) {
     console.warn('[WebPush Server] VAPID initialization warning:', err);
     try {
-      const generated = webpush.generateVAPIDKeys();
-      activePublicKey = generated.publicKey;
-      activePrivateKey = generated.privateKey;
-      webpush.setVapidDetails(VAPID_EMAIL, activePublicKey, activePrivateKey);
+      webpush.setVapidDetails(VAPID_EMAIL, DEFAULT_VAPID_PUBLIC_KEY, DEFAULT_VAPID_PRIVATE_KEY);
+      activePublicKey = DEFAULT_VAPID_PUBLIC_KEY;
+      activePrivateKey = DEFAULT_VAPID_PRIVATE_KEY;
       isVapidConfigured = true;
     } catch (e2) {
       console.error('[WebPush Server] Fatal VAPID setup error:', e2);
@@ -198,12 +190,13 @@ export async function sendWebPushToSubscription(
     console.log(`[WebPush Server] Delivered push to ${sub.subscription_id} (${sub.platform})`);
     return true;
   } catch (err: any) {
-    // Check for 404/410 (Gone - subscription expired or revoked by user)
-    if (err.statusCode === 404 || err.statusCode === 410) {
-      console.warn(`[WebPush Server] Subscription ${sub.subscription_id} is expired (HTTP ${err.statusCode}). Cleaning up...`);
+    const statusCode = err.statusCode || err.status;
+    // Check for 400 (Bad Request / invalid key), 401/403 (Unauthorized / VAPID mismatch), 404/410 (Gone / unsubscribed)
+    if (statusCode === 400 || statusCode === 401 || statusCode === 403 || statusCode === 404 || statusCode === 410) {
+      console.log(`[WebPush Server] Subscription ${sub.subscription_id} is no longer valid on push service (HTTP ${statusCode}). Removing...`);
       removeWebPushSubscription(sub.subscription_id);
     } else {
-      console.warn(`[WebPush Server] Failed to deliver push to ${sub.subscription_id}:`, err.message || err);
+      console.warn(`[WebPush Server] Push notification notice for ${sub.subscription_id}:`, err.message || err);
     }
     return false;
   }

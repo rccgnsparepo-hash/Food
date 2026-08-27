@@ -1,222 +1,624 @@
+import { apiFetchJson } from './apiConfig';
+import {
+  FALLBACK_MTU_UNIVERSITY,
+  FALLBACK_MTU_CAMPUS,
+  FALLBACK_MTU_VENDORS,
+  FALLBACK_MTU_CATEGORIES,
+  FALLBACK_MTU_MENU_ITEMS
+} from '../services/seedService';
+
 /**
- * Authoritative Unified Firestore Engine
- * Provides direct, real-time access to the central Google Cloud Firestore database (bukkit-61aef)
- * with robust undefined-sanitization and offline tolerance across Web and Desktop EXE.
+ * Authoritative Embedded Database Engine
+ * Completely self-contained embedded backend store syncing with Node/Express `/api/db/*`,
+ * local storage, and real-time BroadcastChannel listeners across tabs, windows, and desktop EXE.
  */
 
-import {
-  doc as firestoreDoc,
-  getDoc as firestoreGetDoc,
-  setDoc as firestoreSetDoc,
-  updateDoc as firestoreUpdateDoc,
-  deleteDoc as firestoreDeleteDoc,
-  collection as firestoreCollection,
-  addDoc as firestoreAddDoc,
-  query as firestoreQuery,
-  where as firestoreWhere,
-  orderBy as firestoreOrderBy,
-  limit as firestoreLimit,
-  getDocs as firestoreGetDocs,
-  onSnapshot as firestoreOnSnapshot,
-  runTransaction as firestoreRunTransaction,
-  serverTimestamp as firestoreServerTimestamp,
-  increment as firestoreIncrement,
-  arrayUnion as firestoreArrayUnion,
-  arrayRemove as firestoreArrayRemove,
-  Timestamp,
-  DocumentReference,
-  CollectionReference,
-  Query,
-  SetOptions,
-  UpdateData,
-  Firestore,
-  QueryConstraint
-} from 'firebase/firestore';
-import { db, cleanFirestoreData } from './firebase';
+export interface DocumentSnapshot<T = any> {
+  id: string;
+  exists: () => boolean;
+  data: () => T | undefined;
+}
 
-export {
-  Timestamp,
-  cleanFirestoreData
+export interface QuerySnapshot<T = any> {
+  empty: boolean;
+  size: number;
+  docs: DocumentSnapshot<T>[];
+  forEach: (callback: (doc: DocumentSnapshot<T>) => void) => void;
+}
+
+export interface DocumentReference<T = any> {
+  id: string;
+  path: string;
+  parent: CollectionReference<T>;
+  type: 'document';
+}
+
+export interface CollectionReference<T = any> {
+  id: string;
+  path: string;
+  type: 'collection';
+}
+
+export interface QueryConstraint {
+  type: 'where' | 'orderBy' | 'limit';
+  field?: string;
+  op?: string;
+  value?: any;
+  direction?: 'asc' | 'desc';
+  limitCount?: number;
+}
+
+export interface Query<T = any> {
+  collectionPath: string;
+  constraints: QueryConstraint[];
+}
+
+export type SetOptions = { merge?: boolean };
+export type UpdateData<T = any> = Partial<T>;
+
+const STORAGE_KEY = 'bukkit_embedded_local_store';
+let inMemoryStore: Record<string, Record<string, any>> = {};
+
+// Initialize inMemoryStore from localStorage or default seed
+try {
+  if (typeof window !== 'undefined' && window.localStorage) {
+    const raw = window.localStorage.getItem(STORAGE_KEY);
+    if (raw) {
+      inMemoryStore = JSON.parse(raw);
+    }
+  }
+} catch (e) {
+  console.warn('[EmbeddedDb] Cache load notice:', e);
+}
+
+// Ensure default fallback data is populated if empty
+function ensureSeedData() {
+  if (!inMemoryStore['universities'] || Object.keys(inMemoryStore['universities']).length === 0) {
+    inMemoryStore['universities'] = { [FALLBACK_MTU_UNIVERSITY.id]: FALLBACK_MTU_UNIVERSITY };
+  }
+  if (!inMemoryStore['campuses'] || Object.keys(inMemoryStore['campuses']).length === 0) {
+    inMemoryStore['campuses'] = { [FALLBACK_MTU_CAMPUS.id]: FALLBACK_MTU_CAMPUS };
+  }
+  if (!inMemoryStore['vendors'] || Object.keys(inMemoryStore['vendors']).length === 0) {
+    inMemoryStore['vendors'] = {};
+    for (const v of FALLBACK_MTU_VENDORS) {
+      inMemoryStore['vendors'][v.id] = v;
+    }
+  }
+  if (!inMemoryStore['food_categories'] || Object.keys(inMemoryStore['food_categories']).length === 0) {
+    inMemoryStore['food_categories'] = {};
+    for (const c of FALLBACK_MTU_CATEGORIES) {
+      inMemoryStore['food_categories'][c.id] = c;
+    }
+  }
+  if (!inMemoryStore['menu_items'] || Object.keys(inMemoryStore['menu_items']).length === 0) {
+    inMemoryStore['menu_items'] = {};
+    for (const m of FALLBACK_MTU_MENU_ITEMS) {
+      inMemoryStore['menu_items'][m.id] = m;
+    }
+  }
+}
+ensureSeedData();
+
+// Persist inMemoryStore to localStorage
+function persistLocal() {
+  try {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(inMemoryStore));
+    }
+  } catch {}
+}
+
+// Broadcast Channel for live multi-tab & multi-window sync
+let broadcastChannel: BroadcastChannel | null = null;
+try {
+  if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
+    broadcastChannel = new BroadcastChannel('bukkit_embedded_db_sync');
+    broadcastChannel.onmessage = (event) => {
+      const { type, collection: col, id, data, isDelete } = event.data || {};
+      if (type === 'DB_MUTATION' && col && id) {
+        if (!inMemoryStore[col]) inMemoryStore[col] = {};
+        if (isDelete) {
+          delete inMemoryStore[col][id];
+        } else {
+          inMemoryStore[col][id] = data;
+        }
+        persistLocal();
+        notifyDocListeners(col, id);
+        notifyColListeners(col);
+      }
+    };
+  }
+} catch {}
+
+function broadcastMutation(col: string, id: string, data: any, isDelete = false) {
+  try {
+    if (broadcastChannel) {
+      broadcastChannel.postMessage({
+        type: 'DB_MUTATION',
+        collection: col,
+        id,
+        data,
+        isDelete
+      });
+    }
+  } catch {}
+}
+
+// Listener registries
+const docListeners = new Map<string, Set<(snap: DocumentSnapshot) => void>>();
+const colListeners = new Map<string, Set<(snap: QuerySnapshot) => void>>();
+
+function notifyDocListeners(col: string, id: string) {
+  const key = `${col}/${id}`;
+  const listeners = docListeners.get(key);
+  if (listeners && listeners.size > 0) {
+    const raw = inMemoryStore[col]?.[id];
+    const snap: DocumentSnapshot = {
+      id,
+      exists: () => Boolean(raw),
+      data: () => raw ? JSON.parse(JSON.stringify(raw)) : undefined
+    };
+    listeners.forEach(fn => {
+      try { fn(snap); } catch (e) { console.warn('[EmbeddedDb] Listener error:', e); }
+    });
+  }
+}
+
+function notifyColListeners(col: string) {
+  const listeners = colListeners.get(col);
+  if (listeners && listeners.size > 0) {
+    const colData = inMemoryStore[col] || {};
+    const docs = Object.entries(colData).map(([id, item]) => ({
+      id,
+      exists: () => true,
+      data: () => JSON.parse(JSON.stringify(item))
+    }));
+    const snap: QuerySnapshot = {
+      empty: docs.length === 0,
+      size: docs.length,
+      docs,
+      forEach: (cb) => docs.forEach(cb)
+    };
+    listeners.forEach(fn => {
+      try { fn(snap); } catch (e) { console.warn('[EmbeddedDb] Col listener error:', e); }
+    });
+  }
+}
+
+// Background sync from backend Express `/api/db/dump`
+let hasSyncedWithServer = false;
+export async function syncDatabaseWithServer(): Promise<void> {
+  try {
+    const res = await apiFetchJson<{ success: boolean; store: Record<string, Record<string, any>> }>('/api/db/dump');
+    if (res.ok && res.data?.store && typeof res.data.store === 'object') {
+      const serverStore = res.data.store;
+      let changed = false;
+      for (const [colName, colItems] of Object.entries(serverStore)) {
+        if (!inMemoryStore[colName]) inMemoryStore[colName] = {};
+        for (const [docId, docData] of Object.entries(colItems || {})) {
+          if (JSON.stringify(inMemoryStore[colName][docId]) !== JSON.stringify(docData)) {
+            inMemoryStore[colName][docId] = docData;
+            changed = true;
+          }
+        }
+      }
+      if (changed) {
+        persistLocal();
+        // Notify all active listeners
+        for (const col of colListeners.keys()) {
+          notifyColListeners(col);
+        }
+        for (const key of docListeners.keys()) {
+          const [col, id] = key.split('/');
+          notifyDocListeners(col, id);
+        }
+      }
+      hasSyncedWithServer = true;
+    }
+  } catch (err) {
+    // Non-blocking sync error
+  }
+}
+
+// Trigger initial background sync
+if (typeof window !== 'undefined') {
+  setTimeout(() => {
+    syncDatabaseWithServer().catch(() => {});
+  }, 100);
+}
+
+/**
+ * Standard undefined stripper
+ */
+export function cleanFirestoreData<T>(obj: T): T {
+  if (obj === null || obj === undefined) {
+    return null as any;
+  }
+  if (Array.isArray(obj)) {
+    return obj.map((item) => cleanFirestoreData(item)) as any;
+  }
+  if (typeof obj === 'object' && !(obj instanceof Date)) {
+    const cleaned: Record<string, any> = {};
+    for (const [key, value] of Object.entries(obj)) {
+      if (value !== undefined) {
+        cleaned[key] = cleanFirestoreData(value);
+      }
+    }
+    return cleaned as any;
+  }
+  return obj;
+}
+
+export const Timestamp = {
+  now: () => ({ toISOString: () => new Date().toISOString(), toMillis: () => Date.now(), seconds: Math.floor(Date.now() / 1000) }),
+  fromDate: (date: Date) => ({ toISOString: () => date.toISOString(), toMillis: () => date.getTime(), seconds: Math.floor(date.getTime() / 1000) }),
+  fromMillis: (ms: number) => ({ toISOString: () => new Date(ms).toISOString(), toMillis: () => ms, seconds: Math.floor(ms / 1000) })
 };
 
-export type { DocumentReference, CollectionReference, Query, SetOptions, UpdateData };
+export const serverTimestamp = () => new Date().toISOString();
+export const increment = (n: number) => (current: number = 0) => (current || 0) + n;
+export const arrayUnion = (...items: any[]) => items;
+export const arrayRemove = (...items: any[]) => items;
 
-/**
- * Standard doc reference generator ensuring valid Firestore instance
- */
-export function doc(
-  dbOrColOrPath: any,
-  ...pathSegments: string[]
-): DocumentReference {
-  if (!dbOrColOrPath) {
-    if (pathSegments.length >= 2) {
-      return (firestoreDoc as any)(db, pathSegments[0], ...pathSegments.slice(1));
-    }
-    return (firestoreDoc as any)(db, pathSegments[0] || 'default');
-  }
+export const db: any = {
+  type: 'embedded',
+  name: 'bukkit_embedded_database'
+};
+
+export function doc(dbOrColOrPath: any, ...pathSegments: string[]): DocumentReference {
+  let col = '';
+  let id = '';
+
   if (typeof dbOrColOrPath === 'string') {
-    return (firestoreDoc as any)(db, dbOrColOrPath, ...pathSegments);
+    if (pathSegments.length === 0) {
+      const parts = dbOrColOrPath.split('/').filter(Boolean);
+      col = parts[0] || 'default';
+      id = parts[1] || `doc_${Date.now()}`;
+    } else {
+      col = dbOrColOrPath;
+      id = pathSegments[0];
+    }
+  } else if (dbOrColOrPath?.type === 'collection') {
+    col = dbOrColOrPath.path || dbOrColOrPath.id;
+    id = pathSegments[0] || `doc_${Date.now()}`;
+  } else {
+    col = pathSegments[0] || 'default';
+    id = pathSegments[1] || `doc_${Date.now()}`;
   }
-  if (dbOrColOrPath.firestore || (dbOrColOrPath.type === 'firestore' || typeof dbOrColOrPath.app !== 'undefined')) {
-    return (firestoreDoc as any)(dbOrColOrPath as Firestore, pathSegments[0], ...pathSegments.slice(1));
-  }
-  return (firestoreDoc as any)(dbOrColOrPath, ...pathSegments);
+
+  const colRef: CollectionReference = {
+    id: col,
+    path: col,
+    type: 'collection'
+  };
+
+  return {
+    id,
+    path: `${col}/${id}`,
+    parent: colRef,
+    type: 'document'
+  };
 }
 
-/**
- * Standard collection reference generator ensuring valid Firestore instance
- */
-export function collection(
-  dbOrPath: any,
-  ...pathSegments: string[]
-): CollectionReference {
-  if (!dbOrPath) {
-    return (firestoreCollection as any)(db, pathSegments[0], ...pathSegments.slice(1));
-  }
+export function collection(dbOrPath: any, ...pathSegments: string[]): CollectionReference {
+  let col = '';
   if (typeof dbOrPath === 'string') {
-    return (firestoreCollection as any)(db, dbOrPath, ...pathSegments);
+    col = dbOrPath;
+  } else {
+    col = pathSegments[0] || 'default';
   }
-  if (dbOrPath.firestore || (dbOrPath.type === 'firestore' || typeof dbOrPath.app !== 'undefined')) {
-    return (firestoreCollection as any)(dbOrPath as Firestore, pathSegments[0], ...pathSegments.slice(1));
-  }
-  return (firestoreCollection as any)(dbOrPath, ...pathSegments);
+  return {
+    id: col,
+    path: col,
+    type: 'collection'
+  };
 }
 
-/**
- * Get document snapshot from central Firestore
- */
-export async function getDoc(docRef: DocumentReference): Promise<any> {
-  return firestoreGetDoc(docRef);
+export async function getDoc<T = any>(docRef: DocumentReference<T>): Promise<DocumentSnapshot<T>> {
+  const col = docRef.parent?.path || docRef.parent?.id || docRef.path.split('/')[0];
+  const id = docRef.id;
+
+  let existing = inMemoryStore[col]?.[id];
+
+  // If not found in local memory cache, try fetching from backend Express API
+  if (!existing) {
+    try {
+      const res = await apiFetchJson<{ success: boolean; data: any }>(`/api/db/${col}/${id}`);
+      if (res.ok && res.data?.data) {
+        if (!inMemoryStore[col]) inMemoryStore[col] = {};
+        inMemoryStore[col][id] = res.data.data;
+        existing = res.data.data;
+        persistLocal();
+      }
+    } catch {}
+  }
+
+  return {
+    id,
+    exists: () => Boolean(existing),
+    data: () => existing ? JSON.parse(JSON.stringify(existing)) : undefined
+  };
 }
 
-/**
- * Set document data in central Firestore with automatic undefined cleanup
- */
 export async function setDoc<T = any>(
   docRef: DocumentReference<T>,
   data: Partial<T> | T | any,
   options?: SetOptions
 ): Promise<void> {
+  const col = docRef.parent?.path || docRef.parent?.id || docRef.path.split('/')[0];
+  const id = docRef.id;
+
+  if (!inMemoryStore[col]) inMemoryStore[col] = {};
+
   const cleaned = cleanFirestoreData(data);
-  if (options) {
-    return firestoreSetDoc(docRef as any, cleaned as any, options);
-  }
-  return firestoreSetDoc(docRef as any, cleaned as any);
+  const existing = inMemoryStore[col][id] || {};
+  const merged = options?.merge ? { ...existing, ...cleaned, id } : { ...cleaned, id };
+
+  inMemoryStore[col][id] = merged;
+  persistLocal();
+
+  // Notify listeners and broadcast
+  notifyDocListeners(col, id);
+  notifyColListeners(col);
+  broadcastMutation(col, id, merged, false);
+
+  // Sync to backend Express server
+  apiFetchJson(`/api/db/${col}/${id}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(merged)
+  }).catch(() => {});
 }
 
-/**
- * Update document data in central Firestore with automatic undefined cleanup
- */
 export async function updateDoc<T = any>(
   docRef: DocumentReference<T>,
   data: UpdateData<T> | Partial<T> | any
 ): Promise<void> {
+  const col = docRef.parent?.path || docRef.parent?.id || docRef.path.split('/')[0];
+  const id = docRef.id;
+
+  if (!inMemoryStore[col]) inMemoryStore[col] = {};
+
   const cleaned = cleanFirestoreData(data);
-  return firestoreUpdateDoc(docRef as any, cleaned as any);
+  const existing = inMemoryStore[col][id] || {};
+  const merged = { ...existing, ...cleaned, id };
+
+  inMemoryStore[col][id] = merged;
+  persistLocal();
+
+  notifyDocListeners(col, id);
+  notifyColListeners(col);
+  broadcastMutation(col, id, merged, false);
+
+  apiFetchJson(`/api/db/${col}/${id}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(merged)
+  }).catch(() => {});
 }
 
-/**
- * Delete document from central Firestore
- */
 export async function deleteDoc(docRef: DocumentReference): Promise<void> {
-  return firestoreDeleteDoc(docRef);
+  const col = docRef.parent?.path || docRef.parent?.id || docRef.path.split('/')[0];
+  const id = docRef.id;
+
+  if (inMemoryStore[col]?.[id]) {
+    delete inMemoryStore[col][id];
+    persistLocal();
+
+    notifyDocListeners(col, id);
+    notifyColListeners(col);
+    broadcastMutation(col, id, null, true);
+
+    apiFetchJson(`/api/db/${col}/${id}`, {
+      method: 'DELETE'
+    }).catch(() => {});
+  }
 }
 
-/**
- * Add document to central Firestore collection with automatic undefined cleanup
- */
 export async function addDoc<T = any>(
   colRef: CollectionReference<T>,
   data: T | any
 ): Promise<DocumentReference<T>> {
-  const cleaned = cleanFirestoreData(data);
-  return firestoreAddDoc(colRef as any, cleaned as any) as any;
+  const col = colRef.path || colRef.id;
+  const id = data.id || `${col}_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+  const docRef = doc(col, id);
+  await setDoc(docRef, { ...data, id });
+  return docRef;
 }
 
-/**
- * Query builder for Firestore
- */
 export function query(
   queryTarget: CollectionReference | Query,
   ...queryConstraints: QueryConstraint[]
 ): Query {
-  return firestoreQuery(queryTarget as any, ...queryConstraints);
+  const collectionPath = (queryTarget as any).path || (queryTarget as any).collectionPath || (queryTarget as any).id;
+  const existingConstraints = (queryTarget as any).constraints || [];
+  return {
+    collectionPath,
+    constraints: [...existingConstraints, ...queryConstraints]
+  };
 }
 
-export function where(fieldPath: string, opStr: any, value: any): QueryConstraint {
-  return firestoreWhere(fieldPath, opStr, value);
+export function where(field: string, op: string, value: any): QueryConstraint {
+  return { type: 'where', field, op, value };
 }
 
-export function orderBy(fieldPath: string, directionStr?: 'asc' | 'desc'): QueryConstraint {
-  return firestoreOrderBy(fieldPath, directionStr);
+export function orderBy(field: string, direction: 'asc' | 'desc' = 'asc'): QueryConstraint {
+  return { type: 'orderBy', field, direction };
 }
 
 export function limit(limitCount: number): QueryConstraint {
-  return firestoreLimit(limitCount);
+  return { type: 'limit', limitCount };
 }
 
-/**
- * Fetch documents matching query or collection
- */
-export async function getDocs(q: Query | CollectionReference): Promise<any> {
-  return firestoreGetDocs(q as any);
-}
+export async function getDocs<T = any>(qOrCol: CollectionReference<T> | Query<T>): Promise<QuerySnapshot<T>> {
+  const col = (qOrCol as any).collectionPath || (qOrCol as any).path || (qOrCol as any).id;
+  const constraints: QueryConstraint[] = (qOrCol as any).constraints || [];
 
-/**
- * Real-time onSnapshot listener for central Firestore
- */
-export function onSnapshot(
-  target: DocumentReference | CollectionReference | Query,
-  onNext: (snapshot: any) => void,
-  onError?: (error: any) => void
-): () => void {
-  try {
-    return firestoreOnSnapshot(
-      target as any,
-      (snap: any) => {
-        try {
-          onNext(snap);
-        } catch (callbackErr) {
-          console.error('[Firestore onSnapshot callback error]:', callbackErr);
+  if (!inMemoryStore[col]) {
+    inMemoryStore[col] = {};
+  }
+
+  let items = Object.values(inMemoryStore[col] || {});
+
+  // If local store is empty and not synced yet, attempt quick fetch from server
+  if (items.length === 0) {
+    try {
+      const res = await apiFetchJson<{ success: boolean; data: any[] }>(`/api/db/${col}`);
+      if (res.ok && Array.isArray(res.data?.data)) {
+        for (const it of res.data.data) {
+          if (it.id) inMemoryStore[col][it.id] = it;
         }
-      },
-      (err: any) => {
-        console.warn('[Firestore onSnapshot subscription warning]:', err);
-        if (onError) {
-          onError(err);
-        }
+        items = Object.values(inMemoryStore[col]);
+        persistLocal();
       }
-    );
-  } catch (err) {
-    console.warn('[Firestore onSnapshot initialization notice]:', err);
-    return () => {};
+    } catch {}
+  }
+
+  for (const c of constraints) {
+    if (c.type === 'where' && c.field) {
+      items = items.filter(it => {
+        const val = it[c.field!];
+        if (c.op === '==' || c.op === '===') return val === c.value;
+        if (c.op === '!=') return val !== c.value;
+        if (c.op === '>') return val > c.value;
+        if (c.op === '>=') return val >= c.value;
+        if (c.op === '<') return val < c.value;
+        if (c.op === '<=') return val <= c.value;
+        if (c.op === 'array-contains') return Array.isArray(val) && val.includes(c.value);
+        if (c.op === 'in') return Array.isArray(c.value) && c.value.includes(val);
+        return true;
+      });
+    } else if (c.type === 'orderBy' && c.field) {
+      items.sort((a, b) => {
+        const valA = a[c.field!] || '';
+        const valB = b[c.field!] || '';
+        if (valA < valB) return c.direction === 'desc' ? 1 : -1;
+        if (valA > valB) return c.direction === 'desc' ? -1 : 1;
+        return 0;
+      });
+    } else if (c.type === 'limit' && typeof c.limitCount === 'number') {
+      items = items.slice(0, c.limitCount);
+    }
+  }
+
+  const docs: DocumentSnapshot<T>[] = items.map(it => ({
+    id: it.id,
+    exists: () => true,
+    data: () => JSON.parse(JSON.stringify(it))
+  }));
+
+  return {
+    empty: docs.length === 0,
+    size: docs.length,
+    docs,
+    forEach: (cb) => docs.forEach(cb)
+  };
+}
+
+export function onSnapshot(
+  target: DocumentReference | CollectionReference | Query | any,
+  onNext: (snap: any) => void,
+  onError?: (err: any) => void
+): () => void {
+  const isDoc = target.type === 'document' || target.path?.includes('/');
+
+  if (isDoc) {
+    const col = target.parent?.path || target.parent?.id || target.path.split('/')[0];
+    const id = target.id || target.path.split('/')[1];
+    const key = `${col}/${id}`;
+
+    if (!docListeners.has(key)) {
+      docListeners.set(key, new Set());
+    }
+    docListeners.get(key)!.add(onNext);
+
+    // Immediate callback with current value
+    const raw = inMemoryStore[col]?.[id];
+    const snap: DocumentSnapshot = {
+      id,
+      exists: () => Boolean(raw),
+      data: () => raw ? JSON.parse(JSON.stringify(raw)) : undefined
+    };
+    try { onNext(snap); } catch {}
+
+    // Trigger async server fetch
+    apiFetchJson<{ success: boolean; data: any }>(`/api/db/${col}/${id}`).then(res => {
+      if (res.ok && res.data?.data) {
+        if (!inMemoryStore[col]) inMemoryStore[col] = {};
+        inMemoryStore[col][id] = res.data.data;
+        notifyDocListeners(col, id);
+      }
+    }).catch(() => {});
+
+    return () => {
+      docListeners.get(key)?.delete(onNext);
+      if (docListeners.get(key)?.size === 0) {
+        docListeners.delete(key);
+      }
+    };
+  } else {
+    const col = target.collectionPath || target.path || target.id;
+
+    if (!colListeners.has(col)) {
+      colListeners.set(col, new Set());
+    }
+    colListeners.get(col)!.add(onNext);
+
+    const colData = inMemoryStore[col] || {};
+    const docs = Object.entries(colData).map(([id, item]) => ({
+      id,
+      exists: () => true,
+      data: () => JSON.parse(JSON.stringify(item))
+    }));
+    const snap: QuerySnapshot = {
+      empty: docs.length === 0,
+      size: docs.length,
+      docs,
+      forEach: (cb) => docs.forEach(cb)
+    };
+    try { onNext(snap); } catch {}
+
+    // Trigger async server fetch for collection
+    apiFetchJson<{ success: boolean; data: any[] }>(`/api/db/${col}`).then(res => {
+      if (res.ok && Array.isArray(res.data?.data)) {
+        if (!inMemoryStore[col]) inMemoryStore[col] = {};
+        for (const item of res.data.data) {
+          if (item.id) inMemoryStore[col][item.id] = item;
+        }
+        notifyColListeners(col);
+      }
+    }).catch(() => {});
+
+    return () => {
+      colListeners.get(col)?.delete(onNext);
+      if (colListeners.get(col)?.size === 0) {
+        colListeners.delete(col);
+      }
+    };
   }
 }
 
-/**
- * Transaction runner on central Firestore
- */
-export async function runTransaction(
-  _db: any,
-  updateFunction: (transaction: any) => Promise<any>
-): Promise<any> {
-  return firestoreRunTransaction(db, updateFunction);
+export async function runTransaction<T>(
+  _firestoreInstance: any,
+  updateFunction: (transaction: {
+    get: (ref: DocumentReference) => Promise<DocumentSnapshot>;
+    set: (ref: DocumentReference, data: any, options?: SetOptions) => void;
+    update: (ref: DocumentReference, data: any) => void;
+    delete: (ref: DocumentReference) => void;
+  }) => Promise<T>
+): Promise<T> {
+  const transaction = {
+    get: getDoc,
+    set: (ref: DocumentReference, data: any, options?: SetOptions) => {
+      setDoc(ref, data, options);
+    },
+    update: (ref: DocumentReference, data: any) => {
+      updateDoc(ref, data);
+    },
+    delete: (ref: DocumentReference) => {
+      deleteDoc(ref);
+    }
+  };
+  return updateFunction(transaction);
 }
-
-export function increment(n: number = 1) {
-  return firestoreIncrement(n);
-}
-
-export function serverTimestamp() {
-  return firestoreServerTimestamp();
-}
-
-export function arrayUnion(...elements: any[]) {
-  return firestoreArrayUnion(...elements);
-}
-
-export function arrayRemove(...elements: any[]) {
-  return firestoreArrayRemove(...elements);
-}
-
-export const embeddedDbInstance = db;

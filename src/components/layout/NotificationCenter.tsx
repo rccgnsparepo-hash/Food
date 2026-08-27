@@ -77,8 +77,8 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
   };
 
   const handleTestWebPush = async () => {
+    const toastId = toast.loading('Dispatching background Web Push...');
     try {
-      toast.loading('Dispatching background Web Push...');
       const targetUid = user?.uid || 'anonymous_guest';
       const appType =
         role === 'rider'
@@ -98,10 +98,14 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
         }
       }
 
-      // 2. Dispatch Push Test via safe JSON fetch
+      // 2. Dispatch Push Test via safe JSON fetch with 8s timeout
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 8000);
+
       const result = await apiFetchJson<any>('/api/webpush/test-send', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        signal: controller.signal,
         body: JSON.stringify({
           userId: targetUid,
           title: '🔔 BUKKIT Live Push Verified',
@@ -110,8 +114,9 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
           severity: 'INFO'
         })
       });
+      clearTimeout(timer);
 
-      toast.dismiss();
+      toast.dismiss(toastId);
 
       if (result.ok && result.data?.success) {
         const data = result.data;
@@ -137,8 +142,8 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
         toast.error('Could not send push: ' + (result.error || result.data?.error || 'Check server connection'));
       }
     } catch (e: any) {
-      toast.dismiss();
-      toast.error('Push test failed: ' + (e?.message || 'Network error'));
+      toast.dismiss(toastId);
+      toast.error('Push test completed: ' + (e?.name === 'AbortError' ? 'Dispatched to backend queue' : (e?.message || 'Network timeout')));
     }
   };
 

@@ -18,6 +18,7 @@ import {
   listAllWebPushSubscriptions,
   getVapidPublicKey
 } from '../server/webPushService';
+import { serverDb } from '../server/embeddedServerDb';
 
 // In-memory token & notification store for authoritative real-time routing & resilience
 const activeDeviceTokens = new Map<string, DeviceTokenRecord>();
@@ -59,7 +60,7 @@ function seedSampleDeviceTokens() {
       app_type: 'RIDER',
       device_id: 'dev_samsung_galaxy_s22',
       permission_status: 'granted',
-      user_agent: 'Android 13 / BUKKIT Rider App',
+      user_agent: 'Android 13 / BUKKIT Rider APK',
       active: true,
       created_at: now,
       updated_at: now,
@@ -73,7 +74,7 @@ function seedSampleDeviceTokens() {
       app_type: 'VENDOR',
       device_id: 'dev_kitchen_stand_pos_01',
       permission_status: 'granted',
-      user_agent: 'Android 12 / BUKKIT Kitchen Kiosk',
+      user_agent: 'Android 12 / BUKKIT Kitchen APK',
       active: true,
       created_at: now,
       updated_at: now,
@@ -87,7 +88,7 @@ function seedSampleDeviceTokens() {
       app_type: 'ADMIN',
       device_id: 'dev_admin_console_ops',
       permission_status: 'granted',
-      user_agent: 'BUKKIT Operations HQ',
+      user_agent: 'BUKKIT Operations HQ Desktop EXE',
       active: true,
       created_at: now,
       updated_at: now,
@@ -100,7 +101,232 @@ function seedSampleDeviceTokens() {
   }
 }
 
+// Initial recent native push notifications across all APKs and Desktop EXE
+function seedRecentNativeNotifications() {
+  const baseTime = Date.now();
+  const getAgo = (minsAgo: number) => new Date(baseTime - minsAgo * 60 * 1000).toISOString();
+
+  const recentList: NotificationRecord[] = [
+    // --- CUSTOMER APK NOTIFICATIONS ---
+    {
+      notification_id: 'notif_init_cust_01',
+      recipient_user_id: 'user_cust_01',
+      recipient_role: 'CUSTOMER',
+      order_id: 'ORD-9821',
+      notification_key: 'seed_cust_01_out_for_delivery',
+      type: 'ORDER_STATUS',
+      title: 'Order Out for Delivery 🛵',
+      body: 'Rider Emeka is arriving at Daniel Hall with your meal! Share PIN 4821 with rider.',
+      deep_link: '/orders',
+      status: 'delivered',
+      severity: 'CRITICAL',
+      metadata: { orderId: 'ORD-9821', deliveryCode: '4821', riderName: 'Emeka' },
+      created_at: getAgo(3),
+      read_at: null
+    },
+    {
+      notification_id: 'notif_init_cust_02',
+      recipient_user_id: 'user_cust_01',
+      recipient_role: 'CUSTOMER',
+      order_id: 'ORD-9821',
+      notification_key: 'seed_cust_02_confirmed',
+      type: 'ORDER_STATUS',
+      title: 'Order Confirmed by Kitchen 🍳',
+      body: "Ronald's Food House accepted your order #ORD-9821 and started fresh preparation.",
+      deep_link: '/orders',
+      status: 'delivered',
+      severity: 'INFO',
+      metadata: { orderId: 'ORD-9821', vendorName: "Ronald's Food House" },
+      created_at: getAgo(18),
+      read_at: null
+    },
+    {
+      notification_id: 'notif_init_cust_03',
+      recipient_user_id: 'user_cust_01',
+      recipient_role: 'CUSTOMER',
+      notification_key: 'seed_cust_03_wallet_topup',
+      type: 'WALLET_ALERT',
+      title: 'Wallet Top-Up Successful 💳',
+      body: '₦5,000 credited to your BUKKIT digital wallet. Current balance: ₦12,450.',
+      deep_link: '/wallet',
+      status: 'delivered',
+      severity: 'INFO',
+      metadata: { amount: 5000, balanceAfter: 12450 },
+      created_at: getAgo(45),
+      read_at: null
+    },
+    {
+      notification_id: 'notif_init_cust_04',
+      recipient_user_id: 'user_cust_01',
+      recipient_role: 'CUSTOMER',
+      notification_key: 'seed_cust_04_flash_deal',
+      type: 'SYSTEM_ANNOUNCEMENT',
+      title: 'Campus Lunch Flash Deal ⚡',
+      body: 'Get 20% off all meals & smoothies at Mountain Top University Central Plaza today!',
+      deep_link: '/explore',
+      status: 'delivered',
+      severity: 'INFO',
+      metadata: { discount: '20%' },
+      created_at: getAgo(120),
+      read_at: null
+    },
+
+    // --- RIDER APK NOTIFICATIONS ---
+    {
+      notification_id: 'notif_init_rider_01',
+      recipient_user_id: 'broadcast_riders',
+      recipient_role: 'RIDER',
+      order_id: 'ORD-9821',
+      notification_key: 'seed_rider_01_dispatch',
+      type: 'DELIVERY_ALERT',
+      title: 'New Delivery Dispatch 🛵',
+      body: "Pickup at Ronald's Food House Stand 04 -> Deliver to Daniel Hall Room 204. Payout: ₦400.",
+      deep_link: '/rider/deliveries',
+      status: 'delivered',
+      severity: 'CRITICAL',
+      metadata: { orderId: 'ORD-9821', payout: 400, pickupStand: 'Stand 04' },
+      created_at: getAgo(8),
+      read_at: null
+    },
+    {
+      notification_id: 'notif_init_rider_02',
+      recipient_user_id: 'user_rider_01',
+      recipient_role: 'RIDER',
+      order_id: 'ORD-9819',
+      notification_key: 'seed_rider_02_earnings',
+      type: 'DELIVERY_ALERT',
+      title: 'Delivery Earnings Credited 💰',
+      body: '₦400 credited to your Rider Wallet for completed delivery #ORD-9819.',
+      deep_link: '/rider/earnings',
+      status: 'delivered',
+      severity: 'INFO',
+      metadata: { orderId: 'ORD-9819', fee: 400 },
+      created_at: getAgo(35),
+      read_at: null
+    },
+    {
+      notification_id: 'notif_init_rider_03',
+      recipient_user_id: 'broadcast_riders',
+      recipient_role: 'RIDER',
+      notification_key: 'seed_rider_03_surge',
+      type: 'SYSTEM_ANNOUNCEMENT',
+      title: 'Campus Delivery Surge 📍',
+      body: 'High student order volume detected near Mountain Top University Central Library & Labs.',
+      deep_link: '/rider/deliveries',
+      status: 'delivered',
+      severity: 'INFO',
+      metadata: { zone: 'Central Library' },
+      created_at: getAgo(90),
+      read_at: null
+    },
+
+    // --- KITCHEN & VENDOR STAND APK NOTIFICATIONS ---
+    {
+      notification_id: 'notif_init_vendor_01',
+      recipient_user_id: 'user_vendor_ronalds',
+      recipient_role: 'VENDOR',
+      order_id: 'ORD-9821',
+      notification_key: 'seed_vendor_01_new_order',
+      type: 'VENDOR_ALERT',
+      title: 'New Incoming Order 🔔',
+      body: 'Order #ORD-9821: 2x Special Jollof Rice with Grilled Chicken & Plantain. Total: ₦3,400.',
+      deep_link: '/vendor/orders',
+      status: 'delivered',
+      severity: 'CRITICAL',
+      metadata: { orderId: 'ORD-9821', itemsCount: 2, total: 3400 },
+      created_at: getAgo(19),
+      read_at: null
+    },
+    {
+      notification_id: 'notif_init_vendor_02',
+      recipient_user_id: 'user_vendor_ronalds',
+      recipient_role: 'VENDOR',
+      order_id: 'ORD-9821',
+      notification_key: 'seed_vendor_02_rider_arrival',
+      type: 'VENDOR_ALERT',
+      title: 'Rider Arrived for Pickup 🛵',
+      body: 'Rider Emeka is at your stand for order #ORD-9821 pickup.',
+      deep_link: '/vendor/orders',
+      status: 'delivered',
+      severity: 'INFO',
+      metadata: { orderId: 'ORD-9821', riderName: 'Emeka' },
+      created_at: getAgo(5),
+      read_at: null
+    },
+    {
+      notification_id: 'notif_init_vendor_03',
+      recipient_user_id: 'user_vendor_ronalds',
+      recipient_role: 'VENDOR',
+      notification_key: 'seed_vendor_03_settlement',
+      type: 'WALLET_ALERT',
+      title: 'Daily Settlement Batched 🏦',
+      body: '₦64,800 daily batch revenue finalized for weekly payout settlement to your registered account.',
+      deep_link: '/vendor/finance',
+      status: 'delivered',
+      severity: 'INFO',
+      metadata: { amount: 64800 },
+      created_at: getAgo(360),
+      read_at: null
+    },
+
+    // --- ADMIN APK & DESKTOP EXE NOTIFICATIONS ---
+    {
+      notification_id: 'notif_init_admin_01',
+      recipient_user_id: 'admin_broadcast_channel',
+      recipient_role: 'ADMIN',
+      notification_key: 'seed_admin_01_pipeline_online',
+      type: 'ADMIN_ALERT',
+      title: '[INFO] Native Push Pipeline Online 🟢',
+      body: 'Android APKs and Desktop EXE dispatch channels active with FCM/WebPush background sync.',
+      deep_link: '/admin/notifications',
+      status: 'delivered',
+      severity: 'INFO',
+      metadata: { engine: 'FCM + WebPush + EmbeddedDB', uptime: '100%' },
+      created_at: getAgo(2),
+      read_at: null
+    },
+    {
+      notification_id: 'notif_init_admin_02',
+      recipient_user_id: 'admin_broadcast_channel',
+      recipient_role: 'ADMIN',
+      notification_key: 'seed_admin_02_volume_peak',
+      type: 'ADMIN_ALERT',
+      title: '[WARNING] High Campus Volume Peak 📈',
+      body: 'Central Plaza kitchen stands reached 48 concurrent student orders. Fleet dispatches steady.',
+      deep_link: '/admin/orders',
+      status: 'delivered',
+      severity: 'WARNING',
+      metadata: { activeOrders: 48, surgeZone: 'Central Plaza' },
+      created_at: getAgo(22),
+      read_at: null
+    },
+    {
+      notification_id: 'notif_init_admin_03',
+      recipient_user_id: 'admin_broadcast_channel',
+      recipient_role: 'ADMIN',
+      notification_key: 'seed_admin_03_fleet_active',
+      type: 'ADMIN_ALERT',
+      title: '[INFO] Campus Rider Fleet Active 🛵',
+      body: '14 verified couriers currently on-duty with an average campus delivery time of 11 minutes.',
+      deep_link: '/admin/riders',
+      status: 'delivered',
+      severity: 'INFO',
+      metadata: { activeRiders: 14, avgDeliveryMins: 11 },
+      created_at: getAgo(60),
+      read_at: null
+    }
+  ];
+
+  for (const notif of recentList) {
+    persistedNotifications.set(notif.notification_id, notif);
+    try {
+      serverDb.setDoc('notifications', notif.notification_id, notif);
+    } catch (e) {}
+  }
+}
+
 seedSampleDeviceTokens();
+seedRecentNativeNotifications();
 
 /**
  * Register or update device token
@@ -597,6 +823,9 @@ export async function dispatchOrderEventPipeline(
     };
 
     persistedNotifications.set(notifId, notifRecord);
+    try {
+      serverDb.setDoc('notifications', notifId, notifRecord);
+    } catch (e) {}
     createdRecords.push(notifRecord);
 
     // Multi-device token fanout
@@ -718,6 +947,9 @@ export async function dispatchWalletEventPipeline(payload: {
   };
 
   persistedNotifications.set(notifId, notifRecord);
+  try {
+    serverDb.setDoc('notifications', notifId, notifRecord);
+  } catch (e) {}
   totalSentCount++;
   totalDeliveredCount++;
   lastDispatchTime = now;
@@ -766,6 +998,9 @@ export async function dispatchAdminAlertPipeline(payload: {
   };
 
   persistedNotifications.set(notifId, notifRecord);
+  try {
+    serverDb.setDoc('notifications', notifId, notifRecord);
+  } catch (e) {}
   totalSentCount += adminTokens.length > 0 ? adminTokens.length : 1;
   totalDeliveredCount++;
   lastDispatchTime = now;
@@ -783,16 +1018,46 @@ export async function dispatchAdminAlertPipeline(payload: {
 }
 
 /**
- * Get User Notifications History
+ * Get User Notifications History across all APK and EXE platforms
  */
 export function getUserNotificationHistory(userId: string): NotificationRecord[] {
   const list: NotificationRecord[] = [];
+  const cleanId = (userId || '').trim().toLowerCase();
+
   for (const n of persistedNotifications.values()) {
-    if (n.recipient_user_id === userId || n.recipient_user_id === 'broadcast_riders' || n.recipient_user_id === 'admin_broadcast_channel') {
+    const recId = (n.recipient_user_id || '').toLowerCase();
+    const isBroadcast =
+      recId === 'broadcast_all' ||
+      recId === 'broadcast_riders' ||
+      recId === 'broadcast_vendors' ||
+      recId === 'admin_broadcast_channel';
+
+    const isDirectMatch = recId === cleanId;
+    
+    // Role-specific match for preview / simulation / flavor contexts
+    const isRoleMatch =
+      (cleanId.includes('rider') && (n.recipient_role === 'RIDER' || recId === 'broadcast_riders')) ||
+      (cleanId.includes('vendor') && (n.recipient_role === 'VENDOR' || recId === 'broadcast_vendors')) ||
+      (cleanId.includes('admin') && (n.recipient_role === 'ADMIN' || recId === 'admin_broadcast_channel')) ||
+      ((cleanId.includes('cust') || cleanId === 'guest_user' || cleanId === 'anonymous_guest' || !cleanId) &&
+        (n.recipient_role === 'CUSTOMER' || recId === 'broadcast_all'));
+
+    if (isDirectMatch || isBroadcast || isRoleMatch) {
       list.push(n);
     }
   }
-  return list.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+  // Deduplicate by notification_id and sort chronologically descending
+  const seen = new Set<string>();
+  const uniqueList: NotificationRecord[] = [];
+  for (const item of list) {
+    if (!seen.has(item.notification_id)) {
+      seen.add(item.notification_id);
+      uniqueList.push(item);
+    }
+  }
+
+  return uniqueList.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 }
 
 /**
@@ -804,6 +1069,9 @@ export function markNotificationAsRead(notifId: string): boolean {
     notif.status = 'read';
     notif.read_at = new Date().toISOString();
     persistedNotifications.set(notifId, notif);
+    try {
+      serverDb.setDoc('notifications', notifId, notif);
+    } catch (e) {}
     return true;
   }
   return false;
@@ -819,8 +1087,10 @@ export function markAllNotificationsAsReadForUser(userId: string): number {
     if (notif.recipient_user_id === userId && !notif.read_at) {
       notif.status = 'read';
       notif.read_at = now;
-      notif.status = 'read';
       persistedNotifications.set(id, notif);
+      try {
+        serverDb.setDoc('notifications', id, notif);
+      } catch (e) {}
       count++;
     }
   }
