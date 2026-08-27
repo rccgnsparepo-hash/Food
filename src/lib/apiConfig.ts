@@ -4,7 +4,7 @@ import { Capacitor } from '@capacitor/core';
  * Authoritative Backend Production Base URL for Native Android APKs & Cloud Sync
  */
 export const DEFAULT_PRODUCTION_BACKEND_URL =
-  'https://ais-pre-nxj4dis7zld3t6vcse6vjb-915023145069.europe-west2.run.app';
+  'https://ais-dev-nxj4dis7zld3t6vcse6vjb-915023145069.europe-west2.run.app';
 
 /**
  * Resolve the appropriate API Base URL for Web and Native Android APKs
@@ -19,25 +19,16 @@ export function getApiBaseUrl(): string {
   }
 
   // 2. Native Capacitor App (Android / iOS)
-  if (Capacitor.isNativePlatform()) {
-    return DEFAULT_PRODUCTION_BACKEND_URL;
-  }
-
-  // 3. If running in a local webview or Capacitor WebView
   if (
-    window.location.hostname === 'localhost' ||
-    window.location.hostname === '127.0.0.1' ||
+    Capacitor.isNativePlatform() ||
     window.location.protocol === 'capacitor:' ||
-    window.location.protocol === 'ionic:'
+    window.location.protocol === 'ionic:' ||
+    window.location.protocol === 'file:'
   ) {
-    // If running in development with standard port 3000
-    if (window.location.port === '3000') {
-      return '';
-    }
     return DEFAULT_PRODUCTION_BACKEND_URL;
   }
 
-  // 4. Standard Web Browser Environment - Relative URLs work directly
+  // 3. Standard Web Browser Environment (all ports & hosts) - Relative URLs talk directly to current server
   return '';
 }
 
@@ -57,3 +48,43 @@ export async function apiFetch(endpoint: string, init?: RequestInit): Promise<Re
   const fullUrl = apiUrl(endpoint);
   return fetch(fullUrl, init);
 }
+
+/**
+ * Safe JSON fetch helper with descriptive error parsing and fallback handling
+ */
+export async function apiFetchJson<T = any>(
+  endpoint: string,
+  init?: RequestInit
+): Promise<{ ok: boolean; status: number; data?: T; error?: string }> {
+  try {
+    const res = await apiFetch(endpoint, init);
+    const contentType = res.headers.get('content-type') || '';
+
+    if (contentType.includes('application/json')) {
+      const data = (await res.json()) as T;
+      if (!res.ok) {
+        const errMessage = (data as any)?.error || (data as any)?.message || `Request failed with status ${res.status}`;
+        return { ok: false, status: res.status, data, error: errMessage };
+      }
+      return { ok: true, status: res.status, data };
+    }
+
+    // Non-JSON response (e.g. HTML error page or plain text)
+    const text = await res.text();
+    if (!res.ok) {
+      let cleanError = `Server returned ${res.status}`;
+      if (text.includes('<title>')) {
+        const match = text.match(/<title>(.*?)<\/title>/i);
+        if (match && match[1]) cleanError += `: ${match[1]}`;
+      } else if (text.length > 0 && text.length < 120) {
+        cleanError += `: ${text.trim()}`;
+      }
+      return { ok: false, status: res.status, error: cleanError };
+    }
+
+    return { ok: true, status: res.status, data: text as any };
+  } catch (err: any) {
+    return { ok: false, status: 0, error: err.message || 'Network request failed' };
+  }
+}
+

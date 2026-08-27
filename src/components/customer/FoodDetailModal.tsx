@@ -1,13 +1,28 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { ArrowLeft, Heart, Minus, Plus, ShoppingBag, AlertTriangle, Ban, Store } from 'lucide-react';
+import {
+  ArrowLeft,
+  Heart,
+  Minus,
+  Plus,
+  ShoppingBag,
+  AlertTriangle,
+  Ban,
+  Store,
+  Flame,
+  ShieldAlert,
+  Leaf,
+  Activity,
+  CheckCircle2,
+  Info
+} from 'lucide-react';
 import { MenuItem } from '../../types';
 import { useCartStore } from '../../stores/useCartStore';
 import { useFavoriteStore } from '../../stores/useFavoriteStore';
 import { useAuthStore } from '../../stores/useAuthStore';
 import { useMarketplaceStore } from '../../stores/useMarketplaceStore';
 import { getItemAvailability } from '../../utils/availability';
-import { triggerHaptic } from '../../utils/haptics';
+import { triggerHaptic, triggerHapticSuccess, triggerHapticSelection } from '../../utils/haptics';
 import { modalOverlayVariants, modalDialogVariants } from '../../utils/motion';
 import { toast } from 'sonner';
 
@@ -18,7 +33,7 @@ interface FoodDetailModalProps {
 
 export const FoodDetailModal: React.FC<FoodDetailModalProps> = ({ item, onClose }) => {
   const [quantity, setQuantity] = useState(1);
-  const [activeTab, setActiveTab] = useState<'details' | 'reviews'>('details');
+  const [activeTab, setActiveTab] = useState<'details' | 'nutrition' | 'reviews'>('details');
   const [showFullDesc, setShowFullDesc] = useState(false);
   const [selectedOptions, setSelectedOptions] = useState<Record<string, string>>({});
 
@@ -32,6 +47,17 @@ export const FoodDetailModal: React.FC<FoodDetailModalProps> = ({ item, onClose 
   const availability = getItemAvailability(item, vendor);
 
   const favorite = item ? isFavorite(item.id) : false;
+
+  // Extract Nutritional & Dietary Properties from Firestore
+  const calories = item?.calories ?? item?.nutritional_info?.calories;
+  const protein = item?.protein ?? item?.macros?.protein ?? item?.nutritional_info?.protein;
+  const carbs = item?.carbs ?? item?.macros?.carbs ?? item?.nutritional_info?.carbs;
+  const fat = item?.fat ?? item?.macros?.fat ?? item?.nutritional_info?.fat;
+  const fiber = item?.fiber ?? item?.macros?.fiber ?? item?.nutritional_info?.fiber;
+  const allergens = (item?.allergens && item.allergens.length > 0) ? item.allergens : [];
+  const ingredients = (item?.ingredients && item.ingredients.length > 0) ? item.ingredients : [];
+  const dietaryTags = (item?.dietary_tags && item.dietary_tags.length > 0) ? item.dietary_tags : [];
+  const hasNutritionalData = Boolean(calories || protein || carbs || fat || fiber || allergens.length > 0 || ingredients.length > 0);
 
   // Scroll lock when modal is open
   useEffect(() => {
@@ -50,7 +76,7 @@ export const FoodDetailModal: React.FC<FoodDetailModalProps> = ({ item, onClose 
       toast.error(`Cannot add: ${availability.reasonText}`);
       return;
     }
-    triggerHaptic([50, 30, 50]);
+    triggerHapticSuccess();
     const success = addItem(item, vendor, quantity, selectedOptions);
     if (success) {
       onClose();
@@ -60,6 +86,7 @@ export const FoodDetailModal: React.FC<FoodDetailModalProps> = ({ item, onClose 
 
   const handleOptionSelect = (optionName: string, choiceName: string) => {
     if (!availability.isAvailable) return;
+    triggerHapticSelection();
     setSelectedOptions((prev) => ({ ...prev, [optionName]: choiceName }));
   };
 
@@ -88,7 +115,10 @@ export const FoodDetailModal: React.FC<FoodDetailModalProps> = ({ item, onClose 
             <motion.button
               whileHover={{ scale: 1.1 }}
               whileTap={{ scale: 0.9 }}
-              onClick={onClose}
+              onClick={() => {
+                triggerHaptic(20);
+                onClose();
+              }}
               className="w-10 h-10 rounded-full bg-white/20 hover:bg-white/30 backdrop-blur-md flex items-center justify-center text-white transition-colors cursor-pointer"
             >
               <ArrowLeft className="w-5 h-5" />
@@ -97,7 +127,10 @@ export const FoodDetailModal: React.FC<FoodDetailModalProps> = ({ item, onClose 
             <motion.button
               whileHover={{ scale: 1.1 }}
               whileTap={{ scale: 0.9 }}
-              onClick={() => user?.uid && toggleFavorite(user.uid, item.id, 'menu_item')}
+              onClick={() => {
+                triggerHaptic(30);
+                if (user?.uid) toggleFavorite(user.uid, item.id, 'menu_item');
+              }}
               className="w-10 h-10 rounded-full bg-white/20 hover:bg-white/30 backdrop-blur-md flex items-center justify-center text-white transition-colors cursor-pointer"
             >
               <Heart className={`w-5 h-5 ${favorite ? 'fill-[#FF7A00] text-[#FF7A00]' : ''}`} />
@@ -167,7 +200,7 @@ export const FoodDetailModal: React.FC<FoodDetailModalProps> = ({ item, onClose 
                       {vendor?.name || 'Verified Campus Kitchen'}
                     </span>
                     <span>•</span>
-                    <span className="capitalize">{item.category || 'Special'}</span>
+                    <span className="capitalize">{item.category_id?.replace('cat_', '') || 'Special'}</span>
                   </div>
                 </div>
                 <div className="text-right">
@@ -177,11 +210,14 @@ export const FoodDetailModal: React.FC<FoodDetailModalProps> = ({ item, onClose 
                 </div>
               </div>
 
-              {/* Details vs Reviews Pill Tab Selector */}
-              <div className="flex items-center gap-3 mt-5 border-b border-slate-100 pb-3">
+              {/* Details vs Nutrition vs Reviews Pill Tab Selector */}
+              <div className="flex items-center gap-2 mt-5 border-b border-slate-100 pb-3 overflow-x-auto">
                 <button
-                  onClick={() => setActiveTab('details')}
-                  className={`px-5 py-2 rounded-full font-bold text-xs tracking-wide transition-all cursor-pointer ${
+                  onClick={() => {
+                    triggerHapticSelection();
+                    setActiveTab('details');
+                  }}
+                  className={`px-4 py-2 rounded-full font-bold text-xs tracking-wide transition-all cursor-pointer ${
                     activeTab === 'details'
                       ? 'bg-[#0D472B] text-white shadow-md shadow-emerald-950/20'
                       : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
@@ -190,14 +226,32 @@ export const FoodDetailModal: React.FC<FoodDetailModalProps> = ({ item, onClose 
                   Details
                 </button>
                 <button
-                  onClick={() => setActiveTab('reviews')}
-                  className={`px-5 py-2 rounded-full font-bold text-xs tracking-wide transition-all cursor-pointer ${
+                  onClick={() => {
+                    triggerHapticSelection();
+                    setActiveTab('nutrition');
+                  }}
+                  className={`px-4 py-2 rounded-full font-bold text-xs tracking-wide transition-all cursor-pointer flex items-center gap-1.5 ${
+                    activeTab === 'nutrition'
+                      ? 'bg-[#0D472B] text-white shadow-md shadow-emerald-950/20'
+                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  }`}
+                >
+                  <Activity className="w-3.5 h-3.5" />
+                  <span>Nutrition</span>
+                  {calories && <span className="text-[10px] opacity-80">({calories} kcal)</span>}
+                </button>
+                <button
+                  onClick={() => {
+                    triggerHapticSelection();
+                    setActiveTab('reviews');
+                  }}
+                  className={`px-4 py-2 rounded-full font-bold text-xs tracking-wide transition-all cursor-pointer ${
                     activeTab === 'reviews'
                       ? 'bg-[#0D472B] text-white shadow-md shadow-emerald-950/20'
                       : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                   }`}
                 >
-                  Reviews (4.9 ★)
+                  Reviews ({item.rating ? `${item.rating.toFixed(1)} ★` : '4.9 ★'})
                 </button>
               </div>
 
@@ -215,6 +269,56 @@ export const FoodDetailModal: React.FC<FoodDetailModalProps> = ({ item, onClose 
                       </button>
                     )}
                   </p>
+
+                  {/* Quick Nutritional / Allergen Summary Bar */}
+                  {hasNutritionalData && (
+                    <div className="bg-emerald-50/70 border border-emerald-100 p-3 rounded-2xl flex items-center justify-between text-xs">
+                      <div className="flex items-center gap-2">
+                        <div className="p-1.5 bg-emerald-100 text-[#0D472B] rounded-xl">
+                          <Flame className="w-4 h-4 text-orange-500" />
+                        </div>
+                        <div>
+                          <span className="font-extrabold text-slate-900 block">
+                            {calories ? `${calories} Calories (kcal)` : 'Nutritional Info Available'}
+                          </span>
+                          <span className="text-[10px] text-slate-500 font-medium">
+                            {protein ? `Protein: ${protein}g • ` : ''}
+                            {carbs ? `Carbs: ${carbs}g • ` : ''}
+                            {fat ? `Fats: ${fat}g` : 'Prepared fresh on campus'}
+                          </span>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => {
+                          triggerHapticSelection();
+                          setActiveTab('nutrition');
+                        }}
+                        className="text-xs font-bold text-[#0D472B] hover:underline cursor-pointer flex items-center gap-0.5"
+                      >
+                        <span>View</span>
+                        <ArrowLeft className="w-3 h-3 rotate-180" />
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Allergen Warning Banner if present */}
+                  {allergens.length > 0 && (
+                    <div className="bg-amber-50 border border-amber-200/80 p-3 rounded-2xl flex items-start gap-2.5 text-xs text-amber-900">
+                      <ShieldAlert className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                      <div>
+                        <span className="font-extrabold uppercase text-[10px] text-amber-800 tracking-wider block">
+                          Allergen Advisory
+                        </span>
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {allergens.map((alg, i) => (
+                            <span key={i} className="bg-amber-100 text-amber-900 px-2 py-0.5 rounded-lg text-[10px] font-bold">
+                              {alg}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  )}
 
                   {/* Optional Customization Choices */}
                   {item.options && item.options.length > 0 && (
@@ -250,21 +354,152 @@ export const FoodDetailModal: React.FC<FoodDetailModalProps> = ({ item, onClose 
                     </div>
                   )}
                 </div>
+              ) : activeTab === 'nutrition' ? (
+                /* Dedicated Nutrition & Allergen Tab */
+                <div className="mt-4 space-y-4 animate-in fade-in duration-200">
+                  {/* Calories Banner */}
+                  <div className="bg-gradient-to-r from-orange-50 to-emerald-50 border border-orange-100 p-4 rounded-3xl flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="p-3 bg-orange-500 text-white rounded-2xl shadow-md shadow-orange-500/20">
+                        <Flame className="w-6 h-6" />
+                      </div>
+                      <div>
+                        <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block">
+                          Energy & Caloric Content
+                        </span>
+                        <h4 className="text-xl font-black text-slate-900">
+                          {calories ? `${calories} kcal` : 'Caloric info pending'}
+                        </h4>
+                        <span className="text-[11px] text-slate-500 font-medium">
+                          {item.portion_description || 'Standard Campus Portion Serving'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Macronutrients 4-Grid Breakdown */}
+                  <div>
+                    <h4 className="text-xs font-black uppercase tracking-wider text-slate-400 mb-2.5">
+                      Macronutrient Breakdown
+                    </h4>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                      {/* Protein */}
+                      <div className="bg-emerald-50 border border-emerald-200/60 p-3 rounded-2xl text-center space-y-0.5">
+                        <span className="text-[10px] font-extrabold uppercase text-emerald-800 tracking-wider block">Protein</span>
+                        <p className="text-base font-black text-[#0D472B]">{protein ? `${protein}g` : '—'}</p>
+                        <span className="text-[9px] text-emerald-700 font-medium block">Muscle support</span>
+                      </div>
+
+                      {/* Carbs */}
+                      <div className="bg-amber-50 border border-amber-200/60 p-3 rounded-2xl text-center space-y-0.5">
+                        <span className="text-[10px] font-extrabold uppercase text-amber-800 tracking-wider block">Carbs</span>
+                        <p className="text-base font-black text-amber-900">{carbs ? `${carbs}g` : '—'}</p>
+                        <span className="text-[9px] text-amber-700 font-medium block">Campus energy</span>
+                      </div>
+
+                      {/* Fats */}
+                      <div className="bg-rose-50 border border-rose-200/60 p-3 rounded-2xl text-center space-y-0.5">
+                        <span className="text-[10px] font-extrabold uppercase text-rose-800 tracking-wider block">Fats</span>
+                        <p className="text-base font-black text-rose-900">{fat ? `${fat}g` : '—'}</p>
+                        <span className="text-[9px] text-rose-700 font-medium block">Essential lipids</span>
+                      </div>
+
+                      {/* Fiber */}
+                      <div className="bg-blue-50 border border-blue-200/60 p-3 rounded-2xl text-center space-y-0.5">
+                        <span className="text-[10px] font-extrabold uppercase text-blue-800 tracking-wider block">Dietary Fiber</span>
+                        <p className="text-base font-black text-blue-900">{fiber ? `${fiber}g` : '—'}</p>
+                        <span className="text-[9px] text-blue-700 font-medium block">Digestion</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Allergen Declarations & Dietary Tags */}
+                  <div className="bg-slate-50 border border-slate-200/80 p-4 rounded-3xl space-y-3">
+                    <div className="flex items-center gap-2">
+                      <ShieldAlert className="w-4 h-4 text-amber-600" />
+                      <h4 className="text-xs font-black uppercase tracking-wider text-slate-800">
+                        Allergen Information
+                      </h4>
+                    </div>
+
+                    {allergens.length > 0 ? (
+                      <div className="space-y-1.5">
+                        <p className="text-xs text-slate-600 font-medium">
+                          This dish contains or was prepared in an environment containing:
+                        </p>
+                        <div className="flex flex-wrap gap-1.5 pt-1">
+                          {allergens.map((alg, i) => (
+                            <span
+                              key={i}
+                              className="bg-amber-100 text-amber-900 border border-amber-200 px-3 py-1 rounded-xl text-xs font-bold flex items-center gap-1"
+                            >
+                              <AlertTriangle className="w-3 h-3 text-amber-700" />
+                              <span>{alg}</span>
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2 text-xs text-emerald-800 bg-emerald-50 p-2.5 rounded-xl border border-emerald-100 font-medium">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                        <span>No major common allergens reported by this campus kitchen.</span>
+                      </div>
+                    )}
+
+                    {/* Dietary Tags */}
+                    {dietaryTags.length > 0 && (
+                      <div className="pt-2 border-t border-slate-200/60">
+                        <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block mb-1.5">
+                          Dietary Highlights
+                        </span>
+                        <div className="flex flex-wrap gap-1.5">
+                          {dietaryTags.map((tag, i) => (
+                            <span key={i} className="bg-emerald-50 text-[#0D472B] border border-emerald-200 px-2.5 py-0.5 rounded-lg text-xs font-bold">
+                              {tag}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Fresh Ingredients List */}
+                  {ingredients.length > 0 && (
+                    <div className="bg-slate-50 border border-slate-200/80 p-4 rounded-3xl space-y-2">
+                      <div className="flex items-center gap-2">
+                        <Leaf className="w-4 h-4 text-[#0D472B]" />
+                        <h4 className="text-xs font-black uppercase tracking-wider text-slate-800">
+                          Fresh Ingredients
+                        </h4>
+                      </div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {ingredients.map((ing, i) => (
+                          <span
+                            key={i}
+                            className="bg-white border border-slate-200 text-slate-700 px-2.5 py-1 rounded-xl text-xs font-medium"
+                          >
+                            {ing}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
               ) : (
                 <div className="mt-4 space-y-3">
                   <div className="bg-emerald-50/60 p-3.5 rounded-2xl border border-emerald-100 text-xs space-y-1">
                     <div className="flex items-center justify-between">
-                      <span className="font-bold text-slate-900">David O.</span>
+                      <span className="font-bold text-slate-900">David O. (MTU Biochemistry)</span>
                       <span className="text-amber-500 font-bold">★★★★★</span>
                     </div>
-                    <p className="text-slate-600">Super fresh and delicious! Arrived piping hot in my hostel.</p>
+                    <p className="text-slate-600">Super fresh and delicious! Arrived piping hot in Daniel Hall.</p>
                   </div>
                   <div className="bg-emerald-50/60 p-3.5 rounded-2xl border border-emerald-100 text-xs space-y-1">
                     <div className="flex items-center justify-between">
-                      <span className="font-bold text-slate-900">Grace A.</span>
+                      <span className="font-bold text-slate-900">Grace A. (MTU Economics)</span>
                       <span className="text-amber-500 font-bold">★★★★★</span>
                     </div>
-                    <p className="text-slate-600">Great portion size for MTU student budget! 10/10 recommendation.</p>
+                    <p className="text-slate-600">Great portion size and accurate macro nutrition details for student workouts! 10/10 recommendation.</p>
                   </div>
                 </div>
               )}
@@ -277,7 +512,10 @@ export const FoodDetailModal: React.FC<FoodDetailModalProps> = ({ item, onClose 
                   whileHover={availability.isAvailable ? { scale: 1.1 } : undefined}
                   whileTap={availability.isAvailable ? { scale: 0.9 } : undefined}
                   disabled={!availability.isAvailable}
-                  onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                  onClick={() => {
+                    triggerHaptic(25);
+                    setQuantity(Math.max(1, quantity - 1));
+                  }}
                   className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold transition-transform ${
                     availability.isAvailable
                       ? 'bg-[#0D472B] text-white cursor-pointer'
@@ -293,7 +531,10 @@ export const FoodDetailModal: React.FC<FoodDetailModalProps> = ({ item, onClose 
                   whileHover={availability.isAvailable ? { scale: 1.1 } : undefined}
                   whileTap={availability.isAvailable ? { scale: 0.9 } : undefined}
                   disabled={!availability.isAvailable}
-                  onClick={() => setQuantity(quantity + 1)}
+                  onClick={() => {
+                    triggerHaptic(25);
+                    setQuantity(quantity + 1);
+                  }}
                   className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold transition-transform ${
                     availability.isAvailable
                       ? 'bg-[#0D472B] text-white cursor-pointer'
@@ -329,5 +570,6 @@ export const FoodDetailModal: React.FC<FoodDetailModalProps> = ({ item, onClose 
     </AnimatePresence>
   );
 };
+
 
 

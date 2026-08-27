@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { ShieldCheck, CreditCard, Lock, CheckCircle2, AlertCircle } from 'lucide-react';
-import { apiFetch } from '../../lib/apiConfig';
+import { apiFetchJson } from '../../lib/apiConfig';
+import { triggerHaptic, triggerHapticSuccess, triggerHapticError } from '../../utils/haptics';
 
 interface PaystackModalProps {
   amount: number;
@@ -25,39 +26,47 @@ export const PaystackModal: React.FC<PaystackModalProps> = ({
 
   const handlePayNow = async (e: React.FormEvent) => {
     e.preventDefault();
+    triggerHaptic(40);
     setIsProcessing(true);
     setStep('processing');
 
     try {
       // Call Paystack backend API endpoint
-      const response = await apiFetch('/api/paystack/initialize', {
+      const initResult = await apiFetchJson<any>('/api/paystack/initialize', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, amount, orderId })
       });
-      const data = await response.json();
+
+      if (!initResult.ok || !initResult.data?.data?.reference) {
+        throw new Error(initResult.error || 'Failed to initialize payment');
+      }
+
+      const ref = initResult.data.data.reference;
 
       setTimeout(async () => {
         // Verify payment
-        const verifyRes = await apiFetch('/api/paystack/verify', {
+        const verifyResult = await apiFetchJson<any>('/api/paystack/verify', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ reference: data.data.reference })
+          body: JSON.stringify({ reference: ref })
         });
-        const verifyData = await verifyRes.json();
 
-        if (verifyData.status) {
+        if (verifyResult.ok && verifyResult.data?.status) {
+          triggerHapticSuccess();
           setStep('success');
           setTimeout(() => {
-            onSuccess(data.data.reference);
+            onSuccess(ref);
           }, 1200);
         } else {
+          triggerHapticError();
           setStep('failed');
           setIsProcessing(false);
         }
       }, 1800);
     } catch (err) {
       console.error('Paystack transaction error:', err);
+      triggerHapticError();
       setStep('failed');
       setIsProcessing(false);
     }

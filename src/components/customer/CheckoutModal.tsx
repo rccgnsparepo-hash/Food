@@ -26,7 +26,7 @@ import {
 } from '../../types';
 import { MapPicker } from '../ui/MapPicker';
 import { PaystackModal } from '../ui/PaystackModal';
-import { triggerHaptic } from '../../utils/haptics';
+import { triggerHaptic, triggerHapticSuccess, triggerHapticError } from '../../utils/haptics';
 import { toast } from 'sonner';
 import { staggerContainer, staggerItem } from '../../utils/motion';
 import { createAuthoritativeOrder } from '../../services/orderLifecycleService';
@@ -180,12 +180,13 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ onClose, onOrderCr
 
       clearCart();
       setIsPlacing(false);
-      triggerHaptic([100, 50, 100]);
+      triggerHapticSuccess();
       toast.success(`✓ Order #${createdOrder.id.slice(-6)} placed with authoritative verification codes!`);
       onOrderCreated(createdOrder.id);
     } catch (err: any) {
       console.error('Failed to create order:', err);
       setIsPlacing(false);
+      triggerHapticError();
       toast.error(err?.message || 'Order creation failed. Please try again.');
     }
   };

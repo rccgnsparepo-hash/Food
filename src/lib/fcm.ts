@@ -74,7 +74,15 @@ export async function requestFCMToken(userId?: string, isUserInitiated: boolean 
     if (permission !== 'granted') {
       if (isUserInitiated) {
         if (isInsideIframe) {
-          toast.warning('Notifications are restricted inside embedded preview. Open app in a new tab to enable browser push alerts.');
+          toast.warning('Notifications are restricted inside embedded preview. Open app in a new tab to enable browser push alerts.', {
+            action: {
+              label: 'Open New Tab',
+              onClick: () => {
+                window.open(window.location.href, '_blank');
+              }
+            },
+            duration: 6000
+          });
         } else {
           toast.warning('Notification permission is disabled in browser settings. In-app alerts remain fully active.');
         }

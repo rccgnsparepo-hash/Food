@@ -1,7 +1,7 @@
 import { doc, setDoc } from './embeddedDb';
 import { db } from './firebase';
 import { toast } from 'sonner';
-import { apiFetch } from './apiConfig';
+import { apiFetchJson } from './apiConfig';
 import { NotificationAppType, PushSubscriptionRecord } from '../types';
 
 /**
@@ -78,7 +78,15 @@ export async function registerWebPush(
     if (permission !== 'granted') {
       if (isUserInitiated) {
         if (isInsideIframe) {
-          toast.warning('Notifications are restricted inside embedded preview. Open in a new tab to enable browser push alerts.');
+          toast.warning('Notifications are restricted inside embedded preview. Open app in a new tab to enable browser push alerts.', {
+            action: {
+              label: 'Open New Tab',
+              onClick: () => {
+                window.open(window.location.href, '_blank');
+              }
+            },
+            duration: 6000
+          });
         } else {
           toast.warning('Push notifications are disabled in browser settings. You can enable them anytime.');
         }
@@ -97,13 +105,12 @@ export async function registerWebPush(
 
     if (!subscription) {
       // 1. Fetch VAPID Public Key from authoritative server
-      const keyRes = await apiFetch('/api/webpush/vapid-public-key');
-      const keyData = await keyRes.json();
-      if (!keyData.success || !keyData.publicKey) {
-        throw new Error('Could not retrieve VAPID Public Key from server');
+      const keyResult = await apiFetchJson<{ success: boolean; publicKey: string }>('/api/webpush/vapid-public-key');
+      if (!keyResult.ok || !keyResult.data?.success || !keyResult.data?.publicKey) {
+        throw new Error(keyResult.error || 'Could not retrieve VAPID Public Key from server');
       }
 
-      const applicationServerKey = urlBase64ToUint8Array(keyData.publicKey);
+      const applicationServerKey = urlBase64ToUint8Array(keyResult.data.publicKey);
 
       // 2. Subscribe to PushManager
       subscription = await registration.pushManager.subscribe({
@@ -133,7 +140,7 @@ export async function registerWebPush(
         : 'Browser';
 
       // 3. Register subscription on Authoritative Backend
-      await apiFetch('/api/webpush/subscribe', {
+      await apiFetchJson('/api/webpush/subscribe', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -206,7 +213,7 @@ export async function unsubscribeWebPush(userId?: string): Promise<boolean> {
       const endpoint = subscription.endpoint;
       await subscription.unsubscribe();
 
-      await apiFetch('/api/webpush/unsubscribe', {
+      await apiFetchJson('/api/webpush/unsubscribe', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

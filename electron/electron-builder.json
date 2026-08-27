@@ -1,0 +1,56 @@
+{
+  "$schema": "https://raw.githubusercontent.com/electron-userland/electron-builder/master/packages/app-builder-lib/scheme.json",
+  "appId": "com.faratech.bukkit.desktop",
+  "productName": "BUKKIT",
+  "copyright": "Copyright © 2026 FARATECH. All rights reserved.",
+  "directories": {
+    "output": "dist-electron",
+    "buildResources": "assets"
+  },
+  "files": [
+    "dist/**/*",
+    "electron/**/*",
+    "public/**/*",
+    "package.json"
+  ],
+  "extraMetadata": {
+    "main": "electron/main.cjs"
+  },
+  "win": {
+    "target": [
+      {
+        "target": "nsis",
+        "arch": [
+          "x64"
+        ]
+      },
+      {
+        "target": "portable",
+        "arch": [
+          "x64"
+        ]
+      }
+    ],
+    "icon": "public/bukkit-icon.svg",
+    "artifactName": "Bukkit-${target}-${version}-${arch}.${ext}",
+    "requestedExecutionLevel": "asInvoker",
+    "legalTrademarks": "BUKKIT Campus Food Marketplace"
+  },
+  "nsis": {
+    "oneClick": false,
+    "allowToChangeInstallationDirectory": true,
+    "createDesktopShortcut": "always",
+    "createStartMenuShortcut": true,
+    "shortcutName": "BUKKIT",
+    "uninstallDisplayName": "BUKKIT Desktop Uninstaller",
+    "deleteAppDataOnUninstall": false,
+    "artifactName": "Bukkit-Setup-${version}.${ext}"
+  },
+  "portable": {
+    "artifactName": "Bukkit-Portable-${version}.${ext}"
+  },
+  "publish": {
+    "provider": "github",
+    "releaseType": "release"
+  }
+}

@@ -1,6 +1,6 @@
 import { Order, OrderStatus, UserRole, NotificationChannelId } from '../types';
 import { getActiveDevicesForUsers } from './fcmDeviceService';
-import { apiFetch } from '../lib/apiConfig';
+import { apiFetchJson } from '../lib/apiConfig';
 
 export interface NotificationPayload {
   channelId: NotificationChannelId;
@@ -252,7 +252,7 @@ export async function routeOrderEventNotification(order: Order, status: OrderSta
       customerName: (order as any).customer_name
     });
 
-    const response = await apiFetch('/api/fcm/dispatch-order-event', {
+    const result = await apiFetchJson<EventRoutingResult>('/api/fcm/dispatch-order-event', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -269,8 +269,8 @@ export async function routeOrderEventNotification(order: Order, status: OrderSta
       })
     });
 
-    if (response.ok) {
-      return await response.json();
+    if (result.ok && result.data) {
+      return result.data;
     }
   } catch (err) {
     console.warn('[Event Router] Failed to dispatch order event push:', err);

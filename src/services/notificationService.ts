@@ -17,8 +17,8 @@ import {
 import { requestFCMToken } from '../lib/fcm';
 import { registerWebPush } from '../lib/webPushClient';
 import { isNativeAndroidApp, initNativeAndroidPush } from '../lib/capacitorPush';
-import { apiFetch } from '../lib/apiConfig';
-import { triggerHaptic } from '../utils/haptics';
+import { apiFetch, apiFetchJson } from '../lib/apiConfig';
+import { triggerHaptic, triggerHapticNotification } from '../utils/haptics';
 import { toast } from 'sonner';
 
 /**
@@ -218,11 +218,10 @@ export const useNotificationStore = create<NotificationStoreState>((set, get) =>
     }
 
     // 2. Fetch initial notification history from server API
-    apiFetch(`/api/notifications/user/${userId}`)
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.success && Array.isArray(data.notifications)) {
-          const list: NotificationRecord[] = data.notifications;
+    apiFetchJson<any>(`/api/notifications/user/${userId}`)
+      .then((result) => {
+        if (result.ok && result.data?.success && Array.isArray(result.data.notifications)) {
+          const list: NotificationRecord[] = result.data.notifications;
           const unread = list.filter((n) => !n.read_at && n.status !== 'read').length;
           for (const n of list) {
             seenNotificationIds.add(n.notification_id);
@@ -268,7 +267,7 @@ export const useNotificationStore = create<NotificationStoreState>((set, get) =>
                 playNotificationChime(
                   item.severity === 'CRITICAL' ? 'critical' : item.severity === 'WARNING' ? 'warning' : 'info'
                 );
-                triggerHaptic(item.severity === 'CRITICAL' ? [150, 50, 150] : 60);
+                triggerHapticNotification();
 
                 toast.info(`🔔 ${item.title}`, {
                   description: item.body,
@@ -346,10 +345,9 @@ export const useNotificationStore = create<NotificationStoreState>((set, get) =>
     const activeUid = get().activeUserId;
     if (!activeUid) return;
     try {
-      const res = await apiFetch(`/api/notifications/user/${activeUid}`);
-      const data = await res.json();
-      if (data.success && Array.isArray(data.notifications)) {
-        const list: NotificationRecord[] = data.notifications;
+      const result = await apiFetchJson<any>(`/api/notifications/user/${activeUid}`);
+      if (result.ok && result.data?.success && Array.isArray(result.data.notifications)) {
+        const list: NotificationRecord[] = result.data.notifications;
         const unread = list.filter((n) => !n.read_at && n.status !== 'read').length;
         set({ notifications: list, unreadCount: unread });
       }
@@ -380,16 +378,15 @@ export async function emitAuthoritativeOrderEvent(params: {
   metadata?: Record<string, any>;
 }) {
   try {
-    const response = await apiFetch('/api/notifications/order-event', {
+    const result = await apiFetchJson<any>('/api/notifications/order-event', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(params)
     });
-    const result = await response.json();
 
     // Sync generated notifications to embedded DB for multi-device live listener
-    if (result.success && Array.isArray(result.dispatchedNotifications)) {
-      for (const notif of result.dispatchedNotifications) {
+    if (result.ok && result.data?.success && Array.isArray(result.data.dispatchedNotifications)) {
+      for (const notif of result.data.dispatchedNotifications) {
         try {
           await updateDoc(doc(db, 'notifications', notif.notification_id), notif).catch(async () => {
             const { setDoc } = await import('../lib/embeddedDb');
@@ -401,7 +398,7 @@ export async function emitAuthoritativeOrderEvent(params: {
       }
     }
 
-    return result;
+    return result.data || { success: result.ok };
   } catch (err) {
     console.warn('[Notification Service] Order event emission notice:', err);
     return { success: false };

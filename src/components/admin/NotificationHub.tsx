@@ -24,7 +24,7 @@ import {
   NotificationAppType,
   NotificationSeverity
 } from '../../types';
-import { apiFetch } from '../../lib/apiConfig';
+import { apiFetchJson } from '../../lib/apiConfig';
 import { triggerHaptic } from '../../utils/haptics';
 import { toast } from 'sonner';
 
@@ -48,15 +48,12 @@ export const NotificationHub: React.FC = () => {
     setIsLoading(true);
     try {
       const [healthRes, tokensRes] = await Promise.all([
-        apiFetch('/api/notifications/health'),
-        apiFetch('/api/notifications/tokens')
+        apiFetchJson<any>('/api/notifications/health'),
+        apiFetchJson<any>('/api/notifications/tokens')
       ]);
 
-      const healthData = await healthRes.json();
-      const tokensData = await tokensRes.json();
-
-      if (healthData.success) setStats(healthData.stats);
-      if (tokensData.success) setTokens(tokensData.tokens);
+      if (healthRes.ok && healthRes.data?.success) setStats(healthRes.data.stats);
+      if (tokensRes.ok && tokensRes.data?.success) setTokens(tokensRes.data.tokens);
     } catch (err) {
       console.warn('Failed to load notification hub metrics:', err);
     } finally {
@@ -75,9 +72,9 @@ export const NotificationHub: React.FC = () => {
     triggerHaptic(30);
 
     try {
-      let response;
+      let result;
       if (targetRole === 'ADMIN') {
-        response = await apiFetch('/api/notifications/admin-alert', {
+        result = await apiFetchJson<any>('/api/notifications/admin-alert', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -88,7 +85,7 @@ export const NotificationHub: React.FC = () => {
           })
         });
       } else {
-        response = await apiFetch('/api/notifications/order-event', {
+        result = await apiFetchJson<any>('/api/notifications/order-event', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -110,17 +107,16 @@ export const NotificationHub: React.FC = () => {
         });
       }
 
-      const result = await response.json();
-      if (result.success) {
+      if (result.ok && result.data?.success) {
         toast.success(`✓ Notification Pipeline Dispatched: ${targetRole === 'ADMIN' ? 'Admin Alert' : selectedEventType}`, {
-          description: `${result.dispatchedNotifications?.length || 1} push notification payload(s) routed.`
+          description: `${result.data.dispatchedNotifications?.length || 1} push notification payload(s) routed.`
         });
         fetchHealthAndTokens();
       } else {
-        toast.error(`Dispatch failed: ${result.message || result.error}`);
+        toast.error(`Dispatch failed: ${result.error || result.data?.message || 'Server response error'}`);
       }
     } catch (err: any) {
-      toast.error(`Dispatch error: ${err.message}`);
+      toast.error(`Dispatch error: ${err.message || 'Network error'}`);
     } finally {
       setIsSending(false);
     }

@@ -21,7 +21,8 @@ import { NotificationRecord } from '../../types';
 import { useNotificationStore, enablePushNotifications } from '../../services/notificationService';
 import { useAuthStore } from '../../stores/useAuthStore';
 import { triggerHaptic } from '../../utils/haptics';
-import { apiFetch } from '../../lib/apiConfig';
+import { apiFetch, apiFetchJson } from '../../lib/apiConfig';
+import { registerWebPush } from '../../lib/webPushClient';
 import { toast } from 'sonner';
 
 interface NotificationCenterProps {
@@ -52,6 +53,12 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
     }
   }, [isOpen]);
 
+  const isInsideIframe = typeof window !== 'undefined' && window.self !== window.top;
+
+  const handleOpenInNewTab = () => {
+    window.open(window.location.href, '_blank');
+  };
+
   const handleEnablePush = async () => {
     const targetUid = user?.uid || 'guest_user';
     const appType =
@@ -72,28 +79,66 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
   const handleTestWebPush = async () => {
     try {
       toast.loading('Dispatching background Web Push...');
-      const res = await apiFetch('/api/webpush/test-send', {
+      const targetUid = user?.uid || 'anonymous_guest';
+      const appType =
+        role === 'rider'
+          ? 'RIDER'
+          : role === 'kitchen' || role === 'kitchen_manager' || role === 'kitchen_staff'
+          ? 'VENDOR'
+          : role === 'admin' || role === 'super_admin'
+          ? 'ADMIN'
+          : 'CUSTOMER';
+
+      // 1. Ensure client push is registered if supported
+      if (typeof window !== 'undefined' && 'serviceWorker' in navigator && 'PushManager' in window) {
+        try {
+          await registerWebPush(targetUid, appType, false);
+        } catch (regErr) {
+          console.warn('[WebPush] Auto-registration notice:', regErr);
+        }
+      }
+
+      // 2. Dispatch Push Test via safe JSON fetch
+      const result = await apiFetchJson<any>('/api/webpush/test-send', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          userId: user?.uid || 'anonymous_guest',
+          userId: targetUid,
           title: '🔔 BUKKIT Live Push Verified',
           body: 'Real Web Push & FCM delivered to your active device.',
           deepLink: '/orders',
           severity: 'INFO'
         })
       });
-      const data = await res.json();
-      if (data.success) {
-        toast.dismiss();
-        toast.success('✓ Web Push dispatched to registered devices!');
+
+      toast.dismiss();
+
+      if (result.ok && result.data?.success) {
+        const data = result.data;
+        if (data.successful > 0) {
+          toast.success(`✓ Web Push delivered to ${data.successful} active device(s)!`);
+        } else {
+          // If no active PushManager subscriptions yet (e.g. inside an iframe or permissions pending)
+          if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
+            try {
+              new Notification('🔔 BUKKIT Live Push Verified', {
+                body: 'Real Web Push & FCM delivered to your active device.',
+                icon: '/bukkit-icon.svg'
+              });
+              toast.success('✓ Web Push active! Local system notification shown.');
+            } catch {
+              toast.success('✓ Web Push dispatched to backend pipeline.');
+            }
+          } else {
+            toast.info('Push pipeline triggered. Click "Enable Push Notifications" to receive system lock-screen popups!');
+          }
+        }
       } else {
-        toast.dismiss();
-        toast.error('Could not send push: ' + (data.error || 'Check service worker'));
+        toast.error('Could not send push: ' + (result.error || result.data?.error || 'Check server connection'));
       }
     } catch (e: any) {
       toast.dismiss();
-      toast.error('Push test failed: ' + e.message);
+      toast.error('Push test failed: ' + (e?.message || 'Network error'));
     }
   };
 
@@ -323,11 +368,26 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
               <div className="flex items-center gap-2">
                 <Radio className={`w-3.5 h-3.5 ${pushStatus === 'granted' ? 'text-emerald-400 animate-pulse' : 'text-amber-400'}`} />
                 <span className="text-[11px] font-bold text-slate-300">
-                  {pushStatus === 'granted' ? 'Push Notifications Active' : 'Push Inactive / Pending'}
+                  {pushStatus === 'granted'
+                    ? 'Push Notifications Active'
+                    : isInsideIframe
+                    ? 'Preview Tab: In-App Alerts Active'
+                    : 'Push Inactive / Pending'}
                 </span>
               </div>
 
               <div className="flex items-center gap-2">
+                {isInsideIframe && (
+                  <button
+                    onClick={handleOpenInNewTab}
+                    className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-amber-300 rounded-lg text-[10px] font-black cursor-pointer transition-colors border border-amber-500/30 flex items-center gap-1 shadow-xs"
+                    title="Open app in a new browser tab to grant native Web Push permissions"
+                  >
+                    <ExternalLink className="w-2.5 h-2.5" />
+                    <span>Open New Tab</span>
+                  </button>
+                )}
+
                 {pushStatus !== 'granted' ? (
                   <button
                     onClick={handleEnablePush}

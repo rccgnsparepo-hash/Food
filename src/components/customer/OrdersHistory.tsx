@@ -1,16 +1,19 @@
 import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Clock, TrendingUp, Eye, ArrowRight, FileText, Download, Star, Sparkles } from 'lucide-react';
+import { Clock, TrendingUp, Eye, ArrowRight, FileText, Download, Star, Sparkles, RotateCcw, ShoppingBag } from 'lucide-react';
 import { collection, query, where, onSnapshot } from "../../lib/embeddedDb";
 import { db } from '../../lib/firebase';
-import { Order } from '../../types';
+import { Order, MenuItem } from '../../types';
 import { useAuthStore } from '../../stores/useAuthStore';
+import { useCartStore } from '../../stores/useCartStore';
+import { useMarketplaceStore } from '../../stores/useMarketplaceStore';
 import { OrderDetailModal } from './OrderDetailModal';
 import { OrderReceiptModal } from './OrderReceiptModal';
 import { OrderFeedbackModal } from './OrderFeedbackModal';
 import { downloadOrderReceiptPDF } from '../../services/receiptService';
-import { triggerHaptic } from '../../utils/haptics';
+import { triggerHaptic, triggerHapticSuccess } from '../../utils/haptics';
 import { staggerContainer, staggerItem } from '../../utils/motion';
+import { toast } from 'sonner';
 import {
   ResponsiveContainer,
   LineChart,
@@ -58,6 +61,44 @@ export const OrdersHistory: React.FC<OrdersHistoryProps> = ({ onTrackOrder }) =>
     setOrders((prev) =>
       prev.map((o) => (o.id === updatedOrder.id ? { ...o, ...updatedOrder } : o))
     );
+  };
+
+  const handleReorder = (order: Order) => {
+    triggerHapticSuccess();
+    const { menuItems, vendors } = useMarketplaceStore.getState();
+    const { addItem, setCartOpen } = useCartStore.getState();
+
+    const vendorId = order.vendor_id || order.restaurant_id;
+    const vendor = vendorId ? vendors.find((v) => v.id === vendorId) : undefined;
+
+    let addedCount = 0;
+    for (const item of order.items) {
+      const existingMenuItem = menuItems.find((m) => m.id === item.menu_item_id);
+      const menuItemToUse: MenuItem = existingMenuItem || {
+        id: item.menu_item_id,
+        vendor_id: vendorId,
+        restaurant_id: order.restaurant_id,
+        category_id: 'cat_rice',
+        name: item.name,
+        description: 'Reordered item from past order',
+        price: item.price,
+        base_price: item.price,
+        image_url: 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&q=80&w=400',
+        available: true
+      };
+
+      const success = addItem(menuItemToUse, vendor, item.quantity, item.selectedOptions);
+      if (success) {
+        addedCount += item.quantity || 1;
+      }
+    }
+
+    if (addedCount > 0) {
+      toast.success(`Added ${order.items.length} item(s) to cart from ${order.restaurant_name}!`);
+      setCartOpen(true);
+    } else {
+      toast.error('Could not add items to cart. Please check vendor availability.');
+    }
   };
 
   // Compute monthly spending analytics across semester (e.g. Sep - Feb / 6 Months)
@@ -242,7 +283,19 @@ export const OrdersHistory: React.FC<OrdersHistoryProps> = ({ onTrackOrder }) =>
                     </span>
                   </div>
 
-                  <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                  <div className="flex flex-wrap items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                    {/* Reorder Button */}
+                    <motion.button
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                      onClick={() => handleReorder(ord)}
+                      className="p-2.5 sm:px-3 bg-emerald-50 dark:bg-emerald-950/60 hover:bg-emerald-100 dark:hover:bg-emerald-900/80 text-[#0D472B] dark:text-emerald-400 rounded-2xl text-xs font-black transition-colors cursor-pointer border border-emerald-200 dark:border-emerald-800 flex items-center gap-1.5 shadow-xs"
+                      title="Add items from this past order to your cart"
+                    >
+                      <RotateCcw className="w-3.5 h-3.5" />
+                      <span>Reorder</span>
+                    </motion.button>
+
                     {/* Post-order Rating & Feedback Button for Delivered Orders */}
                     {ord.status === 'delivered' && (
                       <motion.button

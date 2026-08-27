@@ -719,6 +719,23 @@ export interface MenuItemOption {
   }[];
 }
 
+export interface MenuItemMacros {
+  protein?: number | string;
+  carbs?: number | string;
+  fat?: number | string;
+  fiber?: number | string;
+}
+
+export interface MenuItemNutritionalInfo {
+  calories?: number | string;
+  protein?: number | string;
+  carbs?: number | string;
+  fat?: number | string;
+  fiber?: number | string;
+  sodium?: number | string;
+  serving_size?: string;
+}
+
 export interface MenuItem {
   id: string;
   vendor_id?: string;
@@ -739,8 +756,15 @@ export interface MenuItem {
   preparation_time?: string;
   ingredients?: string[];
   allergens?: string[];
+  dietary_tags?: string[];
   portion_description?: string;
   calories?: number;
+  protein?: number | string;
+  carbs?: number | string;
+  fat?: number | string;
+  fiber?: number | string;
+  macros?: MenuItemMacros;
+  nutritional_info?: MenuItemNutritionalInfo;
   rating?: number;
   review_count?: number;
   verification_status?: VerificationStatus;
