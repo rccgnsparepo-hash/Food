@@ -1,5 +1,10 @@
 import fs from 'fs';
 import path from 'path';
+import { EventEmitter } from 'events';
+
+// Event emitter for real-time DB mutations across all connected clients & devices
+export const dbEvents = new EventEmitter();
+dbEvents.setMaxListeners(200);
 
 // Embedded JSON file-backed database for Authoritative Server State
 const DATA_DIR = path.join(process.cwd(), 'data');
@@ -62,6 +67,17 @@ export const serverDb = {
     const finalData = merge ? { ...existing, ...data, id } : { ...data, id };
     col[id] = finalData;
     persistToDisk();
+
+    // Broadcast mutation event to all active SSE streaming connections
+    dbEvents.emit('mutation', {
+      type: 'DB_MUTATION',
+      collection: collectionName,
+      id,
+      data: finalData,
+      isDelete: false,
+      timestamp: Date.now()
+    });
+
     return finalData;
   },
 
@@ -70,6 +86,17 @@ export const serverDb = {
     if (col[id]) {
       delete col[id];
       persistToDisk();
+
+      // Broadcast delete event
+      dbEvents.emit('mutation', {
+        type: 'DB_MUTATION',
+        collection: collectionName,
+        id,
+        data: null,
+        isDelete: true,
+        timestamp: Date.now()
+      });
+
       return true;
     }
     return false;
@@ -79,3 +106,4 @@ export const serverDb = {
     return memoryStore;
   }
 };
+

@@ -26,7 +26,7 @@ import {
   listAllWebPushSubscriptions,
   dispatchWebPushToUser
 } from './src/server/webPushService.ts';
-import { serverDb } from './src/server/embeddedServerDb.ts';
+import { serverDb, dbEvents } from './src/server/embeddedServerDb.ts';
 import { paymentService } from './src/server/payments/paymentService.ts';
 import { financialLedger } from './src/server/payments/financialLedger.ts';
 import { getPaymentConfigStatus } from './src/server/payments/paymentConfig.ts';
@@ -58,6 +58,43 @@ async function startServer() {
   // --- EMBEDDED DATABASE REST & SYNC APIS ---
   app.get('/api/db/dump', (req, res) => {
     res.json({ success: true, store: serverDb.dump() });
+  });
+
+  // Real-time Server-Sent Events (SSE) Stream across all tabs, devices & domains
+  app.get('/api/db/stream', (req, res) => {
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache, no-transform');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.flushHeaders?.();
+
+    // Send initial connected ping
+    res.write(`data: ${JSON.stringify({ type: 'CONNECTED', timestamp: Date.now() })}\n\n`);
+
+    const onMutation = (event: any) => {
+      try {
+        res.write(`data: ${JSON.stringify(event)}\n\n`);
+      } catch (err) {
+        // Connection closed
+      }
+    };
+
+    dbEvents.on('mutation', onMutation);
+
+    // 15-second heartbeat ping to keep connection alive through cloud proxies
+    const heartbeat = setInterval(() => {
+      try {
+        res.write(`: ping ${Date.now()}\n\n`);
+      } catch (err) {
+        clearInterval(heartbeat);
+      }
+    }, 15000);
+
+    req.on('close', () => {
+      clearInterval(heartbeat);
+      dbEvents.off('mutation', onMutation);
+      res.end();
+    });
   });
 
   app.get('/api/db/:collection', (req, res) => {

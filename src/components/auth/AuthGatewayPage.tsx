@@ -988,7 +988,8 @@ export const AuthGatewayPage: React.FC = () => {
 
                       <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
                         {FALLBACK_MTU_VENDORS.map((v) => {
-                          const isSelected = selectedVendorId === v.id || fullName.trim().toLowerCase() === v.name.toLowerCase();
+                          const vName = (v.name || '').trim().toLowerCase();
+                          const isSelected = selectedVendorId === v.id || (fullName && vName && fullName.trim().toLowerCase() === vName);
                           return (
                             <button
                               key={v.id}

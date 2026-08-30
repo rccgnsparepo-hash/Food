@@ -200,8 +200,52 @@ function notifyColListeners(col: string) {
   }
 }
 
-// Background sync from backend Express `/api/db/dump`
+// Background sync and live SSE stream from backend Express `/api/db/stream`
 let hasSyncedWithServer = false;
+let eventSourceInstance: EventSource | null = null;
+
+function initRealtimeEventStream() {
+  if (typeof window === 'undefined' || typeof EventSource === 'undefined') return;
+
+  try {
+    if (eventSourceInstance) {
+      eventSourceInstance.close();
+    }
+
+    eventSourceInstance = new EventSource('/api/db/stream');
+
+    eventSourceInstance.onmessage = (event) => {
+      try {
+        const payload = JSON.parse(event.data);
+        if (payload?.type === 'DB_MUTATION' && payload.collection && payload.id) {
+          const col = payload.collection;
+          const id = payload.id;
+          if (!inMemoryStore[col]) inMemoryStore[col] = {};
+
+          if (payload.isDelete) {
+            delete inMemoryStore[col][id];
+          } else {
+            inMemoryStore[col][id] = payload.data;
+          }
+
+          persistLocal();
+          notifyDocListeners(col, id);
+          notifyColListeners(col);
+        }
+      } catch (e) {
+        // Non-fatal parse issue
+      }
+    };
+
+    eventSourceInstance.onerror = () => {
+      // EventSource auto-reconnects, but fallback sync can be triggered
+      syncDatabaseWithServer().catch(() => {});
+    };
+  } catch (err) {
+    console.warn('[EmbeddedDb] SSE stream setup notice:', err);
+  }
+}
+
 export async function syncDatabaseWithServer(): Promise<void> {
   try {
     const res = await apiFetchJson<{ success: boolean; store: Record<string, Record<string, any>> }>('/api/db/dump');
@@ -235,11 +279,19 @@ export async function syncDatabaseWithServer(): Promise<void> {
   }
 }
 
-// Trigger initial background sync
+// Trigger initial background sync and SSE stream
 if (typeof window !== 'undefined') {
   setTimeout(() => {
     syncDatabaseWithServer().catch(() => {});
+    initRealtimeEventStream();
   }, 100);
+
+  // Active polling safety net (every 3 seconds) for cross-device real-time sync
+  setInterval(() => {
+    if (colListeners.size > 0 || docListeners.size > 0) {
+      syncDatabaseWithServer().catch(() => {});
+    }
+  }, 3000);
 }
 
 /**

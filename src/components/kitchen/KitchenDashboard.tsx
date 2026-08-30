@@ -55,7 +55,12 @@ export const KitchenDashboard: React.FC = () => {
 
     if (userVendorId && vendors.some(v => v.id === userVendorId)) return userVendorId;
     if (user?.uid) {
-      const matched = vendors.find(v => v.owner_uid === user?.uid || v.email?.toLowerCase() === user?.email?.toLowerCase() || v.id === user?.uid);
+      const userEmail = (user?.email || '').trim().toLowerCase();
+      const matched = vendors.find(v => 
+        v.owner_uid === user?.uid || 
+        v.id === user?.uid || 
+        (userEmail && v.email && v.email.trim().toLowerCase() === userEmail)
+      );
       if (matched) return matched.id;
     }
     // Default to 'all' so orders are immediately visible
@@ -476,16 +481,16 @@ export const KitchenDashboard: React.FC = () => {
               >
                 <option value="all">🌟 All Campus Stands ({allOrders.length} orders)</option>
                 {vendors.map(v => {
-                  const standOrdersCount = allOrders.filter(o => 
-                    o.vendor_id === v.id || 
-                    (o as any).restaurant_id === v.id || 
-                    (o as any).vendorId === v.id || 
-                    (o as any).restaurantId === v.id ||
-                    (o.vendor_name && o.vendor_name.toLowerCase() === v.name.toLowerCase())
-                  ).length;
+                  const vName = (v.name || (v as any).restaurant_name || v.slug || '').trim().toLowerCase();
+                  const standOrdersCount = allOrders.filter(o => {
+                    const oVendorId = o.vendor_id || (o as any).restaurant_id || (o as any).vendorId || (o as any).restaurantId;
+                    if (oVendorId && oVendorId === v.id) return true;
+                    const oVendorName = (o.vendor_name || (o as any).restaurant_name || '').trim().toLowerCase();
+                    return Boolean(oVendorName && vName && (oVendorName === vName || oVendorName.includes(vName) || vName.includes(oVendorName)));
+                  }).length;
                   return (
                     <option key={v.id} value={v.id}>
-                      {v.name} ({standOrdersCount} orders)
+                      {v.name || (v as any).restaurant_name || 'Vendor Stand'} ({standOrdersCount} orders)
                     </option>
                   );
                 })}
@@ -699,13 +704,14 @@ export const KitchenDashboard: React.FC = () => {
                 </button>
 
                 {vendors.map((v) => {
+                  const vName = (v.name || (v as any).restaurant_name || v.slug || '').trim().toLowerCase();
                   const count = allOrders.filter(
-                    (o) =>
-                      o.vendor_id === v.id ||
-                      (o as any).restaurant_id === v.id ||
-                      (o as any).vendorId === v.id ||
-                      (o as any).restaurantId === v.id ||
-                      (o.vendor_name && o.vendor_name.toLowerCase() === v.name.toLowerCase())
+                    (o) => {
+                      const oVendorId = o.vendor_id || (o as any).restaurant_id || (o as any).vendorId || (o as any).restaurantId;
+                      if (oVendorId && oVendorId === v.id) return true;
+                      const oVendorName = (o.vendor_name || (o as any).restaurant_name || '').trim().toLowerCase();
+                      return Boolean(oVendorName && vName && (oVendorName === vName || oVendorName.includes(vName) || vName.includes(oVendorName)));
+                    }
                   ).length;
                   const isSelected = activeVendorId === v.id;
                   return (
@@ -721,7 +727,7 @@ export const KitchenDashboard: React.FC = () => {
                           : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
                       }`}
                     >
-                      <span>{v.name}</span>
+                      <span>{v.name || (v as any).restaurant_name || 'Vendor Stand'}</span>
                       {count > 0 && (
                         <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono font-black ${isSelected ? 'bg-white text-[#D6001C]' : 'bg-rose-500 text-white animate-pulse'}`}>
                           {count}
