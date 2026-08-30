@@ -1166,3 +1166,103 @@ export interface ConversationMessage {
   metadata?: Record<string, any>;
 }
 
+// =============================================================================
+// AUTHORITATIVE FINANCIAL LEDGER & PAYSTACK PAYMENT TYPES
+// =============================================================================
+
+export interface OrderFinancialBreakdown {
+  order_id: string;
+  food_subtotal: number;
+  company_fee: number; // ₦250 platform gross
+  rider_fee: number; // ₦100 rider payable
+  customer_total: number; // ₦2,350 customer total
+  paystack_fee: number; // e.g. ₦35.25
+  restaurant_payable: number; // ₦2,000
+  rider_payable: number; // ₦100
+  company_gross_revenue: number; // ₦250
+  company_net_revenue: number; // ₦214.75
+}
+
+export type LedgerEntryType =
+  | 'CUSTOMER_PAYMENT'
+  | 'RESTAURANT_PAYABLE'
+  | 'RIDER_PAYABLE'
+  | 'COMPANY_REVENUE'
+  | 'PAYSTACK_FEE'
+  | 'REFUND'
+  | 'ADJUSTMENT'
+  | 'OPERATING_EXPENSE';
+
+export interface FinancialLedgerEntry {
+  id: string;
+  order_id: string;
+  type: LedgerEntryType;
+  recipient_type: 'CUSTOMER' | 'RESTAURANT' | 'RIDER' | 'PLATFORM' | 'PAYSTACK' | 'VENDOR';
+  recipient_id: string;
+  amount: number;
+  direction: 'credit' | 'debit';
+  status: 'pending' | 'posted' | 'settled' | 'reversed';
+  reference: string;
+  description: string;
+  created_at: string;
+  metadata?: Record<string, any>;
+}
+
+export interface FinancialMetrics {
+  totalOrders: number;
+  totalCustomerGMV: number;
+  totalRestaurantPayable: number;
+  totalRiderPayable: number;
+  totalBukkitGrossRevenue: number;
+  totalPaystackFees: number;
+  totalBukkitNetTransactionRevenue: number;
+  totalOperatingExpenses: number;
+  totalRefunds: number;
+  totalPayouts: number;
+  netProfit: number;
+  averageOrderValue: number;
+  platformRevenuePerOrder: number;
+  paymentProcessingCostPerOrder: number;
+}
+
+export interface DailyFinancialItem {
+  date: string;
+  dayLabel: string;
+  orders: number;
+  gmv: number;
+  companyGross: number;
+  paystackFees: number;
+  companyNet: number;
+  restaurantPayable: number;
+  riderPayable: number;
+  operatingExpenses: number;
+  refunds: number;
+  netProfit: number;
+}
+
+export interface MonthlyFinancialItem {
+  month: string;
+  monthLabel: string;
+  orders: number;
+  gmv: number;
+  companyGross: number;
+  paystackFees: number;
+  companyNet: number;
+  restaurantPayable: number;
+  riderPayable: number;
+  operatingExpenses: number;
+  refunds: number;
+  netProfit: number;
+}
+
+export interface BusinessExpense {
+  id: string;
+  category: 'servers' | 'hosting' | 'sms' | 'email' | 'marketing' | 'advertising' | 'staff' | 'support' | 'operations' | 'refund_losses' | 'other';
+  amount: number;
+  description: string;
+  date: string;
+  recorded_by?: string;
+  created_at: string;
+}
+
+

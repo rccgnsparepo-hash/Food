@@ -103,6 +103,30 @@ export async function apiFetch(endpoint: string, init?: RequestInit): Promise<Re
 }
 
 /**
+ * Robust error message extractor that guarantees a clean, human-readable string (never [object Object])
+ */
+export function formatApiErrorMessage(err: any): string {
+  if (!err) return 'Unknown error';
+  if (typeof err === 'string') return err;
+  if (typeof err.message === 'string' && err.message.trim().length > 0) return err.message.trim();
+  if (typeof err.error === 'string' && err.error.trim().length > 0) return err.error.trim();
+  if (typeof err.error?.message === 'string') return err.error.message.trim();
+  if (typeof err.data?.error === 'string') return err.data.error.trim();
+  if (typeof err.data?.message === 'string') return err.data.message.trim();
+  if (typeof err.data?.error?.message === 'string') return err.data.error.message.trim();
+  
+  try {
+    const serialized = JSON.stringify(err);
+    if (serialized && serialized !== '{}') {
+      return serialized;
+    }
+  } catch {
+    // Ignore serialization failure
+  }
+  return String(err || 'Server communication error');
+}
+
+/**
  * Safe JSON fetch helper with descriptive error parsing and fallback handling
  */
 export async function apiFetchJson<T = any>(
@@ -116,7 +140,8 @@ export async function apiFetchJson<T = any>(
     if (contentType.includes('application/json')) {
       const data = (await res.json()) as T;
       if (!res.ok) {
-        const errMessage = (data as any)?.error || (data as any)?.message || `Request failed with status ${res.status}`;
+        const rawErr = (data as any)?.error || (data as any)?.message || (data as any)?.detail || `Request failed with status ${res.status}`;
+        const errMessage = formatApiErrorMessage(rawErr);
         return { ok: false, status: res.status, data, error: errMessage };
       }
       return { ok: true, status: res.status, data };
@@ -137,6 +162,6 @@ export async function apiFetchJson<T = any>(
 
     return { ok: true, status: res.status, data: text as any };
   } catch (err: any) {
-    return { ok: false, status: 0, error: err?.message || 'Network request failed' };
+    return { ok: false, status: 0, error: formatApiErrorMessage(err) || 'Network request failed' };
   }
 }

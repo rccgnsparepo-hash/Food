@@ -21,7 +21,7 @@ import { NotificationRecord } from '../../types';
 import { useNotificationStore, enablePushNotifications } from '../../services/notificationService';
 import { useAuthStore } from '../../stores/useAuthStore';
 import { triggerHaptic } from '../../utils/haptics';
-import { apiFetch, apiFetchJson } from '../../lib/apiConfig';
+import { apiFetch, apiFetchJson, formatApiErrorMessage } from '../../lib/apiConfig';
 import { registerWebPush } from '../../lib/webPushClient';
 import { toast } from 'sonner';
 
@@ -89,12 +89,17 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
           ? 'ADMIN'
           : 'CUSTOMER';
 
-      // 1. Ensure client push is registered if supported
+      // 1. Ensure client push is registered if supported & prompt if default
       if (typeof window !== 'undefined' && 'serviceWorker' in navigator && 'PushManager' in window) {
         try {
-          await registerWebPush(targetUid, appType, false);
+          // If permission is not yet determined, prompt the user so Edge/Chrome displays the permission request
+          const shouldPrompt = typeof Notification !== 'undefined' && Notification.permission === 'default';
+          await registerWebPush(targetUid, appType, shouldPrompt);
+          if (typeof Notification !== 'undefined') {
+            setPushStatus(Notification.permission as any);
+          }
         } catch (regErr) {
-          console.warn('[WebPush] Auto-registration notice:', regErr);
+          console.warn('[WebPush] Registration notice during test:', regErr);
         }
       }
 
@@ -123,9 +128,22 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
         if (data.successful > 0) {
           toast.success(`✓ Web Push delivered to ${data.successful} active device(s)!`);
         } else {
-          // If no active PushManager subscriptions yet (e.g. inside an iframe or permissions pending)
+          // Show local system / ServiceWorker notification if permission is granted
           if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
             try {
+              if ('serviceWorker' in navigator) {
+                const reg = await navigator.serviceWorker.getRegistration();
+                if (reg && reg.showNotification) {
+                  await reg.showNotification('🔔 BUKKIT Live Push Verified', {
+                    body: 'Real Web Push & FCM delivered to your active device.',
+                    icon: '/bukkit-icon.svg',
+                    badge: '/bukkit-icon.svg',
+                    tag: 'bukkit-test-push'
+                  });
+                  toast.success('✓ Web Push active! Local system notification shown.');
+                  return;
+                }
+              }
               new Notification('🔔 BUKKIT Live Push Verified', {
                 body: 'Real Web Push & FCM delivered to your active device.',
                 icon: '/bukkit-icon.svg'
@@ -139,11 +157,13 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
           }
         }
       } else {
-        toast.error('Could not send push: ' + (result.error || result.data?.error || 'Check server connection'));
+        const readableError = formatApiErrorMessage(result.error || result.data?.error || result.data?.message || 'Server connection error');
+        toast.error(`Could not send push: ${readableError}`);
       }
     } catch (e: any) {
       toast.dismiss(toastId);
-      toast.error('Push test completed: ' + (e?.name === 'AbortError' ? 'Dispatched to backend queue' : (e?.message || 'Network timeout')));
+      const readableError = formatApiErrorMessage(e?.name === 'AbortError' ? 'Dispatched to backend queue' : (e?.message || e));
+      toast.error(`Push test completed: ${readableError}`);
     }
   };
 

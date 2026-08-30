@@ -268,25 +268,42 @@ export async function createAuthoritativeOrder(
     }
   });
 
-  // 3. Asynchronously sync to backend Cloud SQL
+  // 3. Asynchronously sync to backend Cloud SQL and embedded server store
   apiFetch('/api/orders', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
+      ...orderData,
       id: orderId,
+      order_id: orderId,
       userId: currentUser.uid,
+      customer_id: currentUser.uid,
+      vendor_id: orderData.vendor_id,
       vendorId: orderData.vendor_id,
+      restaurant_id: orderData.vendor_id,
+      vendor_name: orderData.vendor_name,
       vendorName: orderData.vendor_name,
+      customer_name: orderData.user_name,
       customerName: orderData.user_name,
+      user_name: orderData.user_name,
+      customer_email: currentUser.email,
       customerEmail: currentUser.email,
       status: initialStatus,
+      payment_status: isPaidInstantly ? 'paid' : 'pending',
+      total_price: orderData.total_price,
       totalAmount: orderData.total_price,
+      delivery_fee: orderData.delivery_fee,
       deliveryFee: orderData.delivery_fee,
+      items: orderData.items,
       itemsJson: JSON.stringify(orderData.items),
+      delivery_address: orderData.delivery_address,
       deliveryLocation: orderData.delivery_address,
+      delivery_room: orderData.delivery_room,
       deliveryRoom: orderData.delivery_room,
+      customer_phone: orderData.customer_phone,
       customerPhone: orderData.customer_phone,
       notes: orderData.notes,
+      pickup_code: orderData.pickup_code,
       pickupCode: orderData.pickup_code
     })
   }).catch((err) => console.warn('Order SQL sync notice:', err));

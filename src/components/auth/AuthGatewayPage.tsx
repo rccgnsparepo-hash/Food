@@ -53,7 +53,7 @@ export const AuthGatewayPage: React.FC = () => {
     user
   } = useAuthStore();
 
-  const { universities, campuses } = useMarketplaceStore();
+  const { universities, campuses, vendors } = useMarketplaceStore();
 
   const [selectedRole, setSelectedRole] = useState<UserRole>('customer');
   const [mode, setMode] = useState<'login' | 'register' | 'forgot_password' | 'verify_email'>(
@@ -74,6 +74,7 @@ export const AuthGatewayPage: React.FC = () => {
   const [adminKey, setAdminKey] = useState('');
   const [universityId, setUniversityId] = useState('uni_mtu');
   const [campusId, setCampusId] = useState('campus_mtu_main');
+  const [selectedVendorId, setSelectedVendorId] = useState('');
 
   // UI Toggles & Feedback
   const [showPassword, setShowPassword] = useState(false);
@@ -340,7 +341,8 @@ export const AuthGatewayPage: React.FC = () => {
         universityId,
         campusId,
         role: selectedRole,
-        adminKey: adminKey.trim()
+        adminKey: adminKey.trim(),
+        vendorId: selectedRole === 'kitchen' ? (selectedVendorId || undefined) : undefined
       });
       setAuthStatus('email-verification-required');
       setMode('verify_email');
@@ -947,6 +949,31 @@ export const AuthGatewayPage: React.FC = () => {
                       <p className="text-[10px] text-red-600 dark:text-red-400 font-bold mt-1 pl-4">{fieldErrors.confirmPassword}</p>
                     )}
                   </div>
+
+                  {/* Kitchen Stand Selection (for kitchen staff / owners) */}
+                  {selectedRole === 'kitchen' && (
+                    <div className="bg-rose-50 dark:bg-slate-800/80 p-3 rounded-2xl border border-rose-100 dark:border-slate-700 space-y-1.5 text-left">
+                      <label className="text-[11px] font-bold text-slate-700 dark:text-slate-200 flex items-center gap-1.5">
+                        <ChefHat className="w-3.5 h-3.5 text-[#D6001C]" />
+                        <span>Select Your Campus Food Stand</span>
+                      </label>
+                      <select
+                        value={selectedVendorId}
+                        onChange={(e) => setSelectedVendorId(e.target.value)}
+                        className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 dark:text-slate-100 outline-none cursor-pointer"
+                      >
+                        <option value="">🌟 Universal Queue (Manage All Stands)</option>
+                        {vendors.map((v) => (
+                          <option key={v.id} value={v.id}>
+                            {v.name}
+                          </option>
+                        ))}
+                      </select>
+                      <p className="text-[10px] text-slate-500 dark:text-slate-400 leading-tight">
+                        You can also switch stands anytime directly from the Kitchen Dashboard.
+                      </p>
+                    </div>
+                  )}
 
                   {/* Vibrant Red Pill Button */}
                   <button

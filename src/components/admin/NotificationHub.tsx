@@ -24,7 +24,7 @@ import {
   NotificationAppType,
   NotificationSeverity
 } from '../../types';
-import { apiFetchJson } from '../../lib/apiConfig';
+import { apiFetchJson, formatApiErrorMessage } from '../../lib/apiConfig';
 import { triggerHaptic } from '../../utils/haptics';
 import { toast } from 'sonner';
 
@@ -113,10 +113,12 @@ export const NotificationHub: React.FC = () => {
         });
         fetchHealthAndTokens();
       } else {
-        toast.error(`Dispatch failed: ${result.error || result.data?.message || 'Server response error'}`);
+        const errorText = formatApiErrorMessage(result.error || result.data?.message || result.data?.error || 'Server response error');
+        toast.error(`Dispatch failed: ${errorText}`);
       }
     } catch (err: any) {
-      toast.error(`Dispatch error: ${err.message || 'Network error'}`);
+      const errorText = formatApiErrorMessage(err?.message || err || 'Network error');
+      toast.error(`Dispatch error: ${errorText}`);
     } finally {
       setIsSending(false);
     }

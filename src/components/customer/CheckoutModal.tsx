@@ -650,6 +650,9 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ onClose, onOrderCr
           amount={paymentMethod === 'split_wallet_paystack' ? remainingCardAmount : total}
           email={customerEmail || user?.email || 'student@mtu.edu.ng'}
           orderId={`ORD_${Date.now()}`}
+          foodSubtotal={subtotal}
+          companyFee={serviceFee || 250}
+          riderFee={deliveryFee || 100}
           onClose={() => setShowPaystack(false)}
           onSuccess={(ref) => {
             setShowPaystack(false);

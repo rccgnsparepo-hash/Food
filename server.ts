@@ -27,13 +27,23 @@ import {
   dispatchWebPushToUser
 } from './src/server/webPushService.ts';
 import { serverDb } from './src/server/embeddedServerDb.ts';
+import { paymentService } from './src/server/payments/paymentService.ts';
+import { financialLedger } from './src/server/payments/financialLedger.ts';
+import { getPaymentConfigStatus } from './src/server/payments/paymentConfig.ts';
 
 async function startServer() {
   const app = express();
   const PORT = 3000;
 
   app.use(cors());
-  app.use(express.json());
+  app.use(express.json({
+    verify: (req: any, _res, buf) => {
+      req.rawBody = buf;
+    }
+  }));
+
+  // Seed baseline financial history if empty
+  paymentService.seedDemoFinancialsIfEmpty();
 
   // Health check API
   app.get('/api/health', (req, res) => {
@@ -92,10 +102,10 @@ async function startServer() {
 
   // --- ORDERS CENTRALIZED APIS ---
 
-  // Create Order
+  // Create Authoritative Order
   app.post('/api/orders', async (req, res) => {
     try {
-      const order = await createSqlOrder(req.body);
+      const order = await paymentService.createAuthoritativeOrder(req.body);
       res.json({ success: true, order });
     } catch (error: any) {
       console.error('API order creation error:', error);
@@ -295,46 +305,261 @@ async function startServer() {
     });
   });
 
-  // --- PAYSTACK APIS ---
+  // --- PRODUCTION-GRADE PAYSTACK PAYMENT & FINANCIAL ARCHITECTURE APIS ---
 
-  app.post('/api/paystack/initialize', (req, res) => {
-    const { email, amount, orderId } = req.body;
-    const reference = `PS_${Date.now()}_${Math.floor(Math.random() * 10000)}`;
-
+  // 1. Get Payment Provider Gateway Configuration Status
+  app.get('/api/payments/config-status', (req, res) => {
+    const status = getPaymentConfigStatus();
     res.json({
-      status: true,
-      message: 'Authorization URL created',
-      data: {
-        authorization_url: `https://checkout.paystack.com/simulate_${reference}`,
-        access_code: `code_${reference}`,
-        reference: reference,
-        amount: amount,
-        email: email,
-        orderId: orderId
-      }
+      success: true,
+      ...status
     });
   });
 
-  app.post('/api/paystack/verify', (req, res) => {
-    const { reference } = req.body;
-    if (reference) {
-      res.json({
-        status: true,
-        message: 'Verification successful',
-        data: {
-          id: Date.now(),
-          domain: 'test',
-          status: 'success',
-          reference: reference,
-          amount: 2500,
-          gateway_response: 'Successful',
-          paid_at: new Date().toISOString(),
-          channel: 'card',
-          currency: 'NGN'
-        }
+  // 2. Authoritative Paystack Payment Initialization (Primary & Alias)
+  const handlePaymentInit = async (req: express.Request, res: express.Response) => {
+    try {
+      const { email, orderId, callbackUrl } = req.body;
+      if (!orderId) {
+        return res.status(400).json({
+          status: false,
+          success: false,
+          message: 'orderId is required to initialize Paystack checkout'
+        });
+      }
+
+      const result = await paymentService.initializeOrderPayment({
+        orderId,
+        email: email || 'student@mtu.edu.ng',
+        callbackUrl
       });
-    } else {
-      res.status(400).json({ status: false, message: 'Invalid transaction reference' });
+
+      res.json(result);
+    } catch (err: any) {
+      console.error('[API_PAYMENT_INIT_ERROR]', err);
+      res.status(500).json({
+        status: false,
+        success: false,
+        message: err.message || 'Payment initialization failed',
+        error: err.message
+      });
+    }
+  };
+
+  app.post('/api/payments/paystack/initialize', handlePaymentInit);
+  app.post('/api/paystack/initialize', handlePaymentInit);
+
+  // 3. Authoritative Paystack Payment Verification by Reference (GET & POST)
+  const handlePaymentVerification = async (req: express.Request, res: express.Response) => {
+    try {
+      const reference = req.params.reference || req.body?.reference || req.query?.reference as string;
+      if (!reference) {
+        return res.status(400).json({
+          status: false,
+          success: false,
+          message: 'Payment reference is required'
+        });
+      }
+
+      const verification = await paymentService.verifyAndConfirmPayment(reference);
+
+      if (verification.success) {
+        // Dispatch order event notification to kitchen and user
+        if (verification.order) {
+          try {
+            await dispatchOrderEventPipeline({
+              orderId: verification.order.id,
+              eventType: 'PAYMENT_CONFIRMED',
+              customerId: verification.order.customer_id || verification.order.user_id,
+              vendorId: verification.order.restaurant_id || verification.order.vendor_id,
+              totalPrice: verification.order.total_price || 2350
+            });
+          } catch (e) {
+            console.warn('Post-payment event notification note:', e);
+          }
+        }
+
+        res.json({
+          status: true,
+          success: true,
+          message: verification.message,
+          data: {
+            status: 'success',
+            reference,
+            orderId: verification.order?.id,
+            totalPrice: verification.order?.total_price,
+            breakdown: verification.order?.financial_breakdown,
+            payment: verification.payment,
+            alreadyProcessed: verification.alreadyProcessed
+          }
+        });
+      } else {
+        res.status(400).json({
+          status: false,
+          success: false,
+          message: verification.message
+        });
+      }
+    } catch (err: any) {
+      console.error('[API_PAYMENT_VERIFY_ERROR]', err);
+      res.status(500).json({
+        status: false,
+        success: false,
+        message: err.message || 'Payment verification server error'
+      });
+    }
+  };
+
+  app.get('/api/payments/paystack/verify/:reference', handlePaymentVerification);
+  app.post('/api/paystack/verify', handlePaymentVerification);
+
+  // 4. Secure Paystack Webhook Handler (HMAC SHA512 Signature Verified)
+  app.post('/api/paystack/webhook', async (req: any, res: express.Response) => {
+    try {
+      const signature = (req.headers['x-paystack-signature'] || '') as string;
+      const rawBody = req.rawBody || JSON.stringify(req.body);
+
+      const result = await paymentService.handlePaystackWebhook(req.body, rawBody, signature);
+      res.status(result.status || 200).json(result);
+    } catch (err: any) {
+      console.error('[API_PAYSTACK_WEBHOOK_ERROR]', err);
+      res.status(500).json({ status: 500, success: false, message: err.message || 'Webhook processing exception' });
+    }
+  });
+
+  // 5. Payment Refund Endpoint
+  app.post('/api/payments/:paymentId/refund', async (req, res) => {
+    try {
+      const { reason, amount } = req.body;
+      const result = await paymentService.refundPayment(req.params.paymentId, reason || 'Administrative order refund');
+      res.json(result);
+    } catch (err: any) {
+      console.error('[API_REFUND_ERROR]', err);
+      res.status(500).json({ success: false, message: err.message || 'Refund execution failed' });
+    }
+  });
+
+  // 6. Get Order Payment Details & Financial Breakdown
+  app.get('/api/orders/:orderId/payment', (req, res) => {
+    const order = serverDb.getDoc('orders', req.params.orderId);
+    if (!order) {
+      return res.status(404).json({ success: false, message: 'Order not found' });
+    }
+    const allPayments = serverDb.getAll('payments');
+    const payment = allPayments.find((p: any) => p.order_id === req.params.orderId);
+    const allLedger = serverDb.getAll('ledger_entries');
+    const orderLedger = allLedger.filter((l: any) => l.order_id === req.params.orderId);
+
+    res.json({
+      success: true,
+      order,
+      payment,
+      financial_breakdown: order.financial_breakdown || paymentService.calculateAuthoritativeBreakdown({ items: order.items || [] }),
+      ledger_entries: orderLedger
+    });
+  });
+
+  // 7. Admin Financials: Aggregate Accounting Metrics
+  app.get('/api/admin/financials', (req, res) => {
+    try {
+      const { startDate, endDate } = req.query;
+      const start = startDate ? new Date(startDate as string) : undefined;
+      const end = endDate ? new Date(endDate as string) : undefined;
+
+      const metrics = financialLedger.getFinancialMetrics(start, end);
+      const ledgerEntries = serverDb.getAll('ledger_entries');
+      const restaurantBalances = serverDb.getAll('restaurant_balances');
+      const riderBalances = serverDb.getAll('rider_balances');
+      const expenses = serverDb.getAll('business_expenses');
+      const config = getPaymentConfigStatus();
+
+      res.json({
+        success: true,
+        metrics,
+        config,
+        restaurantBalances,
+        riderBalances,
+        recentLedger: ledgerEntries.slice(-25).reverse(),
+        recentExpenses: expenses.slice(-10).reverse()
+      });
+    } catch (err: any) {
+      console.error('[API_ADMIN_FINANCIALS_ERROR]', err);
+      res.status(500).json({ success: false, message: err.message || 'Could not fetch financial analytics' });
+    }
+  });
+
+  // 8. Admin Financials: Daily Analytics
+  app.get('/api/admin/financials/daily', (req, res) => {
+    try {
+      const days = parseInt((req.query.days as string) || '30', 10);
+      const daily = financialLedger.getDailyAnalytics(days);
+      res.json({ success: true, daily });
+    } catch (err: any) {
+      console.error('[API_DAILY_FINANCIALS_ERROR]', err);
+      res.status(500).json({ success: false, message: err.message });
+    }
+  });
+
+  // 9. Admin Financials: Monthly Analytics
+  app.get('/api/admin/financials/monthly', (req, res) => {
+    try {
+      const months = parseInt((req.query.months as string) || '6', 10);
+      const monthly = financialLedger.getMonthlyAnalytics(months);
+      res.json({ success: true, monthly });
+    } catch (err: any) {
+      console.error('[API_MONTHLY_FINANCIALS_ERROR]', err);
+      res.status(500).json({ success: false, message: err.message });
+    }
+  });
+
+  // 10. Record Business Operating Expense (servers, SMS, marketing, etc.)
+  app.post('/api/admin/financials/expenses', (req, res) => {
+    try {
+      const { category, amount, description, date, recorded_by } = req.body;
+      if (!category || !amount || !description) {
+        return res.status(400).json({ success: false, message: 'category, amount, and description are required' });
+      }
+
+      const expense = financialLedger.recordBusinessExpense({
+        category,
+        amount: Number(amount),
+        description,
+        date: date || new Date().toISOString(),
+        recorded_by: recorded_by || 'Admin'
+      });
+
+      res.json({ success: true, expense });
+    } catch (err: any) {
+      console.error('[API_EXPENSE_ERROR]', err);
+      res.status(500).json({ success: false, message: err.message });
+    }
+  });
+
+  // 11. Settle Restaurant Earnings to Paid Out
+  app.post('/api/admin/financials/settle-restaurant', (req, res) => {
+    try {
+      const { restaurantId, amount } = req.body;
+      if (!restaurantId || !amount) {
+        return res.status(400).json({ success: false, message: 'restaurantId and amount required' });
+      }
+      financialLedger.settleRestaurantEarnings(restaurantId, Number(amount));
+      res.json({ success: true, message: `Restaurant ${restaurantId} balance settled` });
+    } catch (err: any) {
+      res.status(500).json({ success: false, message: err.message });
+    }
+  });
+
+  // 12. Settle Rider Earnings to Paid Out
+  app.post('/api/admin/financials/settle-rider', (req, res) => {
+    try {
+      const { riderId, amount } = req.body;
+      if (!riderId || !amount) {
+        return res.status(400).json({ success: false, message: 'riderId and amount required' });
+      }
+      financialLedger.settleRiderEarnings(riderId, Number(amount));
+      res.json({ success: true, message: `Rider ${riderId} balance settled` });
+    } catch (err: any) {
+      res.status(500).json({ success: false, message: err.message });
     }
   });
 
@@ -701,7 +926,7 @@ async function startServer() {
       const publicKey = getVapidPublicKey();
       res.json({ success: true, publicKey });
     } catch (err: any) {
-      res.status(500).json({ success: false, error: err.message });
+      res.status(500).json({ success: false, error: err?.message || String(err) });
     }
   });
 
@@ -724,7 +949,7 @@ async function startServer() {
 
       res.json({ success: true, message: 'Web Push subscription registered', record });
     } catch (err: any) {
-      res.status(500).json({ success: false, error: err.message });
+      res.status(500).json({ success: false, error: err?.message || String(err) });
     }
   });
 
@@ -739,7 +964,7 @@ async function startServer() {
       const removed = removeWebPushSubscription(endpoint);
       res.json({ success: true, removed });
     } catch (err: any) {
-      res.status(500).json({ success: false, error: err.message });
+      res.status(500).json({ success: false, error: err?.message || String(err) });
     }
   });
 
@@ -749,7 +974,7 @@ async function startServer() {
       const subscriptions = listAllWebPushSubscriptions();
       res.json({ success: true, count: subscriptions.length, subscriptions });
     } catch (err: any) {
-      res.status(500).json({ success: false, error: err.message });
+      res.status(500).json({ success: false, error: err?.message || String(err) });
     }
   });
 
@@ -784,7 +1009,7 @@ async function startServer() {
         return res.json({ success: true, target: 'all', totalSubscriptions: allSubs.length, delivered: sent });
       }
     } catch (err: any) {
-      res.status(500).json({ success: false, error: err.message });
+      res.status(500).json({ success: false, error: err?.message || String(err) });
     }
   });
 

@@ -38,64 +38,77 @@ import { updateKitchenDetails } from '../../services/kitchenService';
 import { transitionOrderStatus } from '../../services/orderLifecycleService';
 
 export const KitchenDashboard: React.FC = () => {
-  const { user } = useAuthStore();
+  const { user, updateUserProfile } = useAuthStore();
   const { vendors, menuItems, foodZones } = useMarketplaceStore();
 
   // Authoritative vendor resolution
   const userVendorId = user?.vendor_id || user?.kitchen_profile?.vendor_id;
   const isAdmin = user?.role === 'admin' || user?.role === 'super_admin' || user?.active_role === 'admin' || user?.active_role === 'super_admin';
 
-  // Find vendor associated with this kitchen user or use user UID
+  // Find vendor associated with this kitchen user or default to all / first vendor
   const [activeVendorId, setActiveVendorId] = useState<string>(() => {
-    if (userVendorId) return userVendorId;
+    if (userVendorId && vendors.some(v => v.id === userVendorId)) return userVendorId;
     if (user?.uid) {
       const matched = vendors.find(v => v.owner_uid === user?.uid || v.email?.toLowerCase() === user?.email?.toLowerCase() || v.id === user?.uid);
-      return matched ? matched.id : user.uid;
+      if (matched) return matched.id;
     }
-    return vendors[0]?.id || 'vendor_mama_cass';
+    // Default to 'all' or first vendor so all orders are instantly visible
+    return 'all';
   });
 
-  useEffect(() => {
-    if (userVendorId && !isAdmin) {
-      setActiveVendorId(userVendorId);
-    } else if (user?.uid) {
-      const matched = vendors.find(v => v.owner_uid === user?.uid || v.email?.toLowerCase() === user?.email?.toLowerCase() || v.id === user?.uid);
-      if (matched) {
-        setActiveVendorId(matched.id);
-      } else if (!isAdmin) {
-        setActiveVendorId(user.uid);
-      }
-    }
-  }, [userVendorId, isAdmin, user?.uid, user?.email, vendors]);
+  const isAllStands = activeVendorId === 'all';
 
-  const currentVendor = vendors.find(v => v.id === activeVendorId || v.owner_uid === user?.uid) || (user?.uid ? {
-    id: activeVendorId,
-    name: user.name || 'Campus Kitchen',
-    slogan: 'Fresh, hot meals served daily on campus!',
-    rating: 5.0,
-    total_ratings: 1,
-    estimated_delivery_time: '15-25 min',
-    cover_image_url: 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=800&auto=format&fit=crop',
-    logo_url: 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=200&auto=format&fit=crop',
-    opening_time: '07:30',
-    closing_time: '21:00',
-    is_active: true,
-    is_open: true,
-    is_verified: true,
-    food_zone_id: 'zone_central',
-    university_id: user.university_id || 'uni_mtu',
-    campus_id: user.campus_id || 'campus_mtu_main',
-    owner_uid: user.uid,
-    email: user.email || '',
-    phone: user.phone || ''
-  } as any : vendors[0]);
-  const vendorMenu = menuItems.filter(m => m.vendor_id === activeVendorId || m.restaurant_id === activeVendorId);
+  const currentVendor = isAllStands 
+    ? {
+        id: 'all',
+        name: 'All Campus Kitchen Stands (Master Queue)',
+        slogan: 'Central Campus Food & Kitchen Dispatch Operations',
+        rating: 5.0,
+        total_ratings: 1,
+        estimated_delivery_time: '15-25 min',
+        cover_image_url: 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=800&auto=format&fit=crop',
+        logo_url: 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=200&auto=format&fit=crop',
+        opening_time: '07:00',
+        closing_time: '22:00',
+        is_active: true,
+        is_open: true,
+        is_verified: true,
+        food_zone_id: 'zone_central',
+        university_id: user?.university_id || 'uni_mtu',
+        campus_id: user?.campus_id || 'campus_mtu_main'
+      } as any
+    : vendors.find(v => v.id === activeVendorId || v.owner_uid === user?.uid) || (user?.uid ? {
+        id: activeVendorId,
+        name: user.name || 'Campus Kitchen',
+        slogan: 'Fresh, hot meals served daily on campus!',
+        rating: 5.0,
+        total_ratings: 1,
+        estimated_delivery_time: '15-25 min',
+        cover_image_url: 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=800&auto=format&fit=crop',
+        logo_url: 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=200&auto=format&fit=crop',
+        opening_time: '07:30',
+        closing_time: '21:00',
+        is_active: true,
+        is_open: true,
+        is_verified: true,
+        food_zone_id: 'zone_central',
+        university_id: user.university_id || 'uni_mtu',
+        campus_id: user.campus_id || 'campus_mtu_main',
+        owner_uid: user.uid,
+        email: user.email || '',
+        phone: user.phone || ''
+      } as any : vendors[0]);
+
+  const vendorMenu = isAllStands
+    ? menuItems
+    : menuItems.filter(m => m.vendor_id === activeVendorId || m.restaurant_id === activeVendorId);
   const currentZone = foodZones.find(z => z.id === currentVendor?.food_zone_id);
 
   // Active Tab
   const [activeTab, setActiveTab] = useState<'orders' | 'menu' | 'profile' | 'workers'>('orders');
 
   // Live Orders
+  const [allOrders, setAllOrders] = useState<Order[]>([]);
   const [liveOrders, setLiveOrders] = useState<Order[]>([]);
   const [isLoadingOrders, setIsLoadingOrders] = useState(true);
 
@@ -128,7 +141,7 @@ export const KitchenDashboard: React.FC = () => {
 
   // Sync state if vendor changes
   useEffect(() => {
-    if (currentVendor) {
+    if (currentVendor && !isAllStands) {
       setSlogan(currentVendor.slogan || 'Fresh campus meals made with love');
       setCoverUrl(currentVendor.cover_image_url || 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=800&auto=format&fit=crop');
       setLogoUrl(currentVendor.logo_url || 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=200&auto=format&fit=crop');
@@ -137,9 +150,9 @@ export const KitchenDashboard: React.FC = () => {
       setPrepTime(currentVendor.estimated_delivery_time || '15-25 min');
       if (currentVendor.workers) setWorkers(currentVendor.workers);
     }
-  }, [currentVendor?.id]);
+  }, [currentVendor?.id, isAllStands]);
 
-  // Real-time Orders Listener for this Vendor (supporting all ID and name mappings)
+  // Real-time Orders Listener (supporting all ID and name mappings)
   useEffect(() => {
     setIsLoadingOrders(true);
 
@@ -147,27 +160,32 @@ export const KitchenDashboard: React.FC = () => {
       const q = query(collection(db, 'orders'));
 
       const unsub = onSnapshot(q, (snapshot) => {
-        const ords: Order[] = [];
+        const rawOrds: Order[] = [];
         snapshot.forEach((d) => {
-          const data = d.data() as any;
-          const matchesVendorId =
-            data.vendor_id === activeVendorId ||
-            data.restaurant_id === activeVendorId ||
-            data.vendorId === activeVendorId ||
-            data.restaurantId === activeVendorId ||
-            data.vendor_id === user?.uid ||
-            data.restaurant_id === user?.uid;
-
-          const matchesVendorName =
-            currentVendor &&
-            (data.vendor_name === currentVendor.name || data.restaurant_name === currentVendor.name);
-
-          if (matchesVendorId || matchesVendorName) {
-            ords.push({ id: d.id, ...data } as Order);
-          }
+          rawOrds.push({ id: d.id, ...d.data() } as Order);
         });
-        ords.sort((a, b) => new Date(b.created_at || '').getTime() - new Date(a.created_at || '').getTime());
-        setLiveOrders(ords);
+        rawOrds.sort((a, b) => new Date(b.created_at || '').getTime() - new Date(a.created_at || '').getTime());
+        setAllOrders(rawOrds);
+
+        // Filter for the active vendor or all stands
+        const filtered = rawOrds.filter((data: any) => {
+          if (activeVendorId === 'all') return true;
+
+          const dataVendorId = data.vendor_id || data.restaurant_id || data.vendorId || data.restaurantId;
+          if (dataVendorId && (dataVendorId === activeVendorId || dataVendorId === user?.uid || dataVendorId === userVendorId)) {
+            return true;
+          }
+
+          const dataVendorName = (data.vendor_name || data.restaurant_name || '').toLowerCase();
+          const currentName = (currentVendor?.name || '').toLowerCase();
+          if (currentName && dataVendorName && (dataVendorName === currentName || dataVendorName.includes(currentName) || currentName.includes(dataVendorName))) {
+            return true;
+          }
+
+          return false;
+        });
+
+        setLiveOrders(filtered);
         setIsLoadingOrders(false);
       }, (err) => {
         console.warn('Orders listener notice:', err);
@@ -179,7 +197,7 @@ export const KitchenDashboard: React.FC = () => {
       console.warn('Orders query catch:', e);
       setIsLoadingOrders(false);
     }
-  }, [activeVendorId, currentVendor?.name, user?.uid]);
+  }, [activeVendorId, currentVendor?.name, user?.uid, userVendorId]);
 
   // Toggle Stand Open/Closed in Firestore
   const handleToggleStoreOpen = async () => {
@@ -427,18 +445,34 @@ export const KitchenDashboard: React.FC = () => {
               </div>
             </div>
 
-            {/* Stand Switcher (if user manages multiple stands) */}
-            {vendors.length > 1 && (
+            {/* Stand Switcher */}
+            <div className="flex items-center gap-1 bg-slate-800/90 p-1 rounded-xl border border-slate-700">
+              <span className="text-[10px] font-extrabold text-slate-400 px-2 uppercase">Stand:</span>
               <select
                 value={activeVendorId}
-                onChange={(e) => setActiveVendorId(e.target.value)}
-                className="bg-slate-800 text-white text-xs font-bold py-2 px-3 rounded-xl border border-slate-700 outline-none"
+                onChange={(e) => {
+                  triggerHaptic(20);
+                  setActiveVendorId(e.target.value);
+                }}
+                className="bg-slate-900 text-white text-xs font-bold py-1.5 px-3 rounded-lg border-0 outline-none cursor-pointer"
               >
-                {vendors.map(v => (
-                  <option key={v.id} value={v.id}>{v.name}</option>
-                ))}
+                <option value="all">🌟 All Campus Stands ({allOrders.length} orders)</option>
+                {vendors.map(v => {
+                  const standOrdersCount = allOrders.filter(o => 
+                    o.vendor_id === v.id || 
+                    (o as any).restaurant_id === v.id || 
+                    (o as any).vendorId === v.id || 
+                    (o as any).restaurantId === v.id ||
+                    (o.vendor_name && o.vendor_name.toLowerCase() === v.name.toLowerCase())
+                  ).length;
+                  return (
+                    <option key={v.id} value={v.id}>
+                      {v.name} ({standOrdersCount} orders)
+                    </option>
+                  );
+                })}
               </select>
-            )}
+            </div>
 
           </div>
 
@@ -596,24 +630,125 @@ export const KitchenDashboard: React.FC = () => {
             exit={{ opacity: 0, y: -6 }}
             className="space-y-4"
           >
-            <div className="bg-white dark:bg-slate-900 p-5 rounded-3xl border border-rose-100 dark:border-slate-800 shadow-xs flex items-center justify-between">
-              <div>
-                <h2 className="text-lg font-black text-slate-900 dark:text-slate-100 flex items-center gap-2">
-                  <ShoppingBag className="w-5 h-5 text-[#D6001C]" />
-                  <span>Active Kitchen Orders Queue</span>
-                </h2>
-                <p className="text-xs text-slate-500 dark:text-slate-400">Live order flow synchronized with student apps and campus riders.</p>
+            <div className="bg-white dark:bg-slate-900 p-5 rounded-3xl border border-rose-100 dark:border-slate-800 shadow-xs space-y-3">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                <div>
+                  <h2 className="text-lg font-black text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                    <ShoppingBag className="w-5 h-5 text-[#D6001C]" />
+                    <span>Active Kitchen Orders Queue</span>
+                  </h2>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    Live order flow synchronized across student apps, kitchen stands, and campus dispatchers.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="bg-rose-50 dark:bg-rose-950/60 text-[#D6001C] dark:text-rose-400 font-black text-xs px-3 py-1 rounded-full border border-rose-100 dark:border-rose-900/50">
+                    {liveOrders.length} {activeVendorId === 'all' ? 'Total' : 'Stand'} Orders
+                  </span>
+                  {activeVendorId !== 'all' && activeVendorId !== userVendorId && (
+                    <button
+                      onClick={async () => {
+                        if (user?.uid) {
+                          await updateUserProfile({ vendor_id: activeVendorId });
+                          toast.success('Linked this stand as your default kitchen profile!');
+                        }
+                      }}
+                      className="text-[11px] font-extrabold text-[#D6001C] bg-red-50 dark:bg-red-950/50 hover:bg-red-100 px-3 py-1 rounded-full transition-colors cursor-pointer border border-red-200 dark:border-red-900"
+                    >
+                      Set As My Primary Stand
+                    </button>
+                  )}
+                </div>
               </div>
-              <span className="bg-rose-50 dark:bg-rose-950/60 text-[#D6001C] dark:text-rose-400 font-black text-xs px-3 py-1 rounded-full border border-rose-100 dark:border-rose-900/50">
-                {liveOrders.length} Orders
-              </span>
+
+              {/* Stand Filter Chips with Live Order Badges */}
+              <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none pt-1 border-t border-slate-100 dark:border-slate-800">
+                <button
+                  onClick={() => {
+                    triggerHaptic(15);
+                    setActiveVendorId('all');
+                  }}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-black whitespace-nowrap flex items-center gap-1.5 transition-all cursor-pointer ${
+                    activeVendorId === 'all'
+                      ? 'bg-[#D6001C] text-white shadow-xs'
+                      : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+                  }`}
+                >
+                  <span>All Campus Stands</span>
+                  <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${activeVendorId === 'all' ? 'bg-white text-[#D6001C]' : 'bg-slate-200 dark:bg-slate-700 text-slate-800 dark:text-slate-200'}`}>
+                    {allOrders.length}
+                  </span>
+                </button>
+
+                {vendors.map((v) => {
+                  const count = allOrders.filter(
+                    (o) =>
+                      o.vendor_id === v.id ||
+                      (o as any).restaurant_id === v.id ||
+                      (o as any).vendorId === v.id ||
+                      (o as any).restaurantId === v.id ||
+                      (o.vendor_name && o.vendor_name.toLowerCase() === v.name.toLowerCase())
+                  ).length;
+                  const isSelected = activeVendorId === v.id;
+                  return (
+                    <button
+                      key={v.id}
+                      onClick={() => {
+                        triggerHaptic(15);
+                        setActiveVendorId(v.id);
+                      }}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap flex items-center gap-1.5 transition-all cursor-pointer ${
+                        isSelected
+                          ? 'bg-[#D6001C] text-white shadow-xs font-black'
+                          : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+                      }`}
+                    >
+                      <span>{v.name}</span>
+                      {count > 0 && (
+                        <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono font-black ${isSelected ? 'bg-white text-[#D6001C]' : 'bg-rose-500 text-white animate-pulse'}`}>
+                          {count}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
+
+            {/* If current view has 0 orders but campus has pending orders */}
+            {liveOrders.length === 0 && allOrders.length > 0 && (
+              <div className="bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900/50 p-4 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
+                <div className="flex items-center gap-2.5">
+                  <Bell className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
+                  <span className="font-bold text-amber-900 dark:text-amber-200">
+                    There are <span className="underline font-black">{allOrders.length} active order(s)</span> in other campus food stands.
+                  </span>
+                </div>
+                <button
+                  onClick={() => {
+                    triggerHaptic(20);
+                    setActiveVendorId('all');
+                  }}
+                  className="bg-amber-600 hover:bg-amber-700 text-white font-extrabold px-3 py-1.5 rounded-xl transition-all cursor-pointer whitespace-nowrap shadow-xs"
+                >
+                  View All {allOrders.length} Orders
+                </button>
+              </div>
+            )}
 
             {liveOrders.length === 0 ? (
               <div className="bg-white dark:bg-slate-900 p-12 rounded-3xl border border-rose-100 dark:border-slate-800 text-center space-y-2">
                 <Bell className="w-10 h-10 text-slate-300 dark:text-slate-600 mx-auto" />
-                <h3 className="font-extrabold text-slate-700 dark:text-slate-300 text-sm">No active incoming orders right now</h3>
-                <p className="text-xs text-slate-400 dark:text-slate-500">When customers place meal orders for your stand, they will appear here in realtime.</p>
+                <h3 className="font-extrabold text-slate-700 dark:text-slate-300 text-sm">No active incoming orders for {currentVendor?.name || 'this stand'}</h3>
+                <p className="text-xs text-slate-400 dark:text-slate-500">When customers place meal orders, they will appear here in realtime.</p>
+                {allOrders.length > 0 && (
+                  <button
+                    onClick={() => setActiveVendorId('all')}
+                    className="mt-3 inline-block bg-[#D6001C] text-white text-xs font-black px-4 py-2 rounded-xl hover:bg-red-700 cursor-pointer shadow-sm"
+                  >
+                    Switch to Universal Queue ({allOrders.length} total orders)
+                  </button>
+                )}
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

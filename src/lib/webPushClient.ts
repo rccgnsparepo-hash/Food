@@ -171,11 +171,13 @@ export async function registerWebPush(
         ? 'IOS'
         : 'WEB';
 
-      const browserInfo = navigator.userAgent.includes('Chrome')
+      const browserInfo = /edg/i.test(navigator.userAgent)
+        ? 'Edge'
+        : /chrome|crios/i.test(navigator.userAgent)
         ? 'Chrome'
-        : navigator.userAgent.includes('Firefox')
+        : /firefox|fxios/i.test(navigator.userAgent)
         ? 'Firefox'
-        : navigator.userAgent.includes('Safari')
+        : /safari/i.test(navigator.userAgent) && !/chrome/i.test(navigator.userAgent)
         ? 'Safari'
         : 'Browser';
 
