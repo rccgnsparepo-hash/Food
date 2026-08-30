@@ -1,6 +1,7 @@
 import { UserRole, Permission, UserIdentity, UserProfile, Order, OrderStatus } from '../types';
 import { db, auth } from '../lib/firebase';
 import { doc, getDoc, setDoc, updateDoc, collection, query, where, getDocs, limit } from "../lib/embeddedDb";
+import { matchOfficialVendor } from './seedService';
 
 const cleanFirestoreData = (data: any): any => {
   return JSON.parse(JSON.stringify(data));
@@ -173,7 +174,17 @@ export async function resolveAuthoritativeUserProfile(uid: string): Promise<User
     ]);
 
     const isKitchenRole = activeRole === 'kitchen' || activeRole === 'kitchen_manager' || activeRole === 'kitchen_staff' || roles.includes('kitchen');
-    let resolvedVendorId = userData.vendor_id || (kitchenSnap?.exists() ? kitchenSnap.data()?.vendor_id : undefined);
+    
+    // Check match against the 5 official vendors (Stand-1(Bunlab), Multi-grace, Kitchen3, Mama Fruits, Kitchen5(Mummy and Daddy))
+    const matchedVendor = matchOfficialVendor(userData.vendor_id) || 
+                          matchOfficialVendor(kitchenSnap?.data()?.vendor_id) || 
+                          matchOfficialVendor(kitchenSnap?.data()?.vendor_name) || 
+                          matchOfficialVendor(userData.name);
+
+    let resolvedVendorId = matchedVendor 
+      ? matchedVendor.id 
+      : (userData.vendor_id || (kitchenSnap?.exists() ? kitchenSnap.data()?.vendor_id : undefined));
+      
     if (!resolvedVendorId && isKitchenRole) {
       resolvedVendorId = uid;
     }

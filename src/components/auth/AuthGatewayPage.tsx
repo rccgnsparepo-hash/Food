@@ -27,7 +27,10 @@ import {
   MessageCircle,
   Globe,
   LogIn,
-  Check
+  Check,
+  ChefHat,
+  Store,
+  ShieldAlert
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuthStore } from '../../stores/useAuthStore';
@@ -36,6 +39,7 @@ import { translateFirebaseAuthError } from '../../lib/authErrorTranslator';
 import { PasswordStrengthMeter } from './PasswordStrengthMeter';
 import { BukkitLogo } from '../common/BukkitLogo';
 import { UserRole } from '../../types';
+import { FALLBACK_MTU_VENDORS, matchOfficialVendor, VENDOR_CREATION_ADMIN_PIN } from '../../services/seedService';
 
 type AuthStatus = 'idle' | 'loading' | 'success' | 'error' | 'email-verification-required';
 
@@ -317,6 +321,21 @@ export const AuthGatewayPage: React.FC = () => {
     }
     if (selectedRole === 'admin' && !adminKey.trim()) {
       errors.adminKey = 'Admin Passkey is required for administrative registration.';
+    }
+
+    // Kitchen/Vendor Stand PIN Validation:
+    // If selecting/creating a kitchen account:
+    // If the name or selection matches one of the 5 official stands, NO PIN is required!
+    // If creating a new custom stand, require Admin PIN (100110011001).
+    if (selectedRole === 'kitchen') {
+      const isOfficialMatch = matchOfficialVendor(selectedVendorId) || matchOfficialVendor(fullName);
+      if (!isOfficialMatch) {
+        if (!adminKey.trim()) {
+          errors.adminKey = 'Admin PIN (100110011001) is required to create a new custom food vendor stand.';
+        } else if (adminKey.trim() !== VENDOR_CREATION_ADMIN_PIN && adminKey.trim() !== '100110011001' && adminKey.trim() !== 'MTU-ADMIN-2026') {
+          errors.adminKey = 'Invalid Admin PIN. Authorized PIN is 100110011001.';
+        }
+      }
     }
 
     if (Object.keys(errors).length > 0) {
@@ -952,26 +971,107 @@ export const AuthGatewayPage: React.FC = () => {
 
                   {/* Kitchen Stand Selection (for kitchen staff / owners) */}
                   {selectedRole === 'kitchen' && (
-                    <div className="bg-rose-50 dark:bg-slate-800/80 p-3 rounded-2xl border border-rose-100 dark:border-slate-700 space-y-1.5 text-left">
-                      <label className="text-[11px] font-bold text-slate-700 dark:text-slate-200 flex items-center gap-1.5">
-                        <ChefHat className="w-3.5 h-3.5 text-[#D6001C]" />
-                        <span>Select Your Campus Food Stand</span>
-                      </label>
-                      <select
-                        value={selectedVendorId}
-                        onChange={(e) => setSelectedVendorId(e.target.value)}
-                        className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 dark:text-slate-100 outline-none cursor-pointer"
-                      >
-                        <option value="">🌟 Universal Queue (Manage All Stands)</option>
-                        {vendors.map((v) => (
-                          <option key={v.id} value={v.id}>
-                            {v.name}
-                          </option>
-                        ))}
-                      </select>
-                      <p className="text-[10px] text-slate-500 dark:text-slate-400 leading-tight">
-                        You can also switch stands anytime directly from the Kitchen Dashboard.
+                    <div className="bg-rose-50/80 dark:bg-slate-800/90 p-3.5 rounded-2xl border border-rose-200 dark:border-slate-700 space-y-2.5 text-left shadow-xs">
+                      <div className="flex items-center justify-between">
+                        <label className="text-[11px] font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                          <ChefHat className="w-4 h-4 text-[#D6001C]" />
+                          <span>Select MTU Campus Food Stand</span>
+                        </label>
+                        <span className="text-[10px] font-extrabold text-[#D6001C] bg-rose-100 dark:bg-rose-950/60 px-2 py-0.5 rounded-full">
+                          5 Official Stands
+                        </span>
+                      </div>
+
+                      <p className="text-[11px] text-slate-600 dark:text-slate-400 leading-tight">
+                        Select your official stand below, or type its name in <span className="font-bold text-slate-800 dark:text-slate-200">Full Name</span>. Custom stands require Admin PIN (<span className="font-mono font-bold text-[#D6001C]">100110011001</span>).
                       </p>
+
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
+                        {FALLBACK_MTU_VENDORS.map((v) => {
+                          const isSelected = selectedVendorId === v.id || fullName.trim().toLowerCase() === v.name.toLowerCase();
+                          return (
+                            <button
+                              key={v.id}
+                              type="button"
+                              onClick={() => {
+                                setSelectedVendorId(v.id);
+                                setFullName(v.name);
+                                if (fieldErrors.fullName) {
+                                  setFieldErrors(prev => {
+                                    const next = { ...prev };
+                                    delete next.fullName;
+                                    return next;
+                                  });
+                                }
+                              }}
+                              className={`px-2.5 py-2 rounded-xl text-left border text-[11px] font-bold transition-all flex flex-col justify-between ${
+                                isSelected
+                                  ? 'bg-[#D6001C] text-white border-[#D6001C] shadow-sm'
+                                  : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-red-300'
+                              }`}
+                            >
+                              <span className="truncate">{v.name}</span>
+                              <span className={`text-[9px] font-medium ${isSelected ? 'text-red-100' : 'text-slate-400'}`}>
+                                {v.slogan || 'Campus Stand'}
+                              </span>
+                            </button>
+                          );
+                        })}
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedVendorId('custom');
+                          }}
+                          className={`px-2.5 py-2 rounded-xl text-left border text-[11px] font-bold transition-all flex flex-col justify-between ${
+                            selectedVendorId === 'custom' || (!matchOfficialVendor(selectedVendorId) && !matchOfficialVendor(fullName) && fullName.trim().length > 0)
+                              ? 'bg-amber-500 text-white border-amber-500 shadow-sm'
+                              : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-dashed border-slate-300 dark:border-slate-600 hover:border-amber-400'
+                          }`}
+                        >
+                          <span className="truncate flex items-center gap-1">
+                            <Store className="w-3 h-3 shrink-0" />
+                            <span>+ Custom Stand</span>
+                          </span>
+                          <span className="text-[9px] font-medium opacity-80">Requires PIN</span>
+                        </button>
+                      </div>
+
+                      {/* If custom stand or unmapped name, show Admin PIN input */}
+                      {(!matchOfficialVendor(selectedVendorId) && !matchOfficialVendor(fullName)) && (
+                        <div className="bg-amber-50 dark:bg-amber-950/40 p-3 rounded-xl border border-amber-200 dark:border-amber-900/60 space-y-2 mt-2">
+                          <div className="flex items-center justify-between">
+                            <label className="text-[11px] font-bold text-amber-900 dark:text-amber-300 flex items-center gap-1.5">
+                              <KeyRound className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+                              <span>Vendor Creation Admin PIN</span>
+                            </label>
+                            <span className="text-[10px] font-mono font-bold bg-amber-200/70 dark:bg-amber-900/80 px-2 py-0.5 rounded-full text-amber-900 dark:text-amber-200">
+                              PIN: 100110011001
+                            </span>
+                          </div>
+                          <input
+                            type="password"
+                            disabled={isLoadingState}
+                            value={adminKey}
+                            onChange={(e) => handleInputChange('adminKey', e.target.value, setAdminKey)}
+                            placeholder="Enter 12-digit Admin PIN (100110011001)"
+                            className="w-full bg-white dark:bg-slate-900 border border-amber-300 dark:border-amber-700 rounded-lg px-3 py-2 text-xs font-mono text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-500/20"
+                          />
+                          {fieldErrors.adminKey && (
+                            <p className="text-[11px] text-red-600 dark:text-red-400 font-semibold flex items-center gap-1">
+                              <AlertCircle className="w-3 h-3 shrink-0" />
+                              <span>{fieldErrors.adminKey}</span>
+                            </p>
+                          )}
+                        </div>
+                      )}
+
+                      {(matchOfficialVendor(selectedVendorId) || matchOfficialVendor(fullName)) && (
+                        <div className="flex items-center gap-1.5 text-[11px] font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-2.5 py-1.5 rounded-lg border border-emerald-200 dark:border-emerald-900/60">
+                          <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                          <span>Official Campus Stand linked: {(matchOfficialVendor(selectedVendorId) || matchOfficialVendor(fullName))?.name} (No PIN required)</span>
+                        </div>
+                      )}
                     </div>
                   )}
 

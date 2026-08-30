@@ -20,6 +20,7 @@ import { toast } from 'sonner';
 import { emitAuthoritativeOrderEvent } from './notificationService';
 import { apiFetch } from '../lib/apiConfig';
 import { OrderEventType } from '../types';
+import { matchOfficialVendor } from './seedService';
 
 /**
  * Recursively removes undefined fields so that Firestore setDoc/updateDoc never fails.
@@ -164,13 +165,17 @@ export async function createAuthoritativeOrder(
     return itemObj as any;
   });
 
+  const matchedOfficial = matchOfficialVendor(input.vendorId) || matchOfficialVendor(input.vendorName);
+  const effectiveVendorId = matchedOfficial ? matchedOfficial.id : (input.vendorId || 'vendor_stand1_bunlab');
+  const effectiveVendorName = matchedOfficial ? matchedOfficial.name : (input.vendorName || 'MTU Campus Food Stand');
+
   const rawOrderData: Order = {
     id: orderId,
     order_id: orderId,
     customer_id: currentUser.uid,
     user_id: currentUser.uid,
-    vendor_id: input.vendorId || 'vendor_mtu_canteen',
-    restaurant_id: input.vendorId || 'vendor_mtu_canteen',
+    vendor_id: effectiveVendorId,
+    restaurant_id: effectiveVendorId,
     rider_id: null,
     delivery_id: deliveryId,
     payment_id: paymentId,
@@ -183,8 +188,8 @@ export async function createAuthoritativeOrder(
     customer_phone: input.userPhone || currentUser.phone || '',
     user_phone: input.userPhone || currentUser.phone || '',
     customer_email: input.userEmail || currentUser.email || '',
-    vendor_name: input.vendorName || 'MTU Campus Food Vendor',
-    restaurant_name: input.vendorName || 'MTU Campus Food Vendor',
+    vendor_name: effectiveVendorName,
+    restaurant_name: effectiveVendorName,
     vendor_phone: input.vendorPhone || '+234 810 555 1212',
     vendor_address: input.vendorAddress || 'Central Food Plaza, Mountain Top University',
     rider_name: null,

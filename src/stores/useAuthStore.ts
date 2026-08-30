@@ -15,6 +15,7 @@ import {
 import { translateFirebaseAuthError } from '../lib/authErrorTranslator';
 import { resolveAuthoritativeUserProfile, findUserProfileByEmail, getRolePermissions, hasPermission as checkPermission } from '../services/authService';
 import { deactivateDeviceToken } from '../services/fcmDeviceService';
+import { matchOfficialVendor, VENDOR_CREATION_ADMIN_PIN, FALLBACK_MTU_VENDORS } from '../services/seedService';
 
 export type AuthStatus = 'idle' | 'loading' | 'success' | 'error' | 'email-verification-required';
 
@@ -287,9 +288,28 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       set({ isEmailVerified: userCred.user.emailVerified });
 
       const now = new Date().toISOString();
-      const effectiveVendorId = (role === 'kitchen' || role === 'kitchen_manager' || role === 'kitchen_staff')
-        ? (vendorId || createdUid)
-        : undefined;
+      
+      let effectiveVendorId: string | undefined = undefined;
+      let effectiveVendorName = fullName.trim() || 'Campus Food Stand';
+      let matchedOfficialVendor: any = null;
+
+      if (role === 'kitchen' || role === 'kitchen_manager' || role === 'kitchen_staff') {
+        // Check if matching one of the 5 official campus vendors:
+        // 1. Stand-1(Bunlab), 2. Multi-grace, 3. Kitchen3, 4. Mama Fruits, 5. Kitchen5(Mummy and Daddy)
+        matchedOfficialVendor = matchOfficialVendor(vendorId) || matchOfficialVendor(fullName);
+
+        if (matchedOfficialVendor) {
+          effectiveVendorId = matchedOfficialVendor.id;
+          effectiveVendorName = matchedOfficialVendor.name;
+        } else {
+          // Custom vendor creation requires the Admin PIN 100110011001
+          const enteredPin = (adminKey || '').trim();
+          if (enteredPin !== VENDOR_CREATION_ADMIN_PIN && enteredPin !== '100110011001' && enteredPin !== 'MTU-ADMIN-2026') {
+            throw new Error('Authorized Admin PIN (100110011001) is required to create a new custom vendor account. Or select one of the 5 campus stands.');
+          }
+          effectiveVendorId = vendorId || `vendor_${createdUid.slice(0, 10)}`;
+        }
+      }
 
       const newProfile: UserProfile = {
         id: createdUid,
@@ -338,9 +358,19 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         newProfile.rider_profile = riderProf;
         subProfilePromise = setDoc(doc(db, 'rider_profiles', createdUid), cleanFirestoreData(riderProf));
       } else if (role === 'kitchen' || role === 'kitchen_manager' || role === 'kitchen_staff') {
-        const vendorDocData = {
+        const vendorDocData = matchedOfficialVendor ? {
+          ...matchedOfficialVendor,
           id: effectiveVendorId,
-          name: fullName.trim() || 'Campus Kitchen',
+          name: matchedOfficialVendor.name,
+          owner_uid: createdUid,
+          email: cleanEmail,
+          phone: phone.trim(),
+          is_active: true,
+          is_open: true,
+          updated_at: now
+        } : {
+          id: effectiveVendorId,
+          name: effectiveVendorName,
           slogan: 'Fresh, hot meals served daily on campus!',
           rating: 5.0,
           total_ratings: 1,
@@ -367,7 +397,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         const kitchenProf: KitchenStaffProfile = {
           user_id: createdUid,
           vendor_id: effectiveVendorId!,
-          vendor_name: fullName.trim() || 'Campus Kitchen',
+          vendor_name: effectiveVendorName,
           role: role as any,
           permissions: getRolePermissions(role),
           shift_status: 'on_duty',
@@ -377,7 +407,13 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         newProfile.kitchen_profile = kitchenProf;
         subProfilePromise = Promise.all([
           setDoc(doc(db, 'kitchen_staff_profiles', createdUid), cleanFirestoreData(kitchenProf)),
-          setDoc(doc(db, 'vendors', effectiveVendorId!), cleanFirestoreData(vendorDocData))
+          setDoc(doc(db, 'vendors', effectiveVendorId!), cleanFirestoreData(vendorDocData), { merge: true }),
+          setDoc(doc(db, 'restaurants', effectiveVendorId!), cleanFirestoreData({
+            id: effectiveVendorId,
+            name: effectiveVendorName,
+            is_open: true,
+            updated_at: now
+          }), { merge: true })
         ]);
       } else if (role === 'admin' || role === 'super_admin') {
         const adminProf: AdminProfile = {

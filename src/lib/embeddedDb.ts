@@ -71,31 +71,45 @@ try {
   console.warn('[EmbeddedDb] Cache load notice:', e);
 }
 
-// Ensure default fallback data is populated if empty
+// Ensure default fallback data is populated
 function ensureSeedData() {
-  if (!inMemoryStore['universities'] || Object.keys(inMemoryStore['universities']).length === 0) {
-    inMemoryStore['universities'] = { [FALLBACK_MTU_UNIVERSITY.id]: FALLBACK_MTU_UNIVERSITY };
+  if (!inMemoryStore['universities']) inMemoryStore['universities'] = {};
+  inMemoryStore['universities'][FALLBACK_MTU_UNIVERSITY.id] = FALLBACK_MTU_UNIVERSITY;
+
+  if (!inMemoryStore['campuses']) inMemoryStore['campuses'] = {};
+  inMemoryStore['campuses'][FALLBACK_MTU_CAMPUS.id] = FALLBACK_MTU_CAMPUS;
+
+  if (!inMemoryStore['vendors']) inMemoryStore['vendors'] = {};
+  if (!inMemoryStore['restaurants']) inMemoryStore['restaurants'] = {};
+  for (const v of FALLBACK_MTU_VENDORS) {
+    inMemoryStore['vendors'][v.id] = { ...(inMemoryStore['vendors'][v.id] || {}), ...v };
+    inMemoryStore['restaurants'][v.id] = {
+      id: v.id,
+      name: v.name,
+      description: v.description || '',
+      logo_url: v.logo_url,
+      cover_image_url: v.cover_image_url,
+      review_count: v.review_count || 0,
+      rating: v.rating || 4.9,
+      delivery_fee: 200,
+      estimated_delivery_time: '10-20 min',
+      minimum_order: 500,
+      address: v.address,
+      latitude: v.latitude,
+      longitude: v.longitude,
+      is_open: true,
+      created_at: v.created_at
+    };
   }
-  if (!inMemoryStore['campuses'] || Object.keys(inMemoryStore['campuses']).length === 0) {
-    inMemoryStore['campuses'] = { [FALLBACK_MTU_CAMPUS.id]: FALLBACK_MTU_CAMPUS };
+
+  if (!inMemoryStore['food_categories']) inMemoryStore['food_categories'] = {};
+  for (const c of FALLBACK_MTU_CATEGORIES) {
+    inMemoryStore['food_categories'][c.id] = c;
   }
-  if (!inMemoryStore['vendors'] || Object.keys(inMemoryStore['vendors']).length === 0) {
-    inMemoryStore['vendors'] = {};
-    for (const v of FALLBACK_MTU_VENDORS) {
-      inMemoryStore['vendors'][v.id] = v;
-    }
-  }
-  if (!inMemoryStore['food_categories'] || Object.keys(inMemoryStore['food_categories']).length === 0) {
-    inMemoryStore['food_categories'] = {};
-    for (const c of FALLBACK_MTU_CATEGORIES) {
-      inMemoryStore['food_categories'][c.id] = c;
-    }
-  }
-  if (!inMemoryStore['menu_items'] || Object.keys(inMemoryStore['menu_items']).length === 0) {
-    inMemoryStore['menu_items'] = {};
-    for (const m of FALLBACK_MTU_MENU_ITEMS) {
-      inMemoryStore['menu_items'][m.id] = m;
-    }
+
+  if (!inMemoryStore['menu_items']) inMemoryStore['menu_items'] = {};
+  for (const m of FALLBACK_MTU_MENU_ITEMS) {
+    inMemoryStore['menu_items'][m.id] = { ...(inMemoryStore['menu_items'][m.id] || {}), ...m };
   }
 }
 ensureSeedData();

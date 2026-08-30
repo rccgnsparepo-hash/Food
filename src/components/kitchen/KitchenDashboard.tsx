@@ -36,23 +36,29 @@ import { ImageUploadInput } from '../common/ImageUploadInput';
 import { BukkitLogo } from '../common/BukkitLogo';
 import { updateKitchenDetails } from '../../services/kitchenService';
 import { transitionOrderStatus } from '../../services/orderLifecycleService';
+import { matchOfficialVendor, FALLBACK_MTU_VENDORS } from '../../services/seedService';
 
 export const KitchenDashboard: React.FC = () => {
-  const { user, updateUserProfile } = useAuthStore();
+  const { user, updateProfileDetails } = useAuthStore();
   const { vendors, menuItems, foodZones } = useMarketplaceStore();
 
   // Authoritative vendor resolution
   const userVendorId = user?.vendor_id || user?.kitchen_profile?.vendor_id;
   const isAdmin = user?.role === 'admin' || user?.role === 'super_admin' || user?.active_role === 'admin' || user?.active_role === 'super_admin';
 
-  // Find vendor associated with this kitchen user or default to all / first vendor
+  // Find vendor associated with this kitchen user or default to matched 5 official stands / all
   const [activeVendorId, setActiveVendorId] = useState<string>(() => {
+    const matchedOfficial = matchOfficialVendor(userVendorId) || 
+                            matchOfficialVendor(user?.name) || 
+                            matchOfficialVendor(user?.kitchen_profile?.vendor_name);
+    if (matchedOfficial) return matchedOfficial.id;
+
     if (userVendorId && vendors.some(v => v.id === userVendorId)) return userVendorId;
     if (user?.uid) {
       const matched = vendors.find(v => v.owner_uid === user?.uid || v.email?.toLowerCase() === user?.email?.toLowerCase() || v.id === user?.uid);
       if (matched) return matched.id;
     }
-    // Default to 'all' or first vendor so all orders are instantly visible
+    // Default to 'all' so orders are immediately visible
     return 'all';
   });
 
@@ -176,9 +182,21 @@ export const KitchenDashboard: React.FC = () => {
             return true;
           }
 
+          // Check if dataVendorId maps to the active vendor
+          const matchedById = matchOfficialVendor(dataVendorId);
+          if (matchedById && matchedById.id === activeVendorId) {
+            return true;
+          }
+
           const dataVendorName = (data.vendor_name || data.restaurant_name || '').toLowerCase();
           const currentName = (currentVendor?.name || '').toLowerCase();
           if (currentName && dataVendorName && (dataVendorName === currentName || dataVendorName.includes(currentName) || currentName.includes(dataVendorName))) {
+            return true;
+          }
+
+          // Check if dataVendorName maps to the active vendor
+          const matchedByName = matchOfficialVendor(data.vendor_name || data.restaurant_name);
+          if (matchedByName && matchedByName.id === activeVendorId) {
             return true;
           }
 
@@ -649,7 +667,7 @@ export const KitchenDashboard: React.FC = () => {
                     <button
                       onClick={async () => {
                         if (user?.uid) {
-                          await updateUserProfile({ vendor_id: activeVendorId });
+                          await updateProfileDetails({ vendor_id: activeVendorId } as any);
                           toast.success('Linked this stand as your default kitchen profile!');
                         }
                       }}
