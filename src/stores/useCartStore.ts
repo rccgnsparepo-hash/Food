@@ -159,18 +159,17 @@ export const useCartStore = create<CartState>((set, get) => ({
   },
 
   getServiceFee: () => {
-    const subtotal = get().getSubtotal();
-    return subtotal > 0 ? Math.round(subtotal * 0.05) : 0; // 5% service charge
+    return 0;
   },
 
   getDeliveryFee: () => {
-    return get().items.length > 0 ? get().deliveryFee : 0;
+    return get().items.length > 0 ? (get().deliveryFee || 350) : 0;
   },
 
   getTotal: () => {
     const subtotal = get().getSubtotal();
     if (subtotal === 0) return 0;
-    return subtotal + get().getDeliveryFee() + get().getServiceFee();
+    return subtotal + get().getDeliveryFee();
   },
 
   getItemQuantity: (itemId: string) => {

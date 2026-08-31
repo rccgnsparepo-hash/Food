@@ -610,14 +610,10 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ onClose, onOrderCr
             <span>Campus Delivery Fee</span>
             <span>₦{deliveryFee.toLocaleString()}</span>
           </div>
-          <div className="flex justify-between text-xs text-slate-300">
-            <span>Platform Service Fee</span>
-            <span>₦{serviceFee.toLocaleString()}</span>
-          </div>
           <div className="border-t border-slate-800 pt-2.5 flex justify-between items-baseline">
             <div>
               <span className="text-base font-black text-white block">Final Total</span>
-              <span className="text-[10px] text-slate-400">Includes secure QR/PIN verification codes</span>
+              <span className="text-[10px] text-slate-400">Includes secure delivery verification codes</span>
             </div>
             <span className="text-xl font-black text-emerald-400">₦{total.toLocaleString()}</span>
           </div>
@@ -651,8 +647,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ onClose, onOrderCr
           email={customerEmail || user?.email || 'student@mtu.edu.ng'}
           orderId={`ORD_${Date.now()}`}
           foodSubtotal={subtotal}
-          companyFee={serviceFee || 250}
-          riderFee={deliveryFee || 100}
+          deliveryFee={deliveryFee || 350}
           onClose={() => setShowPaystack(false)}
           onSuccess={(ref) => {
             setShowPaystack(false);

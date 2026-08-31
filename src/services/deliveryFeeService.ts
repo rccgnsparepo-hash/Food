@@ -69,9 +69,8 @@ export function calculateDeliveryFee(
     optionAddon = 30;
   }
 
-  // 6. Total delivery fee (rounded to clean multiple of 10 NGN)
-  const rawTotal = baseFee + distanceFee + optionAddon;
-  const totalDeliveryFee = Math.ceil(rawTotal / 10) * 10;
+  // 6. Total delivery fee (Standard Flat ₦350 Campus Delivery)
+  const totalDeliveryFee = 350;
 
   // 7. Estimated Delivery Time
   const routeEst = getEstimatedCampusRoute(

@@ -21,8 +21,7 @@ interface PaystackModalProps {
   email: string;
   orderId: string;
   foodSubtotal?: number;
-  companyFee?: number;
-  riderFee?: number;
+  deliveryFee?: number;
   onSuccess: (reference: string) => void;
   onClose: () => void;
 }
@@ -32,8 +31,7 @@ export const PaystackModal: React.FC<PaystackModalProps> = ({
   email,
   orderId,
   foodSubtotal = 2000,
-  companyFee = 250,
-  riderFee = 100,
+  deliveryFee = 350,
   onSuccess,
   onClose
 }) => {
@@ -202,19 +200,12 @@ export const PaystackModal: React.FC<PaystackModalProps> = ({
             {/* Authoritative Financial Breakdown Box */}
             <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-2">
               <div className="flex items-center justify-between text-xs text-slate-600">
-                <span>Food & Drink Subtotal</span>
+                <span>Meal Subtotal</span>
                 <span className="font-medium font-mono text-slate-800">₦{foodSubtotal.toLocaleString()}</span>
               </div>
               <div className="flex items-center justify-between text-xs text-slate-600">
-                <span className="flex items-center gap-1">
-                  BUKKIT Platform Service Fee
-                  <span className="text-[10px] bg-red-100 text-[#D6001C] font-bold px-1 rounded">Fixed</span>
-                </span>
-                <span className="font-medium font-mono text-slate-800">₦{companyFee.toLocaleString()}</span>
-              </div>
-              <div className="flex items-center justify-between text-xs text-slate-600">
-                <span>Campus Rider Delivery</span>
-                <span className="font-medium font-mono text-slate-800">₦{riderFee.toLocaleString()}</span>
+                <span>Campus Delivery Fee</span>
+                <span className="font-medium font-mono text-slate-800">₦{deliveryFee.toLocaleString()}</span>
               </div>
               <div className="pt-2 border-t border-slate-200 flex items-center justify-between">
                 <span className="text-xs font-bold uppercase tracking-wider text-slate-900">

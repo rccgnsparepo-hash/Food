@@ -241,13 +241,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ onCheckout }) => {
                       </span>
                     </div>
                     <div className="flex justify-between">
-                      <span>Service Fee (5%)</span>
-                      <span className="text-slate-900 dark:text-slate-100 font-black">
-                        ₦{serviceFee.toLocaleString()}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>Estimated Delivery (Campus)</span>
+                      <span>Campus Delivery</span>
                       <span className="text-slate-900 dark:text-slate-100 font-black">
                         ₦{deliveryFee.toLocaleString()}
                       </span>

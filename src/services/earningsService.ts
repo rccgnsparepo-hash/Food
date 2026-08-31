@@ -25,13 +25,14 @@ import { recordAuditLog } from './auditLogService';
 
 /**
  * Authoritative Backend-Defined Commission Rules for Campus Couriers
+ * Delivery Fee: ₦350 (₦100 to Rider, ₦250 to Company Platform)
  */
 export const DEFAULT_COMMISSION_RULES: CommissionRules = {
-  rider_percentage: 0.75, // 75% of delivery fee goes directly to Rider
-  platform_percentage: 0.25, // 25% retained by BUKKIT platform
-  minimum_rider_fee: 300, // Guaranteed minimum payout per completed run (₦300)
+  rider_percentage: 100 / 350,
+  platform_percentage: 250 / 350,
+  minimum_rider_fee: 100, // ₦100 guaranteed per delivery run
   surge_multiplier: 1.0,
-  late_night_bonus: 0 // ₦100 extra if run is between 22:00 and 06:00
+  late_night_bonus: 0
 };
 
 export interface CommissionCalculationResult {
@@ -57,53 +58,29 @@ export interface CalculateEarningsOptions {
 }
 
 /**
- * Calculates rider delivery fees and platform commissions based on authoritative rules
+ * Calculates rider delivery fees (₦100) and platform commissions (₦250) based on authoritative rules
  */
 export function calculateRiderEarnings(
-  deliveryFee: number,
+  deliveryFee: number = 350,
   options?: CalculateEarningsOptions
 ): CommissionCalculationResult {
-  const rules = { ...DEFAULT_COMMISSION_RULES, ...(options?.customRules || {}) };
-  const rawFee = Math.max(0, Number(deliveryFee) || 400);
-
-  // Apply surge multiplier if present
-  const surge = options?.surgeMultiplier && options.surgeMultiplier > 1 ? options.surgeMultiplier : (rules.surge_multiplier || 1.0);
-  const effectiveFee = Math.round(rawFee * surge);
-
-  // Standard percentage split (75% Rider / 25% Platform)
-  let standardRiderCut = Math.round(effectiveFee * rules.rider_percentage);
-  let minimumFloorApplied = false;
-
-  // Enforce minimum rider earnings floor (e.g. ₦300)
-  if (standardRiderCut < rules.minimum_rider_fee) {
-    standardRiderCut = rules.minimum_rider_fee;
-    minimumFloorApplied = true;
-  }
-
-  // Check late night bonus (e.g., between 10 PM and 6 AM)
-  let lateNightBonus = 0;
-  const currentHour = new Date().getHours();
-  const isLateNight = options?.isLateNight ?? (currentHour >= 22 || currentHour < 6);
-  if (isLateNight && rules.late_night_bonus) {
-    lateNightBonus = rules.late_night_bonus;
-  }
-
-  const finalRiderPayout = standardRiderCut + lateNightBonus;
-  const platformCut = Math.max(0, effectiveFee - standardRiderCut);
+  const effectiveFee = Math.max(0, Number(deliveryFee) || 350);
+  const riderPayout = 100; // Fixed ₦100 per completed run to the rider
+  const platformCut = Math.max(0, effectiveFee - riderPayout); // ₦250 to the company
 
   return {
     deliveryFee: effectiveFee,
-    riderEarning: finalRiderPayout,
+    riderEarning: riderPayout,
     platformCommission: platformCut,
-    commissionRate: rules.platform_percentage,
-    minimumFloorApplied,
-    lateNightBonusApplied: lateNightBonus > 0,
-    surgeMultiplierApplied: surge,
+    commissionRate: platformCut / (effectiveFee || 350),
+    minimumFloorApplied: false,
+    lateNightBonusApplied: false,
+    surgeMultiplierApplied: 1.0,
     breakdown: {
       baseDeliveryFee: effectiveFee,
-      standardRiderCut,
+      standardRiderCut: riderPayout,
       platformCut,
-      effectiveRiderPayout: finalRiderPayout
+      effectiveRiderPayout: riderPayout
     }
   };
 }

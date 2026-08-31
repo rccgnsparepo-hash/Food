@@ -46,11 +46,12 @@ export const KitchenDashboard: React.FC = () => {
   const userVendorId = user?.vendor_id || user?.kitchen_profile?.vendor_id;
   const isAdmin = user?.role === 'admin' || user?.role === 'super_admin' || user?.active_role === 'admin' || user?.active_role === 'super_admin';
 
-  // Find vendor associated with this kitchen user or default to matched 5 official stands / all
-  const [activeVendorId, setActiveVendorId] = useState<string>(() => {
+  // 1. Authoritative resolution of the vendor assigned to this authenticated user
+  const resolvedVendorId = (() => {
     const matchedOfficial = matchOfficialVendor(userVendorId) || 
                             matchOfficialVendor(user?.name) || 
-                            matchOfficialVendor(user?.kitchen_profile?.vendor_name);
+                            matchOfficialVendor(user?.kitchen_profile?.vendor_name) ||
+                            matchOfficialVendor(user?.email);
     if (matchedOfficial) return matchedOfficial.id;
 
     if (userVendorId && vendors.some(v => v.id === userVendorId)) return userVendorId;
@@ -63,9 +64,23 @@ export const KitchenDashboard: React.FC = () => {
       );
       if (matched) return matched.id;
     }
-    // Default to 'all' so orders are immediately visible
-    return 'all';
+    return vendors[0]?.id || 'vendor_mtu_canteen';
+  })();
+
+  // Stand state: Vendors are locked to their own stand; Admins can toggle stands or view all
+  const [activeVendorId, setActiveVendorId] = useState<string>(() => {
+    if (!isAdmin) {
+      return resolvedVendorId;
+    }
+    return resolvedVendorId || 'all';
   });
+
+  // Ensure non-admins are never stuck on 'all' or another vendor's ID
+  useEffect(() => {
+    if (!isAdmin && activeVendorId !== resolvedVendorId) {
+      setActiveVendorId(resolvedVendorId);
+    }
+  }, [isAdmin, resolvedVendorId, activeVendorId]);
 
   const isAllStands = activeVendorId === 'all';
 
@@ -88,9 +103,11 @@ export const KitchenDashboard: React.FC = () => {
         university_id: user?.university_id || 'uni_mtu',
         campus_id: user?.campus_id || 'campus_mtu_main'
       } as any
-    : vendors.find(v => v.id === activeVendorId || v.owner_uid === user?.uid) || (user?.uid ? {
+    : vendors.find(v => v.id === activeVendorId) || 
+      vendors.find(v => v.owner_uid === user?.uid) || 
+      (user?.uid ? {
         id: activeVendorId,
-        name: user.name || 'Campus Kitchen',
+        name: user.name || 'Campus Kitchen Stand',
         slogan: 'Fresh, hot meals served daily on campus!',
         rating: 5.0,
         total_ratings: 1,
@@ -117,11 +134,16 @@ export const KitchenDashboard: React.FC = () => {
 
   // Active Tab
   const [activeTab, setActiveTab] = useState<'orders' | 'menu' | 'profile' | 'workers'>('orders');
+  const [orderStatusFilter, setOrderStatusFilter] = useState<'all' | 'action_needed' | 'preparing' | 'ready' | 'completed'>('all');
 
   // Live Orders
   const [allOrders, setAllOrders] = useState<Order[]>([]);
   const [liveOrders, setLiveOrders] = useState<Order[]>([]);
   const [isLoadingOrders, setIsLoadingOrders] = useState(true);
+
+  // Decline Order Modal State
+  const [decliningOrder, setDecliningOrder] = useState<Order | null>(null);
+  const [declineReason, setDeclineReason] = useState<string>('Items currently out of stock');
 
   // Profile Edit State
   const [isEditingProfile, setIsEditingProfile] = useState(false);
@@ -222,9 +244,26 @@ export const KitchenDashboard: React.FC = () => {
     }
   }, [activeVendorId, currentVendor?.name, user?.uid, userVendorId]);
 
-  // Toggle Stand Open/Closed in Firestore
+  // Authorization Check Helper
+  const isAuthorizedToManageStand = (targetVendorId?: string) => {
+    if (isAdmin) return true;
+    const vendorIdToCheck = targetVendorId || currentVendor?.id;
+    return (
+      vendorIdToCheck === resolvedVendorId ||
+      vendorIdToCheck === userVendorId ||
+      currentVendor?.owner_uid === user?.uid
+    );
+  };
+
+  // Toggle Stand Open/Closed in Firestore (Strictly authorization guarded)
   const handleToggleStoreOpen = async () => {
     if (!currentVendor) return;
+
+    if (!isAuthorizedToManageStand()) {
+      toast.error('Unauthorized: You are only permitted to open or close your own assigned food stand.');
+      return;
+    }
+
     const nextState = !currentVendor.is_open;
     triggerHaptic(50);
 
@@ -247,6 +286,11 @@ export const KitchenDashboard: React.FC = () => {
 
   // Toggle Item Availability (In Stock / Sold Out)
   const handleToggleItemAvailability = async (item: MenuItem) => {
+    if (!isAuthorizedToManageStand(item.vendor_id || item.restaurant_id)) {
+      toast.error('Unauthorized: You can only edit dishes for your own kitchen stand.');
+      return;
+    }
+
     triggerHaptic(30);
     const nextAvail = !item.available;
     try {
@@ -265,8 +309,13 @@ export const KitchenDashboard: React.FC = () => {
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!currentVendor) return;
-    triggerHaptic(40);
 
+    if (!isAuthorizedToManageStand()) {
+      toast.error('Unauthorized: You can only edit profile for your own kitchen stand.');
+      return;
+    }
+
+    triggerHaptic(40);
     const workerIds = workers.map(w => w.id);
 
     try {
@@ -311,7 +360,12 @@ export const KitchenDashboard: React.FC = () => {
   // Add Worker
   const handleAddWorker = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newWorkerName.trim()) return;
+    if (!newWorkerName.trim() || !currentVendor) return;
+
+    if (!isAuthorizedToManageStand()) {
+      toast.error('Unauthorized: You can only manage staff for your own kitchen stand.');
+      return;
+    }
 
     const newW: VendorWorker = {
       id: `w_${Date.now()}`,
@@ -327,19 +381,21 @@ export const KitchenDashboard: React.FC = () => {
     setNewWorkerPhone('');
     setShowAddWorker(false);
 
-    if (currentVendor) {
-      updateDoc(doc(db, 'vendors', currentVendor.id), { workers: updated }).catch(console.error);
-    }
+    updateDoc(doc(db, 'vendors', currentVendor.id), { workers: updated }).catch(console.error);
     toast.success(`✓ Added ${newW.name} to kitchen staff list.`);
   };
 
   // Remove Worker
   const handleRemoveWorker = (workerId: string) => {
+    if (!currentVendor) return;
+    if (!isAuthorizedToManageStand()) {
+      toast.error('Unauthorized: You can only manage staff for your own kitchen stand.');
+      return;
+    }
+
     const updated = workers.filter(w => w.id !== workerId);
     setWorkers(updated);
-    if (currentVendor) {
-      updateDoc(doc(db, 'vendors', currentVendor.id), { workers: updated }).catch(console.error);
-    }
+    updateDoc(doc(db, 'vendors', currentVendor.id), { workers: updated }).catch(console.error);
     toast.info('Staff member removed.');
   };
 
@@ -347,6 +403,12 @@ export const KitchenDashboard: React.FC = () => {
   const handleCreateDish = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!dishName.trim() || !dishPrice || !currentVendor) return;
+
+    if (!isAuthorizedToManageStand()) {
+      toast.error('Unauthorized: You can only add dishes to your own kitchen stand.');
+      return;
+    }
+
     triggerHaptic(40);
 
     try {
@@ -381,8 +443,12 @@ export const KitchenDashboard: React.FC = () => {
     }
   };
 
-  // Update Order Status (e.g. Preparing -> Ready for Dispatch)
-  const handleUpdateOrderStatus = async (orderId: string, nextStatus: 'vendor_accepted' | 'preparing' | 'ready_for_pickup' | 'cancelled', reason?: string) => {
+  // Update Order Status (e.g. Accept -> Preparing -> Ready for Dispatch -> Refund on Cancel)
+  const handleUpdateOrderStatus = async (
+    orderId: string,
+    nextStatus: 'vendor_accepted' | 'preparing' | 'ready_for_pickup' | 'cancelled',
+    reason?: string
+  ) => {
     if (!user) return;
     triggerHaptic(40);
     try {
@@ -390,7 +456,17 @@ export const KitchenDashboard: React.FC = () => {
         cancellationReason: reason
       });
       if (res.success) {
-        toast.success(`✓ Order status transitioned to: ${nextStatus.replace(/_/g, ' ').toUpperCase()}`);
+        if (nextStatus === 'vendor_accepted') {
+          toast.success('✓ Order accepted! Started preparation pipeline.');
+        } else if (nextStatus === 'preparing') {
+          toast.success('🍳 Order marked as preparing in kitchen.');
+        } else if (nextStatus === 'ready_for_pickup') {
+          toast.success('✓ Order is READY! Dispatch verification PIN generated for courier.');
+        } else if (nextStatus === 'cancelled') {
+          toast.info('Order declined and customer has been automatically refunded.');
+        } else {
+          toast.success(`✓ Order status updated successfully`);
+        }
       } else {
         toast.error(res.error || 'Failed to update order status');
       }
@@ -399,6 +475,23 @@ export const KitchenDashboard: React.FC = () => {
       toast.error(e?.message || 'Failed to update order status.');
     }
   };
+
+  // Filtered orders for the dashboard view
+  const displayedOrders = liveOrders.filter((ord) => {
+    if (orderStatusFilter === 'action_needed') {
+      return ord.status === 'pending' || ord.status === 'payment_confirmed' || ord.status === 'placed';
+    }
+    if (orderStatusFilter === 'preparing') {
+      return ord.status === 'vendor_accepted' || ord.status === 'preparing';
+    }
+    if (orderStatusFilter === 'ready') {
+      return ord.status === 'ready' || ord.status === 'ready_for_pickup' || ord.status === 'rider_assigned' || ord.status === 'picked_up';
+    }
+    if (orderStatusFilter === 'completed') {
+      return ord.status === 'delivered' || ord.status === 'cancelled' || ord.status === 'refunded';
+    }
+    return true;
+  });
 
   return (
     <div className="space-y-6 pb-20 animate-in fade-in duration-200">
@@ -468,34 +561,41 @@ export const KitchenDashboard: React.FC = () => {
               </div>
             </div>
 
-            {/* Stand Switcher */}
-            <div className="flex items-center gap-1 bg-slate-800/90 p-1 rounded-xl border border-slate-700">
-              <span className="text-[10px] font-extrabold text-slate-400 px-2 uppercase">Stand:</span>
-              <select
-                value={activeVendorId}
-                onChange={(e) => {
-                  triggerHaptic(20);
-                  setActiveVendorId(e.target.value);
-                }}
-                className="bg-slate-900 text-white text-xs font-bold py-1.5 px-3 rounded-lg border-0 outline-none cursor-pointer"
-              >
-                <option value="all">🌟 All Campus Stands ({allOrders.length} orders)</option>
-                {vendors.map(v => {
-                  const vName = (v.name || (v as any).restaurant_name || v.slug || '').trim().toLowerCase();
-                  const standOrdersCount = allOrders.filter(o => {
-                    const oVendorId = o.vendor_id || (o as any).restaurant_id || (o as any).vendorId || (o as any).restaurantId;
-                    if (oVendorId && oVendorId === v.id) return true;
-                    const oVendorName = (o.vendor_name || (o as any).restaurant_name || '').trim().toLowerCase();
-                    return Boolean(oVendorName && vName && (oVendorName === vName || oVendorName.includes(vName) || vName.includes(oVendorName)));
-                  }).length;
-                  return (
-                    <option key={v.id} value={v.id}>
-                      {v.name || (v as any).restaurant_name || 'Vendor Stand'} ({standOrdersCount} orders)
-                    </option>
-                  );
-                })}
-              </select>
-            </div>
+            {/* Stand Switcher - Only visible to Admins; Vendors are locked to their own stand */}
+            {isAdmin ? (
+              <div className="flex items-center gap-1 bg-slate-800/90 p-1 rounded-xl border border-slate-700">
+                <span className="text-[10px] font-extrabold text-slate-400 px-2 uppercase">Stand:</span>
+                <select
+                  value={activeVendorId}
+                  onChange={(e) => {
+                    triggerHaptic(20);
+                    setActiveVendorId(e.target.value);
+                  }}
+                  className="bg-slate-900 text-white text-xs font-bold py-1.5 px-3 rounded-lg border-0 outline-none cursor-pointer"
+                >
+                  <option value="all">🌟 All Campus Stands ({allOrders.length} orders)</option>
+                  {vendors.map(v => {
+                    const vName = (v.name || (v as any).restaurant_name || v.slug || '').trim().toLowerCase();
+                    const standOrdersCount = allOrders.filter(o => {
+                      const oVendorId = o.vendor_id || (o as any).restaurant_id || (o as any).vendorId || (o as any).restaurantId;
+                      if (oVendorId && oVendorId === v.id) return true;
+                      const oVendorName = (o.vendor_name || (o as any).restaurant_name || '').trim().toLowerCase();
+                      return Boolean(oVendorName && vName && (oVendorName === vName || oVendorName.includes(vName) || vName.includes(oVendorName)));
+                    }).length;
+                    return (
+                      <option key={v.id} value={v.id}>
+                        {v.name || (v as any).restaurant_name || 'Vendor Stand'} ({standOrdersCount} orders)
+                      </option>
+                    );
+                  })}
+                </select>
+              </div>
+            ) : (
+              <div className="flex items-center gap-1.5 bg-slate-800/90 px-3 py-1.5 rounded-xl border border-slate-700 text-xs font-bold text-slate-200">
+                <Shield className="w-3.5 h-3.5 text-emerald-400" />
+                <span className="text-[11px] truncate max-w-[140px]">{currentVendor?.name}</span>
+              </div>
+            )}
 
           </div>
 
@@ -658,17 +758,17 @@ export const KitchenDashboard: React.FC = () => {
                 <div>
                   <h2 className="text-lg font-black text-slate-900 dark:text-slate-100 flex items-center gap-2">
                     <ShoppingBag className="w-5 h-5 text-[#D6001C]" />
-                    <span>Active Kitchen Orders Queue</span>
+                    <span>Incoming Kitchen Orders Queue</span>
                   </h2>
                   <p className="text-xs text-slate-500 dark:text-slate-400">
-                    Live order flow synchronized across student apps, kitchen stands, and campus dispatchers.
+                    Live orders for {currentVendor?.name || 'your kitchen stand'}. Accept orders, prepare dishes, and verify courier pickup.
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="bg-rose-50 dark:bg-rose-950/60 text-[#D6001C] dark:text-rose-400 font-black text-xs px-3 py-1 rounded-full border border-rose-100 dark:border-rose-900/50">
                     {liveOrders.length} {activeVendorId === 'all' ? 'Total' : 'Stand'} Orders
                   </span>
-                  {activeVendorId !== 'all' && activeVendorId !== userVendorId && (
+                  {isAdmin && activeVendorId !== 'all' && activeVendorId !== userVendorId && (
                     <button
                       onClick={async () => {
                         if (user?.uid) {
@@ -684,207 +784,309 @@ export const KitchenDashboard: React.FC = () => {
                 </div>
               </div>
 
-              {/* Stand Filter Chips with Live Order Badges */}
-              <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none pt-1 border-t border-slate-100 dark:border-slate-800">
-                <button
-                  onClick={() => {
-                    triggerHaptic(15);
-                    setActiveVendorId('all');
-                  }}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-black whitespace-nowrap flex items-center gap-1.5 transition-all cursor-pointer ${
-                    activeVendorId === 'all'
-                      ? 'bg-[#D6001C] text-white shadow-xs'
-                      : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
-                  }`}
-                >
-                  <span>All Campus Stands</span>
-                  <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${activeVendorId === 'all' ? 'bg-white text-[#D6001C]' : 'bg-slate-200 dark:bg-slate-700 text-slate-800 dark:text-slate-200'}`}>
-                    {allOrders.length}
-                  </span>
-                </button>
-
-                {vendors.map((v) => {
-                  const vName = (v.name || (v as any).restaurant_name || v.slug || '').trim().toLowerCase();
-                  const count = allOrders.filter(
-                    (o) => {
-                      const oVendorId = o.vendor_id || (o as any).restaurant_id || (o as any).vendorId || (o as any).restaurantId;
-                      if (oVendorId && oVendorId === v.id) return true;
-                      const oVendorName = (o.vendor_name || (o as any).restaurant_name || '').trim().toLowerCase();
-                      return Boolean(oVendorName && vName && (oVendorName === vName || oVendorName.includes(vName) || vName.includes(oVendorName)));
-                    }
-                  ).length;
-                  const isSelected = activeVendorId === v.id;
+              {/* Status Filter Tabs */}
+              <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none pt-2 border-t border-slate-100 dark:border-slate-800 text-xs">
+                {[
+                  { id: 'all', label: 'All Orders', count: liveOrders.length },
+                  { 
+                    id: 'action_needed', 
+                    label: '⚡ Needs Action', 
+                    count: liveOrders.filter(o => o.status === 'pending' || o.status === 'payment_confirmed' || o.status === 'placed').length,
+                    urgent: true 
+                  },
+                  { 
+                    id: 'preparing', 
+                    label: '🍳 In Cooking', 
+                    count: liveOrders.filter(o => o.status === 'vendor_accepted' || o.status === 'preparing').length 
+                  },
+                  { 
+                    id: 'ready', 
+                    label: '🛵 Ready for Courier', 
+                    count: liveOrders.filter(o => o.status === 'ready' || o.status === 'ready_for_pickup' || o.status === 'rider_assigned' || o.status === 'picked_up').length 
+                  },
+                  { 
+                    id: 'completed', 
+                    label: '✓ History', 
+                    count: liveOrders.filter(o => o.status === 'delivered' || o.status === 'cancelled' || o.status === 'refunded').length 
+                  }
+                ].map(tab => {
+                  const isSelected = orderStatusFilter === tab.id;
                   return (
                     <button
-                      key={v.id}
+                      key={tab.id}
                       onClick={() => {
                         triggerHaptic(15);
-                        setActiveVendorId(v.id);
+                        setOrderStatusFilter(tab.id as any);
                       }}
-                      className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap flex items-center gap-1.5 transition-all cursor-pointer ${
+                      className={`px-3 py-1.5 rounded-xl font-extrabold whitespace-nowrap flex items-center gap-1.5 transition-all cursor-pointer ${
                         isSelected
-                          ? 'bg-[#D6001C] text-white shadow-xs font-black'
+                          ? 'bg-[#D6001C] text-white shadow-xs'
                           : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
                       }`}
                     >
-                      <span>{v.name || (v as any).restaurant_name || 'Vendor Stand'}</span>
-                      {count > 0 && (
-                        <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono font-black ${isSelected ? 'bg-white text-[#D6001C]' : 'bg-rose-500 text-white animate-pulse'}`}>
-                          {count}
+                      <span>{tab.label}</span>
+                      {tab.count > 0 && (
+                        <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono font-black ${
+                          isSelected 
+                            ? 'bg-white text-[#D6001C]' 
+                            : tab.urgent 
+                            ? 'bg-rose-600 text-white animate-pulse' 
+                            : 'bg-slate-200 dark:bg-slate-700 text-slate-800 dark:text-slate-200'
+                        }`}>
+                          {tab.count}
                         </span>
                       )}
                     </button>
                   );
                 })}
               </div>
+
+              {/* Stand Filter Chips - Only for Admins */}
+              {isAdmin && (
+                <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none pt-1 border-t border-slate-100 dark:border-slate-800">
+                  <button
+                    onClick={() => {
+                      triggerHaptic(15);
+                      setActiveVendorId('all');
+                    }}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-black whitespace-nowrap flex items-center gap-1.5 transition-all cursor-pointer ${
+                      activeVendorId === 'all'
+                        ? 'bg-[#D6001C] text-white shadow-xs'
+                        : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+                    }`}
+                  >
+                    <span>All Stands Master Queue</span>
+                    <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${activeVendorId === 'all' ? 'bg-white text-[#D6001C]' : 'bg-slate-200 dark:bg-slate-700 text-slate-800 dark:text-slate-200'}`}>
+                      {allOrders.length}
+                    </span>
+                  </button>
+
+                  {vendors.map((v) => {
+                    const vName = (v.name || (v as any).restaurant_name || v.slug || '').trim().toLowerCase();
+                    const count = allOrders.filter(
+                      (o) => {
+                        const oVendorId = o.vendor_id || (o as any).restaurant_id || (o as any).vendorId || (o as any).restaurantId;
+                        if (oVendorId && oVendorId === v.id) return true;
+                        const oVendorName = (o.vendor_name || (o as any).restaurant_name || '').trim().toLowerCase();
+                        return Boolean(oVendorName && vName && (oVendorName === vName || oVendorName.includes(vName) || vName.includes(oVendorName)));
+                      }
+                    ).length;
+                    const isSelected = activeVendorId === v.id;
+                    return (
+                      <button
+                        key={v.id}
+                        onClick={() => {
+                          triggerHaptic(15);
+                          setActiveVendorId(v.id);
+                        }}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap flex items-center gap-1.5 transition-all cursor-pointer ${
+                          isSelected
+                            ? 'bg-[#D6001C] text-white shadow-xs font-black'
+                            : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+                        }`}
+                      >
+                        <span>{v.name || (v as any).restaurant_name || 'Vendor Stand'}</span>
+                        {count > 0 && (
+                          <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono font-black ${isSelected ? 'bg-white text-[#D6001C]' : 'bg-rose-500 text-white animate-pulse'}`}>
+                            {count}
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
             </div>
 
-            {/* If current view has 0 orders but campus has pending orders */}
-            {liveOrders.length === 0 && allOrders.length > 0 && (
-              <div className="bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900/50 p-4 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
-                <div className="flex items-center gap-2.5">
-                  <Bell className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
-                  <span className="font-bold text-amber-900 dark:text-amber-200">
-                    There are <span className="underline font-black">{allOrders.length} active order(s)</span> in other campus food stands.
-                  </span>
-                </div>
-                <button
-                  onClick={() => {
-                    triggerHaptic(20);
-                    setActiveVendorId('all');
-                  }}
-                  className="bg-amber-600 hover:bg-amber-700 text-white font-extrabold px-3 py-1.5 rounded-xl transition-all cursor-pointer whitespace-nowrap shadow-xs"
-                >
-                  View All {allOrders.length} Orders
-                </button>
-              </div>
-            )}
-
-            {liveOrders.length === 0 ? (
+            {displayedOrders.length === 0 ? (
               <div className="bg-white dark:bg-slate-900 p-12 rounded-3xl border border-rose-100 dark:border-slate-800 text-center space-y-2">
                 <Bell className="w-10 h-10 text-slate-300 dark:text-slate-600 mx-auto" />
-                <h3 className="font-extrabold text-slate-700 dark:text-slate-300 text-sm">No active incoming orders for {currentVendor?.name || 'this stand'}</h3>
+                <h3 className="font-extrabold text-slate-700 dark:text-slate-300 text-sm">
+                  {orderStatusFilter === 'all' 
+                    ? `No orders currently in queue for ${currentVendor?.name || 'this stand'}` 
+                    : `No orders in "${orderStatusFilter.replace('_', ' ')}" stage`}
+                </h3>
                 <p className="text-xs text-slate-400 dark:text-slate-500">When customers place meal orders, they will appear here in realtime.</p>
-                {allOrders.length > 0 && (
+                {orderStatusFilter !== 'all' && (
                   <button
-                    onClick={() => setActiveVendorId('all')}
-                    className="mt-3 inline-block bg-[#D6001C] text-white text-xs font-black px-4 py-2 rounded-xl hover:bg-red-700 cursor-pointer shadow-sm"
+                    onClick={() => setOrderStatusFilter('all')}
+                    className="mt-2 text-xs font-bold text-[#D6001C] underline cursor-pointer"
                   >
-                    Switch to Universal Queue ({allOrders.length} total orders)
+                    View All Orders
                   </button>
                 )}
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {liveOrders.map((ord) => (
-                  <div key={ord.id} className="bg-white dark:bg-slate-900 p-5 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-xs space-y-3">
-                    <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-2">
-                      <div>
-                        <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 font-mono">ORDER #{ord.id.slice(-6)}</span>
-                        <h4 className="font-extrabold text-sm text-slate-900 dark:text-slate-100">{ord.customer_name || ord.user_name || 'MTU Student'}</h4>
-                        {ord.customer_phone && (
-                          <p className="text-[11px] text-slate-500 dark:text-slate-400">{ord.customer_phone}</p>
-                        )}
-                      </div>
-                      <span className={`text-[10px] font-black px-2.5 py-1 rounded-full uppercase ${
-                        ord.status === 'pending' || ord.status === 'payment_confirmed'
-                          ? 'bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300'
-                          : ord.status === 'preparing'
-                          ? 'bg-blue-100 dark:bg-blue-950/60 text-blue-800 dark:text-blue-300'
-                          : ord.status === 'ready' || ord.status === 'ready_for_pickup'
-                          ? 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300'
-                          : 'bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-300'
-                      }`}>
-                        {ord.status.replace(/_/g, ' ')}
-                      </span>
-                    </div>
+                {displayedOrders.map((ord) => {
+                  const isActionNeeded = ord.status === 'pending' || ord.status === 'payment_confirmed' || ord.status === 'placed';
+                  const isPreparing = ord.status === 'vendor_accepted' || ord.status === 'preparing';
+                  const isReady = ord.status === 'ready' || ord.status === 'ready_for_pickup' || ord.status === 'rider_assigned' || ord.status === 'picked_up';
+                  const isDelivered = ord.status === 'delivered';
+                  const isCancelled = ord.status === 'cancelled' || ord.status === 'refunded';
 
-                    {/* Delivery Destination Snapshot */}
-                    <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-100 dark:border-slate-700 text-xs">
-                      <span className="font-bold text-slate-500 dark:text-slate-400 block text-[10px] uppercase">Destination:</span>
-                      <p className="font-bold text-slate-800 dark:text-slate-200">{ord.delivery_address}</p>
-                      {ord.delivery_room && <p className="text-emerald-700 dark:text-emerald-400 font-bold">Room: {ord.delivery_room}</p>}
-                    </div>
-
-                    <div className="space-y-1 text-xs text-slate-700 dark:text-slate-300">
-                      {ord.items?.map((it, idx) => (
-                        <div key={idx} className="flex justify-between">
-                          <span>{it.quantity}x {it.name}</span>
-                          <span className="font-mono font-bold">₦{((Number(it.price) || 0) * it.quantity).toLocaleString()}</span>
+                  return (
+                    <div 
+                      key={ord.id} 
+                      className={`bg-white dark:bg-slate-900 p-5 rounded-3xl border transition-all shadow-xs space-y-3 ${
+                        isActionNeeded 
+                          ? 'border-amber-400 dark:border-amber-500/60 ring-2 ring-amber-400/20' 
+                          : isPreparing
+                          ? 'border-blue-300 dark:border-blue-800/60'
+                          : isReady
+                          ? 'border-emerald-300 dark:border-emerald-800/60'
+                          : 'border-slate-200 dark:border-slate-800'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-2">
+                        <div>
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 font-mono">ORDER #{ord.id.slice(-6)}</span>
+                            {isActionNeeded && (
+                              <span className="bg-amber-500 text-white text-[9px] font-black px-1.5 py-0.2 rounded-full uppercase tracking-wider animate-pulse">
+                                Action Needed
+                              </span>
+                            )}
+                          </div>
+                          <h4 className="font-extrabold text-sm text-slate-900 dark:text-slate-100">{ord.customer_name || ord.user_name || 'MTU Student'}</h4>
+                          {ord.customer_phone && (
+                            <p className="text-[11px] text-slate-500 dark:text-slate-400">{ord.customer_phone}</p>
+                          )}
                         </div>
-                      ))}
-                    </div>
-
-                    <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs">
-                      <span className="font-bold text-slate-500 dark:text-slate-400">Payment: {ord.payment_status?.toUpperCase() || 'PAID'}</span>
-                      <span className="font-black text-[#D6001C] font-mono text-sm">₦{Number(ord.total_price || ord.total || 0).toLocaleString()}</span>
-                    </div>
-
-                    {/* Prominent Pickup PIN Box for Kitchen -> Rider Handover */}
-                    {(ord.status === 'ready' || ord.status === 'ready_for_pickup') && (
-                      <div className="p-3 rounded-2xl bg-emerald-600 text-white text-center shadow-md">
-                        <span className="text-[10px] uppercase font-bold tracking-wider opacity-90 block">
-                          Rider Pickup Verification Code
-                        </span>
-                        <span className="text-2xl font-black tracking-widest block my-0.5">
-                          {ord.pickup_code || '3914'}
-                        </span>
-                        <span className="text-[10px] opacity-80 block">
-                          Rider must enter this code to collect meal
+                        <span className={`text-[10px] font-black px-2.5 py-1 rounded-full uppercase ${
+                          isActionNeeded
+                            ? 'bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300'
+                            : isPreparing
+                            ? 'bg-blue-100 dark:bg-blue-950/60 text-blue-800 dark:text-blue-300'
+                            : isReady
+                            ? 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300'
+                            : isDelivered
+                            ? 'bg-green-100 dark:bg-green-950/60 text-green-800 dark:text-green-300'
+                            : 'bg-rose-100 dark:bg-rose-950/60 text-rose-800 dark:text-rose-300'
+                        }`}>
+                          {ord.status.replace(/_/g, ' ')}
                         </span>
                       </div>
-                    )}
 
-                    {/* Status Advance Buttons */}
-                    <div className="pt-2 flex flex-col gap-1.5">
-                      {(ord.status === 'pending' || ord.status === 'payment_confirmed') && (
-                        <div className="space-y-1.5">
-                          <div className="flex gap-2">
+                      {/* Delivery Destination Snapshot */}
+                      <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-100 dark:border-slate-700 text-xs">
+                        <span className="font-bold text-slate-500 dark:text-slate-400 block text-[10px] uppercase">Campus Delivery:</span>
+                        <p className="font-bold text-slate-800 dark:text-slate-200">{ord.delivery_address || 'MTU Student Hostel'}</p>
+                        {ord.delivery_room && <p className="text-emerald-700 dark:text-emerald-400 font-bold">Room / Location: {ord.delivery_room}</p>}
+                      </div>
+
+                      {/* Ordered Dishes */}
+                      <div className="space-y-1 text-xs text-slate-700 dark:text-slate-300 bg-slate-50/50 dark:bg-slate-800/40 p-2.5 rounded-xl">
+                        {ord.items?.map((it, idx) => (
+                          <div key={idx} className="flex justify-between items-center py-0.5">
+                            <span className="font-semibold">{it.quantity}x {it.name}</span>
+                            <span className="font-mono font-bold">₦{((Number(it.price) || 0) * it.quantity).toLocaleString()}</span>
+                          </div>
+                        ))}
+                      </div>
+
+                      <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs">
+                        <span className="font-bold text-slate-500 dark:text-slate-400">Payment: {ord.payment_status?.toUpperCase() || 'PAID'}</span>
+                        <span className="font-black text-[#D6001C] font-mono text-sm">₦{Number(ord.total_price || ord.total || 0).toLocaleString()}</span>
+                      </div>
+
+                      {/* Prominent Pickup PIN Box for Kitchen -> Rider Handover */}
+                      {(ord.status === 'ready' || ord.status === 'ready_for_pickup' || ord.status === 'rider_assigned') && (
+                        <div className="p-3 rounded-2xl bg-emerald-600 text-white text-center shadow-md">
+                          <span className="text-[10px] uppercase font-bold tracking-wider opacity-90 block">
+                            Rider Pickup Verification Code
+                          </span>
+                          <span className="text-2xl font-black tracking-widest block my-0.5">
+                            {ord.pickup_code || '3914'}
+                          </span>
+                          <span className="text-[10px] opacity-80 block">
+                            Give this 4-digit PIN to the rider upon collection
+                          </span>
+                        </div>
+                      )}
+
+                      {/* Status Action Buttons */}
+                      <div className="pt-2 flex flex-col gap-1.5">
+                        {/* When order is pending or payment confirmed: ACCEPT or DECLINE */}
+                        {isActionNeeded && (
+                          <div className="space-y-1.5">
+                            <div className="flex gap-2">
+                              <button
+                                onClick={() => handleUpdateOrderStatus(ord.id, 'vendor_accepted')}
+                                className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold py-2.5 rounded-xl text-xs cursor-pointer shadow-sm flex items-center justify-center gap-1"
+                              >
+                                <CheckCircle2 className="w-3.5 h-3.5" />
+                                <span>Accept Order</span>
+                              </button>
+                              <button
+                                onClick={() => handleUpdateOrderStatus(ord.id, 'preparing')}
+                                className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-extrabold py-2.5 rounded-xl text-xs cursor-pointer shadow-sm flex items-center justify-center gap-1"
+                              >
+                                <UtensilsCrossed className="w-3.5 h-3.5" />
+                                <span>Start Cooking</span>
+                              </button>
+                            </div>
                             <button
-                              onClick={() => handleUpdateOrderStatus(ord.id, 'vendor_accepted')}
-                              className="flex-1 bg-slate-900 dark:bg-slate-800 hover:bg-black dark:hover:bg-slate-700 text-white font-extrabold py-2 rounded-xl text-xs cursor-pointer"
+                              onClick={() => {
+                                setDecliningOrder(ord);
+                                setDeclineReason('Items currently out of stock');
+                              }}
+                              className="w-full py-2 text-center text-xs font-bold text-rose-600 dark:text-rose-400 hover:text-rose-700 dark:hover:text-rose-300 bg-rose-50 dark:bg-rose-950/40 hover:bg-rose-100 dark:hover:bg-rose-900/60 rounded-xl transition-colors cursor-pointer border border-rose-200 dark:border-rose-900/50 flex items-center justify-center gap-1.5"
                             >
-                              Accept Order
-                            </button>
-                            <button
-                              onClick={() => handleUpdateOrderStatus(ord.id, 'preparing')}
-                              className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-extrabold py-2 rounded-xl text-xs cursor-pointer"
-                            >
-                              Start Cooking
+                              <AlertCircle className="w-3.5 h-3.5" />
+                              <span>Decline Order (Auto-Refund Customer)</span>
                             </button>
                           </div>
+                        )}
+
+                        {ord.status === 'vendor_accepted' && (
+                          <div className="space-y-1.5">
+                            <button
+                              onClick={() => handleUpdateOrderStatus(ord.id, 'preparing')}
+                              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-extrabold py-2.5 rounded-xl text-xs cursor-pointer shadow-md shadow-blue-600/20 flex items-center justify-center gap-1.5"
+                            >
+                              <UtensilsCrossed className="w-4 h-4" />
+                              <span>Start Preparing Food</span>
+                            </button>
+                            <button
+                              onClick={() => {
+                                setDecliningOrder(ord);
+                                setDeclineReason('Items currently out of stock');
+                              }}
+                              className="w-full py-1.5 text-center text-[11px] font-bold text-rose-600 dark:text-rose-400 hover:text-rose-700 bg-rose-50 dark:bg-rose-950/40 rounded-xl transition-colors cursor-pointer"
+                            >
+                              Cancel Order
+                            </button>
+                          </div>
+                        )}
+
+                        {ord.status === 'preparing' && (
                           <button
-                            onClick={() => {
-                              const reason = window.prompt('Reason for rejecting order (e.g., ingredients out of stock):', 'Items currently unavailable at kitchen stand');
-                              if (reason) {
-                                handleUpdateOrderStatus(ord.id, 'cancelled', reason);
-                              }
-                            }}
-                            className="w-full py-1.5 text-center text-[11px] font-bold text-rose-600 dark:text-rose-400 hover:text-rose-700 dark:hover:text-rose-300 bg-rose-50 dark:bg-rose-950/40 hover:bg-rose-100 dark:hover:bg-rose-900/60 rounded-xl transition-colors cursor-pointer border border-rose-200 dark:border-rose-900/50"
+                            onClick={() => handleUpdateOrderStatus(ord.id, 'ready_for_pickup')}
+                            className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-black py-2.5 rounded-xl text-xs cursor-pointer shadow-md shadow-emerald-600/30 flex items-center justify-center gap-1.5"
                           >
-                            Decline / Out of Stock (Auto-Refund Customer)
+                            <CheckCircle2 className="w-4 h-4" />
+                            <span>Mark Ready for Courier (Generate PIN)</span>
                           </button>
-                        </div>
-                      )}
-                      {ord.status === 'vendor_accepted' && (
-                        <button
-                          onClick={() => handleUpdateOrderStatus(ord.id, 'preparing')}
-                          className="w-full bg-blue-600 hover:bg-blue-700 text-white font-extrabold py-2.5 rounded-xl text-xs cursor-pointer"
-                        >
-                          Start Preparing Food
-                        </button>
-                      )}
-                      {ord.status === 'preparing' && (
-                        <button
-                          onClick={() => handleUpdateOrderStatus(ord.id, 'ready_for_pickup')}
-                          className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-black py-2.5 rounded-xl text-xs cursor-pointer shadow-md shadow-emerald-600/30"
-                        >
-                          Ready for Rider Pickup (Generate PIN)
-                        </button>
-                      )}
+                        )}
+
+                        {isDelivered && (
+                          <div className="text-center py-1 text-xs font-bold text-emerald-600 dark:text-emerald-400 flex items-center justify-center gap-1">
+                            <CheckCircle2 className="w-4 h-4" />
+                            <span>Successfully Delivered to Student</span>
+                          </div>
+                        )}
+
+                        {isCancelled && (
+                          <div className="text-center py-1 text-xs font-bold text-rose-600 dark:text-rose-400 flex items-center justify-center gap-1">
+                            <AlertCircle className="w-4 h-4" />
+                            <span>Order Cancelled & Refunded</span>
+                          </div>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </motion.div>
@@ -1226,6 +1428,88 @@ export const KitchenDashboard: React.FC = () => {
                 Add Staff Member
               </button>
             </form>
+          </motion.div>
+        </div>
+      )}
+
+      {/* MODAL: DECLINE ORDER */}
+      {decliningOrder && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-white dark:bg-slate-900 rounded-3xl p-6 max-w-md w-full border border-rose-200 dark:border-rose-900/50 shadow-2xl space-y-4"
+          >
+            <div className="flex items-center gap-3 border-b border-slate-100 dark:border-slate-800 pb-3">
+              <div className="w-10 h-10 rounded-2xl bg-rose-100 dark:bg-rose-950 flex items-center justify-center text-rose-600 dark:text-rose-400 shrink-0">
+                <AlertCircle className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="font-extrabold text-base text-slate-900 dark:text-slate-100">
+                  Decline Order #{decliningOrder.id.slice(-6)}
+                </h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  Customer {decliningOrder.customer_name || 'student'} will be automatically refunded (₦{Number(decliningOrder.total_price || decliningOrder.total || 0).toLocaleString()}).
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-slate-700 dark:text-slate-300 block">Select Reason for Declining:</label>
+              <div className="grid grid-cols-1 gap-1.5">
+                {[
+                  'Items currently out of stock',
+                  'Kitchen stand is closing',
+                  'Cannot fulfill order in time',
+                  'Ingredients finished for the day'
+                ].map((preset) => (
+                  <button
+                    key={preset}
+                    type="button"
+                    onClick={() => setDeclineReason(preset)}
+                    className={`p-2.5 rounded-xl text-left text-xs font-medium border transition-all cursor-pointer ${
+                      declineReason === preset
+                        ? 'border-rose-500 bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 font-bold'
+                        : 'border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
+                    }`}
+                  >
+                    {preset}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <label className="text-xs font-bold text-slate-700 dark:text-slate-300 block mb-1">Custom Note / Reason:</label>
+              <input
+                type="text"
+                value={declineReason}
+                onChange={(e) => setDeclineReason(e.target.value)}
+                placeholder="e.g. Fried plantain finished for today"
+                className="w-full p-2.5 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl outline-none focus:ring-2 focus:ring-rose-500 text-slate-900 dark:text-slate-100"
+              />
+            </div>
+
+            <div className="flex gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+              <button
+                type="button"
+                onClick={() => setDecliningOrder(null)}
+                className="flex-1 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 text-xs font-bold hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
+              >
+                Keep Order
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  const ord = decliningOrder;
+                  setDecliningOrder(null);
+                  await handleUpdateOrderStatus(ord.id, 'cancelled', declineReason);
+                }}
+                className="flex-1 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-black shadow-md shadow-rose-600/30 cursor-pointer"
+              >
+                Confirm Decline & Refund
+              </button>
+            </div>
           </motion.div>
         </div>
       )}
