@@ -40,6 +40,7 @@ import { PasswordStrengthMeter } from './PasswordStrengthMeter';
 import { BukkitLogo } from '../common/BukkitLogo';
 import { UserRole } from '../../types';
 import { FALLBACK_MTU_VENDORS, matchOfficialVendor, VENDOR_CREATION_ADMIN_PIN } from '../../services/seedService';
+import { getCurrentAppFlavor } from '../../config/appFlavor';
 
 type AuthStatus = 'idle' | 'loading' | 'success' | 'error' | 'email-verification-required';
 
@@ -59,7 +60,16 @@ export const AuthGatewayPage: React.FC = () => {
 
   const { universities, campuses, vendors } = useMarketplaceStore();
 
-  const [selectedRole, setSelectedRole] = useState<UserRole>('customer');
+  const initialFlavor = getCurrentAppFlavor();
+  const defaultFlavorRole: UserRole = initialFlavor === 'vendor' 
+    ? 'kitchen' 
+    : initialFlavor === 'rider' 
+    ? 'rider' 
+    : initialFlavor === 'admin' 
+    ? 'admin' 
+    : 'customer';
+
+  const [selectedRole, setSelectedRole] = useState<UserRole>(defaultFlavorRole);
   const [mode, setMode] = useState<'login' | 'register' | 'forgot_password' | 'verify_email'>(
     globalAuthStatus === 'email-verification-required' || (!isEmailVerified && user?.uid && !user.uid.startsWith('guest_'))
       ? 'verify_email'

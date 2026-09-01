@@ -4,80 +4,86 @@ import { auth } from './firebase';
 /**
  * Authoritative Backend Production Base URL for Native Android APKs, Electron Desktop EXE & External Web Deployments (Vercel, Netlify, etc.)
  */
-export const DEFAULT_PRODUCTION_BACKEND_URL =
+export const DEFAULT_DEV_BACKEND_URL =
+  'https://ais-dev-nxj4dis7zld3t6vcse6vjb-915023145069.europe-west2.run.app';
+export const DEFAULT_PREVIEW_BACKEND_URL =
   'https://ais-pre-nxj4dis7zld3t6vcse6vjb-915023145069.europe-west2.run.app';
 
+export const DEFAULT_PRODUCTION_BACKEND_URL = DEFAULT_DEV_BACKEND_URL;
+
 /**
- * Resolve the appropriate API Base URL for Web (Cloud Run vs Vercel / External), Desktop EXE and Native Android APKs
+ * Get candidate backend URLs in priority order
  */
-export function getApiBaseUrl(): string {
-  if (typeof window === 'undefined') return '';
+export function getCandidateBackendUrls(): string[] {
+  const candidates: string[] = [];
 
   // 1. Explicit environment variable override
   const envUrl = (import.meta as any)?.env?.VITE_API_URL;
   if (envUrl && typeof envUrl === 'string' && envUrl.trim().length > 0) {
-    return envUrl.replace(/\/+$/, '');
+    candidates.push(envUrl.replace(/\/+$/, ''));
   }
 
-  // 2. Native Capacitor App (Android / iOS) or Electron Desktop App loaded from file://
-  const isElectron =
-    typeof navigator !== 'undefined' &&
-    (/electron/i.test(navigator.userAgent) || Boolean((window as any).electronAPI));
+  // 2. Local storage override (for testing or custom backend connections)
+  if (typeof window !== 'undefined') {
+    try {
+      const customUrl = localStorage.getItem('BUKKIT_API_URL');
+      if (customUrl && customUrl.trim().startsWith('http')) {
+        candidates.push(customUrl.trim().replace(/\/+$/, ''));
+      }
+    } catch {}
+  }
 
-  if (
-    Capacitor.isNativePlatform() ||
-    window.location.protocol === 'capacitor:' ||
-    window.location.protocol === 'ionic:' ||
-    window.location.protocol === 'file:' ||
-    isElectron
-  ) {
-    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-      return 'http://localhost:3000';
+  // 3. Localhost or same-origin Cloud Run
+  if (typeof window !== 'undefined' && window.location?.origin) {
+    const hostname = window.location.hostname || '';
+    const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1';
+    const isCloudRun =
+      hostname.endsWith('.run.app') ||
+      hostname.includes('googleusercontent.com') ||
+      hostname.includes('aistudio.google.com') ||
+      hostname.includes('cloudfunctions.net');
+
+    if (isLocalhost) {
+      candidates.push(window.location.origin);
+    } else if (isCloudRun) {
+      candidates.push(''); // Relative paths for same-container fullstack
     }
-    return DEFAULT_PRODUCTION_BACKEND_URL;
   }
 
-  // 3. Localhost development environment (Vite dev server or local Express on port 3000)
-  if (
-    typeof window.location !== 'undefined' &&
-    window.location.origin &&
-    window.location.origin.startsWith('http') &&
-    (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
-  ) {
-    return window.location.origin;
-  }
+  // 4. Primary Live Dev Cloud Run container
+  candidates.push(DEFAULT_DEV_BACKEND_URL);
 
-  // 4. Co-hosted Full-Stack Cloud Run container (Frontend + Node Express Backend served together)
-  const hostname = window.location.hostname || '';
-  const isCloudRunDirect =
-    hostname.endsWith('.run.app') ||
-    hostname.includes('googleusercontent.com') ||
-    hostname.includes('aistudio.google.com') ||
-    hostname.includes('cloudfunctions.net');
+  // 5. Shared Preview container
+  candidates.push(DEFAULT_PREVIEW_BACKEND_URL);
 
-  if (isCloudRunDirect) {
-    return '';
-  }
+  // 6. Relative path (for Vercel rewrites or proxies)
+  candidates.push('');
 
-  // 5. External Web Hosting (e.g. *.vercel.app, *.netlify.app, *.github.io, *.pages.dev, *.web.app, or custom domain)
-  // These hosts only serve static frontend assets, so all /api/* requests must target the live Cloud Run backend
-  return DEFAULT_PRODUCTION_BACKEND_URL;
+  // Remove duplicates
+  return Array.from(new Set(candidates));
+}
+
+/**
+ * Resolve the primary API Base URL for Web, Desktop EXE and Native Android APKs
+ */
+export function getApiBaseUrl(): string {
+  const candidates = getCandidateBackendUrls();
+  return candidates[0] || '';
 }
 
 /**
  * Build a full API endpoint URL
  */
-export function apiUrl(endpoint: string): string {
+export function apiUrl(endpoint: string, baseUrl?: string): string {
   const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
-  const base = getApiBaseUrl();
+  const base = baseUrl !== undefined ? baseUrl : getApiBaseUrl();
   return `${base}${cleanEndpoint}`;
 }
 
 /**
- * Standardized API fetch wrapper ensuring proper URLs, Bearer Auth headers, and error handling across Web, Desktop EXE and Native APKs
+ * Standardized API fetch wrapper ensuring proper URLs, Bearer Auth headers, and automatic multi-candidate fallback
  */
 export async function apiFetch(endpoint: string, init?: RequestInit): Promise<Response> {
-  const fullUrl = apiUrl(endpoint);
   const headers = new Headers(init?.headers || {});
   
   // Ensure JSON acceptance
@@ -97,10 +103,29 @@ export async function apiFetch(endpoint: string, init?: RequestInit): Promise<Re
     }
   }
 
-  return fetch(fullUrl, {
-    ...init,
-    headers
-  });
+  const candidates = getCandidateBackendUrls();
+  let lastError: any = null;
+
+  for (let i = 0; i < candidates.length; i++) {
+    const candidateBase = candidates[i];
+    const candidateUrl = apiUrl(endpoint, candidateBase);
+
+    try {
+      const res = await fetch(candidateUrl, {
+        ...init,
+        headers
+      });
+
+      // If server responded (even 4xx/5xx), return the response (not a network connectivity error)
+      return res;
+    } catch (err: any) {
+      lastError = err;
+      // Network failure (e.g. Failed to fetch / CORS / container sleeping), continue to next candidate
+      console.warn(`[apiFetch] Network attempt failed for ${candidateUrl}, trying next fallback...`, err);
+    }
+  }
+
+  throw lastError || new Error('Network error: Unable to reach backend server');
 }
 
 /**

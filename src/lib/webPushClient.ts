@@ -53,6 +53,10 @@ export async function getExistingWebPushSubscription(): Promise<PushSubscription
   }
 }
 
+// Deterministic fallback VAPID Public Key for RFC 8292 Web Push
+export const DEFAULT_CLIENT_VAPID_PUBLIC_KEY =
+  'BPxivn5IjNTybe5RKOPhjXJ5xoiOJxA7S2PgPBj3XRq9EPGJgUZx-pyRb6_eWbs5wsosT8I0FZsXc3-JTP03QD8';
+
 /**
  * Register for Web Push Notifications (Standard RFC 8030 Push API + VAPID)
  */
@@ -122,14 +126,18 @@ export async function registerWebPush(
       return null;
     }
 
-    // Fetch authoritative VAPID Public Key from server
-    const keyResult = await apiFetchJson<{ success: boolean; publicKey: string }>('/api/webpush/vapid-public-key');
-    if (!keyResult.ok || !keyResult.data?.success || !keyResult.data?.publicKey) {
-      console.warn('[WebPush Client] VAPID Key unavailable:', keyResult.error);
-      return null;
+    // Fetch authoritative VAPID Public Key from server with deterministic fallback
+    let rawPublicKey = DEFAULT_CLIENT_VAPID_PUBLIC_KEY;
+    try {
+      const keyResult = await apiFetchJson<{ success: boolean; publicKey: string }>('/api/webpush/vapid-public-key');
+      if (keyResult.ok && keyResult.data?.publicKey) {
+        rawPublicKey = keyResult.data.publicKey;
+      }
+    } catch (kErr) {
+      console.warn('[WebPush Client] Using local VAPID fallback key:', kErr);
     }
 
-    const applicationServerKey = urlBase64ToUint8Array(keyResult.data.publicKey);
+    const applicationServerKey = urlBase64ToUint8Array(rawPublicKey);
 
     // Register or get active service worker
     const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js', {
@@ -181,8 +189,8 @@ export async function registerWebPush(
         ? 'Safari'
         : 'Browser';
 
-      // 3. Register subscription on Authoritative Backend
-      await apiFetchJson('/api/webpush/subscribe', {
+      // 3. Register subscription on Authoritative Backend (non-blocking)
+      apiFetchJson('/api/webpush/subscribe', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -196,6 +204,8 @@ export async function registerWebPush(
           browser: browserInfo,
           userAgent: navigator.userAgent
         })
+      }).catch(err => {
+        console.warn('[WebPush Client] Backend subscription registration notice:', err);
       });
 
       // 4. Save to Firestore users/{uid}/pushSubscriptions/{subId}

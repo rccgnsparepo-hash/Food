@@ -160,18 +160,39 @@ export const useAuthStore = create<AuthState>((set, get) => ({
             });
 
             // Set up real-time live sync on user's Firestore document
-            userProfileDocUnsubscribe = onSnapshot(doc(db, 'users', firebaseUser.uid), (docSnap) => {
+            userProfileDocUnsubscribe = onSnapshot(doc(db, 'users', firebaseUser.uid), async (docSnap) => {
               if (docSnap.exists()) {
                 const liveData = docSnap.data() as Partial<UserProfile>;
                 const currentUser = get().user;
                 if (currentUser) {
+                  // Determine authoritative effective role, giving priority to liveData, then subprofiles/existing role
+                  let effRole = liveData.active_role || liveData.role;
+                  if (!effRole || effRole === 'customer') {
+                    if (currentUser.kitchen_profile || currentUser.roles?.includes('kitchen') || currentUser.roles?.includes('kitchen_manager') || currentUser.roles?.includes('kitchen_staff') || liveData.vendor_id || currentUser.vendor_id) {
+                      effRole = currentUser.active_role || 'kitchen';
+                    } else if (currentUser.rider_profile || currentUser.roles?.includes('rider')) {
+                      effRole = 'rider';
+                    } else if (currentUser.admin_profile || currentUser.roles?.includes('admin') || currentUser.roles?.includes('super_admin')) {
+                      effRole = currentUser.active_role || 'admin';
+                    } else {
+                      effRole = 'customer';
+                    }
+                  }
+
                   const merged: UserProfile = {
                     ...currentUser,
                     ...liveData,
+                    roles: Array.from(new Set([...(currentUser.roles || []), ...(liveData.roles || []), effRole])),
+                    active_role: effRole,
+                    role: effRole,
+                    vendor_id: liveData.vendor_id || currentUser.vendor_id,
+                    kitchen_profile: currentUser.kitchen_profile,
+                    rider_profile: currentUser.rider_profile,
+                    admin_profile: currentUser.admin_profile,
+                    customer_profile: currentUser.customer_profile,
                     uid: firebaseUser.uid,
                     id: firebaseUser.uid
                   };
-                  const effRole = merged.active_role || merged.role || 'customer';
                   set({ user: merged, role: effRole });
                 }
               }
