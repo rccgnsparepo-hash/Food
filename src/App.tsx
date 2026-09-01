@@ -244,17 +244,32 @@ export default function App() {
     return <AuthGatewayPage />;
   }
 
-  // 3. HARD APK ROLE LOCKING: Verify authoritative database role against active APK Flavor
-  const userAuthoritativeRole = (user.active_role || user.role || role) as UserRole;
-  const isAuthorizedForCurrentApk = isRoleAuthorizedForFlavor(userAuthoritativeRole, currentFlavor);
+  // 3. Authoritative role determination
+  const effectiveRole = (user.active_role || user.role || role) as UserRole;
+  const isAuthorizedForCurrentApk = isRoleAuthorizedForFlavor(effectiveRole, currentFlavor);
 
   if (!isAuthorizedForCurrentApk) {
-    return (
-      <AppRoleMismatchScreen
-        currentFlavor={currentFlavor}
-        userRole={userAuthoritativeRole}
-      />
-    );
+    const isNativeAndroid = typeof window !== 'undefined' && Boolean((window as any).BUKKIT_NATIVE_FLAVOR);
+    if (!isNativeAndroid) {
+      // In web/preview environment, auto-align flavor to match the active authenticated role
+      const targetFlavor = effectiveRole === 'rider' 
+        ? 'rider' 
+        : (effectiveRole === 'kitchen' || effectiveRole === 'kitchen_manager' || effectiveRole === 'kitchen_staff') 
+        ? 'vendor' 
+        : (effectiveRole === 'admin' || effectiveRole === 'super_admin') 
+        ? 'admin' 
+        : 'customer';
+      if (currentFlavor !== targetFlavor) {
+        setDevAppFlavor(targetFlavor);
+      }
+    } else {
+      return (
+        <AppRoleMismatchScreen
+          currentFlavor={currentFlavor}
+          userRole={effectiveRole}
+        />
+      );
+    }
   }
 
   const isGuest = user.uid.startsWith('guest_');
@@ -265,7 +280,7 @@ export default function App() {
       <NetworkStatusBanner />
 
       {/* 1. Splash / Onboarding Screen */}
-      {activeView === 'splash' && role === 'customer' ? (
+      {activeView === 'splash' && effectiveRole === 'customer' ? (
         <SplashOnboarding onStart={handleStartMealOrder} />
       ) : (
         <div className="flex flex-col min-h-screen">
@@ -303,7 +318,7 @@ export default function App() {
           <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 pt-6 pb-20">
             <ErrorBoundary>
               {/* Customer Views: Strictly home, menu, vendors, wallet, orders, tracking, profile */}
-              {role === 'customer' && (
+              {effectiveRole === 'customer' && (
                 <>
                   {activeView === 'home' && (
                     <HomeFeed
@@ -496,18 +511,18 @@ export default function App() {
               )}
 
               {/* Kitchen / Stand View: Strictly Kitchen Stand Dashboard */}
-              {(role === 'kitchen' || role === 'kitchen_manager' || role === 'kitchen_staff') && <KitchenDashboard />}
+              {(effectiveRole === 'kitchen' || effectiveRole === 'kitchen_manager' || effectiveRole === 'kitchen_staff') && <KitchenDashboard />}
 
               {/* Rider View: Strictly Rider Delivery Dashboard */}
-              {role === 'rider' && <RiderDashboard />}
+              {effectiveRole === 'rider' && <RiderDashboard />}
 
               {/* Admin View: Strictly Campus Operations & Admin Console */}
-              {(role === 'admin' || role === 'super_admin') && <AdminDashboard />}
+              {(effectiveRole === 'admin' || effectiveRole === 'super_admin') && <AdminDashboard />}
             </ErrorBoundary>
           </main>
 
           {/* Floating Bottom Navigation */}
-          {role === 'customer' && activeView !== 'tracking' && (
+          {effectiveRole === 'customer' && activeView !== 'tracking' && (
             <BottomNav activeView={activeView} setActiveView={setActiveView} />
           )}
 

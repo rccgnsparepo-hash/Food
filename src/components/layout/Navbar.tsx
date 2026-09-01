@@ -40,6 +40,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   setActiveView
 }) => {
   const { user, role, logout } = useAuthStore();
+  const effectiveRole = (user?.active_role || user?.role || role) as string;
   const { items, setCartOpen } = useCartStore();
   const { theme, resolvedTheme, toggleTheme, setTheme } = useThemeStore();
   const [showProfileMenu, setShowProfileMenu] = useState(false);
@@ -56,22 +57,22 @@ export const Navbar: React.FC<NavbarProps> = ({
           whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.97 }}
           onClick={() => {
-            if (role === 'customer') {
+            if (effectiveRole === 'customer') {
               setActiveView('home');
             }
           }}
           className="flex items-center gap-2.5 cursor-pointer group"
         >
           <BukkitLogo variant="full" size="sm" />
-          {role !== 'customer' && (
+          {effectiveRole !== 'customer' && (
             <span className="bg-[#0D472B] dark:bg-emerald-600 text-white text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider shadow-xs">
-              {role === 'rider' ? 'RIDER' : role === 'kitchen' ? 'KITCHEN' : 'ADMIN'}
+              {effectiveRole === 'rider' ? 'RIDER' : (effectiveRole === 'kitchen' || effectiveRole === 'kitchen_manager' || effectiveRole === 'kitchen_staff') ? 'KITCHEN' : 'ADMIN'}
             </span>
           )}
         </motion.div>
 
         {/* CUSTOMER DESKTOP NAVIGATION: Strictly Home, Menu, Vendors, Wallet, Orders */}
-        {role === 'customer' && (
+        {effectiveRole === 'customer' && (
           <nav className="hidden md:flex items-center gap-1 lg:gap-2">
             {[
               { id: 'home', label: 'Home', icon: UtensilsCrossed },
@@ -107,21 +108,21 @@ export const Navbar: React.FC<NavbarProps> = ({
         )}
 
         {/* Non-Customer Portal Context Info */}
-        {role === 'rider' && (
+        {effectiveRole === 'rider' && (
           <div className="hidden sm:flex items-center gap-2 bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-800/60 text-emerald-800 dark:text-emerald-300 text-xs font-extrabold px-3 py-1.5 rounded-full">
             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
             <span>Rider Active & Ready for Orders</span>
           </div>
         )}
 
-        {role === 'kitchen' && (
+        {(effectiveRole === 'kitchen' || effectiveRole === 'kitchen_manager' || effectiveRole === 'kitchen_staff') && (
           <div className="hidden sm:flex items-center gap-2 bg-amber-50 dark:bg-amber-950/50 border border-amber-200 dark:border-amber-800/60 text-amber-900 dark:text-amber-300 text-xs font-extrabold px-3 py-1.5 rounded-full">
             <Store className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
             <span>{user?.kitchen_profile?.vendor_name || 'Campus Kitchen Stand'}</span>
           </div>
         )}
 
-        {role === 'admin' && (
+        {(effectiveRole === 'admin' || effectiveRole === 'super_admin') && (
           <div className="hidden sm:flex items-center gap-2 bg-slate-900 dark:bg-slate-800 text-white text-xs font-extrabold px-3.5 py-1.5 rounded-full shadow-xs border border-slate-700">
             <Shield className="w-3.5 h-3.5 text-red-400" />
             <span>Campus Control Console</span>

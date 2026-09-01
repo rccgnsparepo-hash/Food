@@ -248,10 +248,17 @@ export const KitchenDashboard: React.FC = () => {
   const isAuthorizedToManageStand = (targetVendorId?: string) => {
     if (isAdmin) return true;
     const vendorIdToCheck = targetVendorId || currentVendor?.id;
+    if (!vendorIdToCheck) return false;
+
+    const userCanonicalVendorId = matchOfficialVendor(userVendorId)?.id || userVendorId;
+    const resolvedCanonical = matchOfficialVendor(resolvedVendorId)?.id || resolvedVendorId;
+    const targetCanonical = matchOfficialVendor(vendorIdToCheck)?.id || vendorIdToCheck;
+
     return (
-      vendorIdToCheck === resolvedVendorId ||
-      vendorIdToCheck === userVendorId ||
-      currentVendor?.owner_uid === user?.uid
+      targetCanonical === resolvedCanonical ||
+      targetCanonical === userCanonicalVendorId ||
+      currentVendor?.owner_uid === user?.uid ||
+      vendorIdToCheck === user?.uid
     );
   };
 
@@ -450,6 +457,13 @@ export const KitchenDashboard: React.FC = () => {
     reason?: string
   ) => {
     if (!user) return;
+    const targetOrder = liveOrders.find(o => o.id === orderId);
+    const orderVendorId = targetOrder?.vendor_id || (targetOrder as any)?.restaurant_id;
+    if (orderVendorId && !isAuthorizedToManageStand(orderVendorId)) {
+      toast.error('Unauthorized: You can only manage orders for your own kitchen stand.');
+      return;
+    }
+
     triggerHaptic(40);
     try {
       const res = await transitionOrderStatus(orderId, nextStatus as any, user, {

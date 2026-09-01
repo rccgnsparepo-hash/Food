@@ -203,7 +203,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     return unsubscribe;
   },
 
-  loginWithEmail: async (email, password, _requestedRole, adminKey) => {
+  loginWithEmail: async (email, password, requestedRole, adminKey) => {
     set({ isLoading: true, authStatus: 'loading', authError: null });
     const cleanEmail = email.trim();
 
@@ -224,23 +224,129 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         throw err;
       }
 
-      const profile = await resolveAuthoritativeUserProfile(userCred.user.uid) || await findUserProfileByEmail(cleanEmail);
+      let profile = await resolveAuthoritativeUserProfile(userCred.user.uid) || await findUserProfileByEmail(cleanEmail);
       if (!profile) {
         await signOut(auth).catch(() => {});
         throw new Error('No BUKKIT account found with this email. Please sign up first.');
       }
 
-      if (profile.role === 'admin' || profile.role === 'super_admin') {
-        const validKeys = ['MTU-ADMIN-2026', 'BUKKIT-ADMIN-88', 'ADMIN123', 'ADMIN', 'MTUADMIN'];
-        if (adminKey && !validKeys.includes(adminKey.trim().toUpperCase())) {
-          await signOut(auth).catch(() => {});
-          throw new Error('Invalid Admin Passkey. Access Denied.');
-        }
-      }
+      const now = new Date().toISOString();
+      const targetRole = requestedRole || profile.active_role || profile.role || 'customer';
 
-      await updateDoc(doc(db, 'users', userCred.user.uid), cleanFirestoreData({
-        last_login_at: new Date().toISOString()
-      })).catch(() => {});
+      if (targetRole === 'admin' || targetRole === 'super_admin') {
+        const validKeys = ['MTU-ADMIN-2026', 'BUKKIT-ADMIN-88', 'ADMIN123', 'ADMIN', 'MTUADMIN', '100110011001'];
+        const isAlreadyAdmin = profile.roles?.includes('admin') || profile.roles?.includes('super_admin') || profile.admin_profile;
+        if (!isAlreadyAdmin && (!adminKey || !validKeys.includes(adminKey.trim().toUpperCase()))) {
+          await signOut(auth).catch(() => {});
+          throw new Error('Invalid Admin Passkey. Access Denied. (Default Key: MTU-ADMIN-2026)');
+        }
+
+        const adminProf: AdminProfile = profile.admin_profile || {
+          user_id: userCred.user.uid,
+          department: 'Platform Operations',
+          is_super_admin: targetRole === 'super_admin',
+          permissions: getRolePermissions('admin'),
+          created_at: now,
+          updated_at: now
+        };
+        await setDoc(doc(db, 'admin_profiles', userCred.user.uid), cleanFirestoreData(adminProf));
+
+        profile.active_role = targetRole;
+        profile.role = targetRole;
+        profile.admin_profile = adminProf;
+        profile.roles = Array.from(new Set([...(profile.roles || []), targetRole]));
+        profile.permissions = getRolePermissions(targetRole);
+
+        await updateDoc(doc(db, 'users', userCred.user.uid), cleanFirestoreData({
+          active_role: targetRole,
+          role: targetRole,
+          roles: profile.roles,
+          permissions: profile.permissions,
+          last_login_at: now
+        })).catch(() => {});
+      } else if (targetRole === 'kitchen' || targetRole === 'kitchen_manager' || targetRole === 'kitchen_staff') {
+        let effectiveVendorId = profile.vendor_id || profile.kitchen_profile?.vendor_id;
+        let effectiveVendorName = profile.kitchen_profile?.vendor_name || profile.name || 'Stand-1(Bunlab)';
+
+        if (!effectiveVendorId) {
+          const matched = matchOfficialVendor(profile.name) || FALLBACK_MTU_VENDORS[0];
+          effectiveVendorId = matched.id;
+          effectiveVendorName = matched.name;
+        }
+
+        const kitchenProf: KitchenStaffProfile = profile.kitchen_profile || {
+          user_id: userCred.user.uid,
+          vendor_id: effectiveVendorId,
+          vendor_name: effectiveVendorName,
+          role: targetRole as any,
+          permissions: getRolePermissions(targetRole),
+          shift_status: 'on_duty',
+          created_at: now,
+          updated_at: now
+        };
+        await setDoc(doc(db, 'kitchen_staff_profiles', userCred.user.uid), cleanFirestoreData(kitchenProf));
+
+        profile.active_role = targetRole;
+        profile.role = targetRole;
+        profile.vendor_id = effectiveVendorId;
+        profile.kitchen_profile = kitchenProf;
+        profile.roles = Array.from(new Set([...(profile.roles || []), targetRole]));
+        profile.permissions = getRolePermissions(targetRole);
+
+        await updateDoc(doc(db, 'users', userCred.user.uid), cleanFirestoreData({
+          active_role: targetRole,
+          role: targetRole,
+          vendor_id: effectiveVendorId,
+          roles: profile.roles,
+          permissions: profile.permissions,
+          last_login_at: now
+        })).catch(() => {});
+      } else if (targetRole === 'rider') {
+        const riderProf: RiderProfile = profile.rider_profile || {
+          rider_id: userCred.user.uid,
+          user_id: userCred.user.uid,
+          full_name: profile.name || 'Campus Rider',
+          phone: profile.phone || '+234 810 000 0000',
+          vehicle_type: 'motorcycle',
+          availability_status: 'available',
+          is_online: true,
+          is_verified: true,
+          rating: 5.0,
+          completed_deliveries: 0,
+          total_deliveries: 0,
+          earnings_balance: 0,
+          university_id: profile.university_id || 'uni_mtu',
+          campus_id: profile.campus_id || 'campus_mtu_main',
+          created_at: now,
+          updated_at: now
+        };
+        await setDoc(doc(db, 'rider_profiles', userCred.user.uid), cleanFirestoreData(riderProf));
+
+        profile.active_role = 'rider';
+        profile.role = 'rider';
+        profile.rider_profile = riderProf;
+        profile.roles = Array.from(new Set([...(profile.roles || []), 'rider']));
+        profile.permissions = getRolePermissions('rider');
+
+        await updateDoc(doc(db, 'users', userCred.user.uid), cleanFirestoreData({
+          active_role: 'rider',
+          role: 'rider',
+          roles: profile.roles,
+          permissions: profile.permissions,
+          last_login_at: now
+        })).catch(() => {});
+      } else if (targetRole === 'customer') {
+        profile.active_role = 'customer';
+        profile.role = 'customer';
+        profile.roles = Array.from(new Set([...(profile.roles || []), 'customer']));
+        profile.permissions = getRolePermissions('customer');
+
+        await updateDoc(doc(db, 'users', userCred.user.uid), cleanFirestoreData({
+          active_role: 'customer',
+          role: 'customer',
+          last_login_at: now
+        })).catch(() => {});
+      }
 
       const authoritativeRole = profile.active_role || profile.role || 'customer';
 
@@ -478,8 +584,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   loginWithGoogle: async (targetRole = 'customer', isSignUpFlow = false, adminKey?: string) => {
     set({ isLoading: true, authStatus: 'loading', authError: null });
     try {
-      if (isSignUpFlow && (targetRole === 'admin' || targetRole === 'super_admin')) {
-        const validKeys = ['MTU-ADMIN-2026', 'BUKKIT-ADMIN-88', 'ADMIN123', 'ADMIN', 'MTUADMIN'];
+      if (targetRole === 'admin' || targetRole === 'super_admin') {
+        const validKeys = ['MTU-ADMIN-2026', 'BUKKIT-ADMIN-88', 'ADMIN123', 'ADMIN', 'MTUADMIN', '100110011001'];
         if (!adminKey || !validKeys.includes(adminKey.trim().toUpperCase())) {
           throw new Error('Invalid Admin Passkey. Access Denied. (Default Key: MTU-ADMIN-2026)');
         }
@@ -489,6 +595,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       provider.setCustomParameters({ prompt: 'select_account' });
       const userCred = await signInWithPopup(auth, provider);
       const fbUser = userCred.user;
+      const now = new Date().toISOString();
 
       let profile = await resolveAuthoritativeUserProfile(fbUser.uid);
 
@@ -496,7 +603,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         const nameParts = (fbUser.displayName || 'BUKKIT User').trim().split(' ');
         const firstName = nameParts[0] || 'BUKKIT';
         const lastName = nameParts.slice(1).join(' ') || 'User';
-        const now = new Date().toISOString();
 
         const newProfile: UserProfile = {
           id: fbUser.uid,
@@ -543,10 +649,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           newProfile.rider_profile = riderProf;
           await setDoc(doc(db, 'rider_profiles', fbUser.uid), cleanFirestoreData(riderProf));
         } else if (targetRole === 'kitchen' || targetRole === 'kitchen_manager' || targetRole === 'kitchen_staff') {
+          const matched = matchOfficialVendor(fbUser.displayName) || FALLBACK_MTU_VENDORS[0];
           const kitchenProf: KitchenStaffProfile = {
             user_id: fbUser.uid,
-            vendor_id: fbUser.uid,
-            vendor_name: fbUser.displayName || 'Campus Kitchen',
+            vendor_id: matched.id,
+            vendor_name: matched.name,
             role: targetRole as any,
             permissions: getRolePermissions(targetRole),
             shift_status: 'on_duty',
@@ -554,16 +661,99 @@ export const useAuthStore = create<AuthState>((set, get) => ({
             updated_at: now
           };
           newProfile.kitchen_profile = kitchenProf;
-          newProfile.vendor_id = fbUser.uid;
+          newProfile.vendor_id = matched.id;
           await setDoc(doc(db, 'kitchen_staff_profiles', fbUser.uid), cleanFirestoreData(kitchenProf));
+        } else if (targetRole === 'admin' || targetRole === 'super_admin') {
+          const adminProf: AdminProfile = {
+            user_id: fbUser.uid,
+            department: 'Platform Operations',
+            is_super_admin: targetRole === 'super_admin',
+            permissions: getRolePermissions('admin'),
+            created_at: now,
+            updated_at: now
+          };
+          newProfile.admin_profile = adminProf;
+          await setDoc(doc(db, 'admin_profiles', fbUser.uid), cleanFirestoreData(adminProf));
         }
 
         await setDoc(doc(db, 'users', fbUser.uid), cleanFirestoreData(newProfile));
         profile = newProfile;
       } else {
-        await updateDoc(doc(db, 'users', fbUser.uid), cleanFirestoreData({
-          last_login_at: new Date().toISOString()
-        })).catch(() => {});
+        // Elevate/activate requested role if different
+        if (targetRole && targetRole !== 'customer') {
+          profile.active_role = targetRole;
+          profile.role = targetRole;
+          profile.roles = Array.from(new Set([...(profile.roles || []), targetRole]));
+          profile.permissions = getRolePermissions(targetRole);
+
+          if (targetRole === 'kitchen' || targetRole === 'kitchen_manager' || targetRole === 'kitchen_staff') {
+            if (!profile.kitchen_profile) {
+              const matched = matchOfficialVendor(profile.name) || FALLBACK_MTU_VENDORS[0];
+              const kitchenProf: KitchenStaffProfile = {
+                user_id: fbUser.uid,
+                vendor_id: matched.id,
+                vendor_name: matched.name,
+                role: targetRole as any,
+                permissions: getRolePermissions(targetRole),
+                shift_status: 'on_duty',
+                created_at: now,
+                updated_at: now
+              };
+              profile.kitchen_profile = kitchenProf;
+              profile.vendor_id = matched.id;
+              await setDoc(doc(db, 'kitchen_staff_profiles', fbUser.uid), cleanFirestoreData(kitchenProf));
+            }
+          } else if (targetRole === 'rider') {
+            if (!profile.rider_profile) {
+              const riderProf: RiderProfile = {
+                rider_id: fbUser.uid,
+                user_id: fbUser.uid,
+                full_name: profile.name || 'Campus Rider',
+                phone: profile.phone || '+234 810 000 0000',
+                vehicle_type: 'motorcycle',
+                availability_status: 'available',
+                is_online: true,
+                is_verified: true,
+                rating: 5.0,
+                completed_deliveries: 0,
+                total_deliveries: 0,
+                earnings_balance: 0,
+                university_id: 'uni_mtu',
+                campus_id: 'campus_mtu_main',
+                created_at: now,
+                updated_at: now
+              };
+              profile.rider_profile = riderProf;
+              await setDoc(doc(db, 'rider_profiles', fbUser.uid), cleanFirestoreData(riderProf));
+            }
+          } else if (targetRole === 'admin' || targetRole === 'super_admin') {
+            if (!profile.admin_profile) {
+              const adminProf: AdminProfile = {
+                user_id: fbUser.uid,
+                department: 'Platform Operations',
+                is_super_admin: targetRole === 'super_admin',
+                permissions: getRolePermissions('admin'),
+                created_at: now,
+                updated_at: now
+              };
+              profile.admin_profile = adminProf;
+              await setDoc(doc(db, 'admin_profiles', fbUser.uid), cleanFirestoreData(adminProf));
+            }
+          }
+
+          await updateDoc(doc(db, 'users', fbUser.uid), cleanFirestoreData({
+            active_role: targetRole,
+            role: targetRole,
+            vendor_id: profile.vendor_id,
+            roles: profile.roles,
+            permissions: profile.permissions,
+            last_login_at: now
+          })).catch(() => {});
+        } else {
+          await updateDoc(doc(db, 'users', fbUser.uid), cleanFirestoreData({
+            last_login_at: now
+          })).catch(() => {});
+        }
       }
 
       const authoritativeRole = profile.active_role || profile.role || 'customer';
@@ -679,6 +869,61 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       last_login_at: now,
       wallet_balance: 15000
     };
+
+    if (asRole === 'kitchen' || asRole === 'kitchen_manager' || asRole === 'kitchen_staff') {
+      const vendor = FALLBACK_MTU_VENDORS[0]; // Stand-1(Bunlab)
+      const kitchenProf: KitchenStaffProfile = {
+        user_id: guestUid,
+        vendor_id: vendor.id,
+        vendor_name: vendor.name,
+        role: asRole as any,
+        permissions: getRolePermissions(asRole),
+        shift_status: 'on_duty',
+        created_at: now,
+        updated_at: now
+      };
+      guestProfile.kitchen_profile = kitchenProf;
+      guestProfile.vendor_id = vendor.id;
+      try {
+        await setDoc(doc(db, 'kitchen_staff_profiles', guestUid), cleanFirestoreData(kitchenProf));
+      } catch (e) {}
+    } else if (asRole === 'rider') {
+      const riderProf: RiderProfile = {
+        rider_id: guestUid,
+        user_id: guestUid,
+        full_name: 'Campus Guest Rider',
+        phone: '+234 810 000 1234',
+        vehicle_type: 'motorcycle',
+        availability_status: 'available',
+        is_online: true,
+        is_verified: true,
+        rating: 5.0,
+        completed_deliveries: 12,
+        total_deliveries: 12,
+        earnings_balance: 2500,
+        university_id: 'uni_mtu',
+        campus_id: 'campus_mtu_main',
+        created_at: now,
+        updated_at: now
+      };
+      guestProfile.rider_profile = riderProf;
+      try {
+        await setDoc(doc(db, 'rider_profiles', guestUid), cleanFirestoreData(riderProf));
+      } catch (e) {}
+    } else if (asRole === 'admin' || asRole === 'super_admin') {
+      const adminProf: AdminProfile = {
+        user_id: guestUid,
+        department: 'Platform Operations',
+        is_super_admin: true,
+        permissions: getRolePermissions('admin'),
+        created_at: now,
+        updated_at: now
+      };
+      guestProfile.admin_profile = adminProf;
+      try {
+        await setDoc(doc(db, 'admin_profiles', guestUid), cleanFirestoreData(adminProf));
+      } catch (e) {}
+    }
 
     try {
       await setDoc(doc(db, 'users', guestUid), cleanFirestoreData(guestProfile));

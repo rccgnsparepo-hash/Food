@@ -161,9 +161,6 @@ export async function resolveAuthoritativeUserProfile(uid: string): Promise<User
     }
 
     const userData = userDoc.data() as Partial<UserProfile>;
-    const roles = userData.roles || (userData.role ? [userData.role] : ['customer']);
-    const activeRole = userData.active_role || userData.role || 'customer';
-    const permissions = userData.permissions || getRolePermissions(activeRole);
 
     // Fetch sub-profiles in parallel
     const [custSnap, riderSnap, kitchenSnap, adminSnap] = await Promise.all([
@@ -172,6 +169,38 @@ export async function resolveAuthoritativeUserProfile(uid: string): Promise<User
       getDoc(doc(db, 'kitchen_staff_profiles', uid)).catch(() => null),
       getDoc(doc(db, 'admin_profiles', uid)).catch(() => null)
     ]);
+
+    // Discover all assigned roles from user document + sub-profile documents
+    const discoveredRoles = new Set<UserRole>(
+      userData.roles || (userData.role ? [userData.role] : [])
+    );
+    if (adminSnap?.exists()) discoveredRoles.add('admin');
+    if (kitchenSnap?.exists()) {
+      const kRole = kitchenSnap.data()?.role;
+      discoveredRoles.add(kRole === 'kitchen_manager' || kRole === 'kitchen_staff' ? kRole : 'kitchen');
+    }
+    if (riderSnap?.exists()) discoveredRoles.add('rider');
+    if (custSnap?.exists()) discoveredRoles.add('customer');
+    if (discoveredRoles.size === 0) discoveredRoles.add('customer');
+
+    const roles = Array.from(discoveredRoles);
+
+    // Authoritative active role determination
+    let activeRole: UserRole = userData.active_role || userData.role || 'customer';
+    
+    // If activeRole is 'customer' or default, check if user has a non-customer subprofile or role assignment
+    if (activeRole === 'customer' || !activeRole) {
+      if (adminSnap?.exists() || roles.includes('admin') || roles.includes('super_admin')) {
+        activeRole = roles.includes('super_admin') ? 'super_admin' : 'admin';
+      } else if (kitchenSnap?.exists() || roles.includes('kitchen') || roles.includes('kitchen_manager') || roles.includes('kitchen_staff')) {
+        const kRole = kitchenSnap?.data()?.role;
+        activeRole = (kRole === 'kitchen_manager' || kRole === 'kitchen_staff') ? kRole : 'kitchen';
+      } else if (riderSnap?.exists() || roles.includes('rider')) {
+        activeRole = 'rider';
+      }
+    }
+
+    const permissions = userData.permissions || getRolePermissions(activeRole);
 
     const isKitchenRole = activeRole === 'kitchen' || activeRole === 'kitchen_manager' || activeRole === 'kitchen_staff' || roles.includes('kitchen');
     
@@ -186,7 +215,7 @@ export async function resolveAuthoritativeUserProfile(uid: string): Promise<User
       : (userData.vendor_id || (kitchenSnap?.exists() ? kitchenSnap.data()?.vendor_id : undefined));
       
     if (!resolvedVendorId && isKitchenRole) {
-      resolvedVendorId = uid;
+      resolvedVendorId = 'vendor_bunlab_01';
     }
 
     const profile: UserProfile = {
