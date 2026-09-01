@@ -145,6 +145,31 @@ try {
   }
 } catch {}
 
+// Cross-tab / Cross-window storage event listener fallback
+if (typeof window !== 'undefined') {
+  window.addEventListener('storage', (event) => {
+    if (event.key === STORAGE_KEY && event.newValue) {
+      try {
+        const nextStore = JSON.parse(event.newValue);
+        inMemoryStore = nextStore;
+        // Notify all active collection listeners
+        colListeners.forEach((_, col) => {
+          notifyColListeners(col);
+        });
+        // Notify all active document listeners
+        docListeners.forEach((_, key) => {
+          const parts = key.split('/');
+          const col = parts[0];
+          const id = parts.slice(1).join('/');
+          if (col && id) notifyDocListeners(col, id);
+        });
+      } catch (err) {
+        console.warn('[EmbeddedDb] Storage sync notice:', err);
+      }
+    }
+  });
+}
+
 function broadcastMutation(col: string, id: string, data: any, isDelete = false) {
   try {
     if (broadcastChannel) {

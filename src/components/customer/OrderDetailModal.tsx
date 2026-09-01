@@ -24,7 +24,7 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({ order, onClo
 
   const steps: { status: OrderStatus; title: string; time?: string }[] = [
     { status: 'pending', title: 'Order Placed', time: new Date(order.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) },
-    { status: 'accepted', title: 'Confirmed by Restaurant' },
+    { status: 'accepted', title: 'Confirmed by Vendor' },
     { status: 'preparing', title: 'Food Preparation' },
     { status: 'picked_up', title: 'Picked Up by Rider' },
     { status: 'on_the_way', title: 'Out for Delivery' },
@@ -33,12 +33,17 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({ order, onClo
 
   const getStepStatusIndex = (st: OrderStatus) => {
     switch (st) {
-      case 'pending': return 0;
-      case 'accepted': return 1;
+      case 'pending':
+      case 'payment_confirmed': return 0;
+      case 'accepted':
+      case 'vendor_accepted': return 1;
       case 'preparing': return 2;
-      case 'ready': return 3;
+      case 'ready':
+      case 'ready_for_pickup':
+      case 'rider_assigned':
       case 'picked_up': return 3;
-      case 'on_the_way': return 4;
+      case 'on_the_way':
+      case 'out_for_delivery': return 4;
       case 'delivered': return 5;
       default: return 0;
     }
@@ -98,9 +103,9 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({ order, onClo
             <div className="flex items-center justify-between">
               <div>
                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-                  Restaurant
+                  Vendor Stand
                 </span>
-                <h3 className="font-black text-slate-900 text-lg">{order.restaurant_name}</h3>
+                <h3 className="font-black text-slate-900 text-lg">{order.vendor_name || order.restaurant_name || 'MTU Campus Stand'}</h3>
               </div>
               <span className={`px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider ${
                 isCompleted

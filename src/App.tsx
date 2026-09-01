@@ -536,7 +536,7 @@ export default function App() {
           orderNumber={activeChat.orderNumber}
           currentUserId={user?.uid || ''}
           currentUserName={user?.name || 'BUKKIT User'}
-          currentUserRole={userAuthoritativeRole === 'rider' ? 'rider' : userAuthoritativeRole === 'admin' ? 'admin' : 'customer'}
+          currentUserRole={effectiveRole === 'rider' ? 'rider' : effectiveRole === 'admin' ? 'admin' : 'customer'}
           recipientId={activeChat.recipientId}
           recipientName={activeChat.recipientName}
           vendorName={activeChat.vendorName}

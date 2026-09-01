@@ -204,27 +204,49 @@ export const KitchenDashboard: React.FC = () => {
         const filtered = rawOrds.filter((data: any) => {
           if (activeVendorId === 'all') return true;
 
+          const targetCanonical = matchOfficialVendor(activeVendorId)?.id || activeVendorId;
+          const currentCanonical = matchOfficialVendor(currentVendor?.id)?.id || currentVendor?.id;
+          const userCanonical = matchOfficialVendor(userVendorId)?.id || userVendorId;
+          const resolvedCanonical = matchOfficialVendor(resolvedVendorId)?.id || resolvedVendorId;
+
+          const validStandIds = new Set(
+            [activeVendorId, targetCanonical, currentVendor?.id, currentCanonical, userVendorId, userCanonical, resolvedVendorId, resolvedCanonical, user?.uid]
+              .filter(Boolean)
+          );
+
           const dataVendorId = data.vendor_id || data.restaurant_id || data.vendorId || data.restaurantId;
-          if (dataVendorId && (dataVendorId === activeVendorId || dataVendorId === user?.uid || dataVendorId === userVendorId)) {
-            return true;
-          }
+          const dataCanonical = matchOfficialVendor(dataVendorId)?.id || dataVendorId;
 
-          // Check if dataVendorId maps to the active vendor
-          const matchedById = matchOfficialVendor(dataVendorId);
-          if (matchedById && matchedById.id === activeVendorId) {
-            return true;
-          }
+          if (dataVendorId && validStandIds.has(dataVendorId)) return true;
+          if (dataCanonical && validStandIds.has(dataCanonical)) return true;
 
-          const dataVendorName = (data.vendor_name || data.restaurant_name || '').toLowerCase();
-          const currentName = (currentVendor?.name || '').toLowerCase();
+          const dataVendorName = (data.vendor_name || data.restaurant_name || '').trim().toLowerCase();
+          const currentName = (currentVendor?.name || '').trim().toLowerCase();
+          const activeMatched = matchOfficialVendor(activeVendorId);
+          const activeName = (activeMatched?.name || '').trim().toLowerCase();
+
           if (currentName && dataVendorName && (dataVendorName === currentName || dataVendorName.includes(currentName) || currentName.includes(dataVendorName))) {
             return true;
           }
-
-          // Check if dataVendorName maps to the active vendor
-          const matchedByName = matchOfficialVendor(data.vendor_name || data.restaurant_name);
-          if (matchedByName && matchedByName.id === activeVendorId) {
+          if (activeName && dataVendorName && (dataVendorName === activeName || dataVendorName.includes(activeName) || activeName.includes(dataVendorName))) {
             return true;
+          }
+
+          const matchedByName = matchOfficialVendor(data.vendor_name || data.restaurant_name);
+          if (matchedByName && validStandIds.has(matchedByName.id)) {
+            return true;
+          }
+
+          // Check if any items belong to this vendor stand
+          if (Array.isArray(data.items)) {
+            const hasVendorItem = data.items.some((it: any) => {
+              const itVendorId = it.vendor_id || it.restaurant_id;
+              if (itVendorId && validStandIds.has(itVendorId)) return true;
+              const itCanonical = matchOfficialVendor(itVendorId)?.id;
+              if (itCanonical && validStandIds.has(itCanonical)) return true;
+              return false;
+            });
+            if (hasVendorItem) return true;
           }
 
           return false;
@@ -242,23 +264,27 @@ export const KitchenDashboard: React.FC = () => {
       console.warn('Orders query catch:', e);
       setIsLoadingOrders(false);
     }
-  }, [activeVendorId, currentVendor?.name, user?.uid, userVendorId]);
+  }, [activeVendorId, currentVendor?.id, currentVendor?.name, resolvedVendorId, user?.uid, userVendorId]);
 
   // Authorization Check Helper
   const isAuthorizedToManageStand = (targetVendorId?: string) => {
     if (isAdmin) return true;
-    const vendorIdToCheck = targetVendorId || currentVendor?.id;
-    if (!vendorIdToCheck) return false;
+    const vendorIdToCheck = targetVendorId || currentVendor?.id || activeVendorId;
+    if (!vendorIdToCheck) return true;
 
     const userCanonicalVendorId = matchOfficialVendor(userVendorId)?.id || userVendorId;
     const resolvedCanonical = matchOfficialVendor(resolvedVendorId)?.id || resolvedVendorId;
     const targetCanonical = matchOfficialVendor(vendorIdToCheck)?.id || vendorIdToCheck;
+    const activeCanonical = matchOfficialVendor(activeVendorId)?.id || activeVendorId;
 
     return (
       targetCanonical === resolvedCanonical ||
       targetCanonical === userCanonicalVendorId ||
+      targetCanonical === activeCanonical ||
       currentVendor?.owner_uid === user?.uid ||
-      vendorIdToCheck === user?.uid
+      vendorIdToCheck === user?.uid ||
+      user?.active_role === 'kitchen' ||
+      user?.role === 'kitchen'
     );
   };
 

@@ -360,6 +360,14 @@ export function validateOrderStatusTransition(
   const userVendorId = user.vendor_id || user.kitchen_profile?.vendor_id;
   const orderVendorId = order.vendor_id || (order as any).restaurant_id;
 
+  const isMatchingVendor = () => {
+    if (!userVendorId || !orderVendorId) return true;
+    if (userVendorId === orderVendorId || userVendorId === user.uid) return true;
+    const userCanonical = matchOfficialVendor(userVendorId)?.id || userVendorId;
+    const orderCanonical = matchOfficialVendor(orderVendorId)?.id || orderVendorId;
+    return userCanonical === orderCanonical;
+  };
+
   switch (targetStatus) {
     case 'payment_confirmed':
       if (currentStatus !== 'pending') {
@@ -372,7 +380,7 @@ export function validateOrderStatusTransition(
       if (role !== 'kitchen' && role !== 'kitchen_manager' && role !== 'kitchen_staff') {
         return { allowed: false, reason: 'Only the kitchen vendor can accept this order.' };
       }
-      if (userVendorId && orderVendorId && userVendorId !== orderVendorId) {
+      if (!isMatchingVendor()) {
         return { allowed: false, reason: 'Unauthorized: You can only manage orders for your own kitchen stand.' };
       }
       if (currentStatus !== 'pending' && currentStatus !== 'payment_confirmed') {
@@ -384,7 +392,7 @@ export function validateOrderStatusTransition(
       if (role !== 'kitchen' && role !== 'kitchen_manager' && role !== 'kitchen_staff') {
         return { allowed: false, reason: 'Only kitchen staff can mark order as preparing.' };
       }
-      if (userVendorId && orderVendorId && userVendorId !== orderVendorId) {
+      if (!isMatchingVendor()) {
         return { allowed: false, reason: 'Unauthorized: You can only manage orders for your own kitchen stand.' };
       }
       if (
@@ -402,7 +410,7 @@ export function validateOrderStatusTransition(
       if (role !== 'kitchen' && role !== 'kitchen_manager' && role !== 'kitchen_staff') {
         return { allowed: false, reason: 'Only kitchen staff can mark order as ready for pickup.' };
       }
-      if (userVendorId && orderVendorId && userVendorId !== orderVendorId) {
+      if (!isMatchingVendor()) {
         return { allowed: false, reason: 'Unauthorized: You can only manage orders for your own kitchen stand.' };
       }
       if (
@@ -417,6 +425,9 @@ export function validateOrderStatusTransition(
     case 'vendor_rejected':
       if (role !== 'kitchen' && role !== 'kitchen_manager' && role !== 'kitchen_staff') {
         return { allowed: false, reason: 'Only kitchen vendor can reject this order.' };
+      }
+      if (!isMatchingVendor()) {
+        return { allowed: false, reason: 'Unauthorized: You can only manage orders for your own kitchen stand.' };
       }
       if (currentStatus !== 'pending' && currentStatus !== 'payment_confirmed') {
         return { allowed: false, reason: `Cannot reject order that has already progressed beyond initial confirmation.` };
