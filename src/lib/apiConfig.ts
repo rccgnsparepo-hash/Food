@@ -2,13 +2,13 @@ import { Capacitor } from '@capacitor/core';
 import { auth } from './firebase';
 
 /**
- * Authoritative Backend Production Base URL for Native Android APKs, Electron Desktop EXE & Cloud Sync
+ * Authoritative Backend Production Base URL for Native Android APKs, Electron Desktop EXE & External Web Deployments (Vercel, Netlify, etc.)
  */
 export const DEFAULT_PRODUCTION_BACKEND_URL =
   'https://ais-pre-nxj4dis7zld3t6vcse6vjb-915023145069.europe-west2.run.app';
 
 /**
- * Resolve the appropriate API Base URL for Web, Desktop EXE and Native Android APKs
+ * Resolve the appropriate API Base URL for Web (Cloud Run vs Vercel / External), Desktop EXE and Native Android APKs
  */
 export function getApiBaseUrl(): string {
   if (typeof window === 'undefined') return '';
@@ -19,29 +19,7 @@ export function getApiBaseUrl(): string {
     return envUrl.replace(/\/+$/, '');
   }
 
-  // 2. Localhost or standard HTTP origin (e.g. Vite dev or local Express backend on port 3000)
-  if (
-    typeof window.location !== 'undefined' &&
-    window.location.origin &&
-    window.location.origin.startsWith('http') &&
-    (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
-  ) {
-    return window.location.origin;
-  }
-
-  // 3. Web Browser with active HTTP/HTTPS origin
-  if (
-    typeof window.location !== 'undefined' &&
-    window.location.origin &&
-    window.location.origin.startsWith('http') &&
-    window.location.protocol !== 'file:' &&
-    window.location.protocol !== 'capacitor:' &&
-    window.location.protocol !== 'ionic:'
-  ) {
-    return '';
-  }
-
-  // 4. Native Capacitor App (Android / iOS) or Electron Desktop App loaded from file://
+  // 2. Native Capacitor App (Android / iOS) or Electron Desktop App loaded from file://
   const isElectron =
     typeof navigator !== 'undefined' &&
     (/electron/i.test(navigator.userAgent) || Boolean((window as any).electronAPI));
@@ -53,14 +31,37 @@ export function getApiBaseUrl(): string {
     window.location.protocol === 'file:' ||
     isElectron
   ) {
-    // If running in local desktop server test
     if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
       return 'http://localhost:3000';
     }
     return DEFAULT_PRODUCTION_BACKEND_URL;
   }
 
-  return '';
+  // 3. Localhost development environment (Vite dev server or local Express on port 3000)
+  if (
+    typeof window.location !== 'undefined' &&
+    window.location.origin &&
+    window.location.origin.startsWith('http') &&
+    (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+  ) {
+    return window.location.origin;
+  }
+
+  // 4. Co-hosted Full-Stack Cloud Run container (Frontend + Node Express Backend served together)
+  const hostname = window.location.hostname || '';
+  const isCloudRunDirect =
+    hostname.endsWith('.run.app') ||
+    hostname.includes('googleusercontent.com') ||
+    hostname.includes('aistudio.google.com') ||
+    hostname.includes('cloudfunctions.net');
+
+  if (isCloudRunDirect) {
+    return '';
+  }
+
+  // 5. External Web Hosting (e.g. *.vercel.app, *.netlify.app, *.github.io, *.pages.dev, *.web.app, or custom domain)
+  // These hosts only serve static frontend assets, so all /api/* requests must target the live Cloud Run backend
+  return DEFAULT_PRODUCTION_BACKEND_URL;
 }
 
 /**
