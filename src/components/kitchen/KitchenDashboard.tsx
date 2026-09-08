@@ -23,7 +23,8 @@ import {
   Bell,
   RefreshCw,
   TrendingUp,
-  Tag
+  Tag,
+  BarChart3
 } from 'lucide-react';
 import { doc, updateDoc, setDoc, collection, onSnapshot, query, where } from "../../lib/embeddedDb";
 import { db } from '../../lib/firebase';
@@ -34,6 +35,7 @@ import { triggerHaptic } from '../../utils/haptics';
 import { toast } from 'sonner';
 import { ImageUploadInput } from '../common/ImageUploadInput';
 import { BukkitLogo } from '../common/BukkitLogo';
+import { KitchenSummaryDashboard } from './KitchenSummaryDashboard';
 import { updateKitchenDetails } from '../../services/kitchenService';
 import { transitionOrderStatus } from '../../services/orderLifecycleService';
 import { matchOfficialVendor, FALLBACK_MTU_VENDORS } from '../../services/seedService';
@@ -133,7 +135,7 @@ export const KitchenDashboard: React.FC = () => {
   const currentZone = foodZones.find(z => z.id === currentVendor?.food_zone_id);
 
   // Active Tab
-  const [activeTab, setActiveTab] = useState<'orders' | 'menu' | 'profile' | 'workers'>('orders');
+  const [activeTab, setActiveTab] = useState<'summary' | 'orders' | 'menu' | 'profile' | 'workers'>('summary');
   const [orderStatusFilter, setOrderStatusFilter] = useState<'all' | 'action_needed' | 'preparing' | 'ready' | 'completed'>('all');
 
   // Live Orders
@@ -533,6 +535,24 @@ export const KitchenDashboard: React.FC = () => {
     return true;
   });
 
+  // Today's summary metrics calculations for quick visibility
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
+  const todayLiveOrders = liveOrders.filter(
+    (o) => new Date(o.created_at) >= todayStart && o.status !== 'cancelled' && o.status !== 'refunded'
+  );
+  const todayTotalRevenue = todayLiveOrders.reduce((sum, o) => sum + (Number(o.total_price) || 0), 0);
+
+  const itemCounts = new Map<string, number>();
+  todayLiveOrders.forEach((o) => {
+    if (Array.isArray(o.items)) {
+      o.items.forEach((it) => {
+        itemCounts.set(it.name, (itemCounts.get(it.name) || 0) + (Number(it.quantity) || 1));
+      });
+    }
+  });
+  const topItemEntry = Array.from(itemCounts.entries()).sort((a, b) => b[1] - a[1])[0];
+
   return (
     <div className="space-y-6 pb-20 animate-in fade-in duration-200">
       
@@ -644,8 +664,9 @@ export const KitchenDashboard: React.FC = () => {
         {/* Phase Navigation Tabs */}
         <div className="relative z-10 bg-slate-950/90 border-t border-slate-800 px-6 flex items-center gap-2 overflow-x-auto scrollbar-none py-2 text-xs font-black">
           {[
-            { id: 'menu', label: 'Dish Menu & Stock', icon: UtensilsCrossed, count: vendorMenu.length },
+            { id: 'summary', label: 'Summary Dashboard', icon: BarChart3 },
             { id: 'orders', label: 'Incoming Orders', icon: ShoppingBag, count: liveOrders.length },
+            { id: 'menu', label: 'Dish Menu & Stock', icon: UtensilsCrossed, count: vendorMenu.length },
             { id: 'profile', label: 'Stand Identity & Slogan', icon: Store },
             { id: 'workers', label: 'Staff & Workers', icon: Users, count: workers.length }
           ].map((tab) => {
@@ -681,6 +702,23 @@ export const KitchenDashboard: React.FC = () => {
       {/* 2. TAB CONTENT */}
       <AnimatePresence mode="wait">
         
+        {/* TAB 0: SUMMARY DASHBOARD */}
+        {activeTab === 'summary' && (
+          <motion.div
+            key="summary-tab"
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -6 }}
+          >
+            <KitchenSummaryDashboard
+              orders={liveOrders}
+              vendor={currentVendor}
+              menuItems={vendorMenu}
+              onNavigateToOrders={() => setActiveTab('orders')}
+            />
+          </motion.div>
+        )}
+
         {/* TAB 1: MENU & STOCK MANAGEMENT */}
         {activeTab === 'menu' && (
           <motion.div
@@ -822,6 +860,54 @@ export const KitchenDashboard: React.FC = () => {
                     </button>
                   )}
                 </div>
+              </div>
+
+              {/* Real-time Daily Revenue & Popular Item Quick Metric Ribbon */}
+              <div className="bg-gradient-to-r from-emerald-500/10 via-amber-500/10 to-rose-500/10 border border-emerald-200/60 dark:border-emerald-900/40 rounded-2xl p-3 flex flex-wrap items-center justify-between gap-3 text-xs">
+                <div className="flex items-center gap-4 flex-wrap">
+                  <div>
+                    <span className="text-[10px] text-slate-500 dark:text-slate-400 font-bold block uppercase tracking-wider">
+                      Total Daily Revenue
+                    </span>
+                    <span className="font-black text-emerald-700 dark:text-emerald-400 text-sm">
+                      ₦{todayTotalRevenue.toLocaleString()}
+                    </span>
+                  </div>
+                  <div className="h-6 w-px bg-slate-200 dark:bg-slate-700 hidden sm:block" />
+                  <div>
+                    <span className="text-[10px] text-slate-500 dark:text-slate-400 font-bold block uppercase tracking-wider">
+                      Today's Orders
+                    </span>
+                    <span className="font-black text-slate-800 dark:text-slate-200 text-sm">
+                      {todayLiveOrders.length} {todayLiveOrders.length === 1 ? 'order' : 'orders'}
+                    </span>
+                  </div>
+                  {topItemEntry && (
+                    <>
+                      <div className="h-6 w-px bg-slate-200 dark:bg-slate-700 hidden sm:block" />
+                      <div>
+                        <span className="text-[10px] text-slate-500 dark:text-slate-400 font-bold block uppercase tracking-wider">
+                          Popular Item Today
+                        </span>
+                        <span className="font-black text-amber-700 dark:text-amber-400 text-xs sm:text-sm flex items-center gap-1">
+                          <span>🔥 {topItemEntry[0]}</span>
+                          <span className="text-slate-500 text-[11px] font-bold">({topItemEntry[1]} sold)</span>
+                        </span>
+                      </div>
+                    </>
+                  )}
+                </div>
+
+                <button
+                  onClick={() => {
+                    triggerHaptic(20);
+                    setActiveTab('summary');
+                  }}
+                  className="px-3.5 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-extrabold text-[11px] flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs ml-auto sm:ml-0"
+                >
+                  <BarChart3 className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Full Summary Dashboard</span>
+                </button>
               </div>
 
               {/* Status Filter Tabs */}

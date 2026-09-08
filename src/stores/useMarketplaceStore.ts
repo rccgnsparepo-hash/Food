@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { collection, onSnapshot, doc, setDoc, updateDoc, deleteDoc, cleanFirestoreData } from "../lib/embeddedDb";
-import { db } from '../lib/firebase';
+import { db, configureFirestorePersistence } from '../lib/firebase';
 import { University, Campus, FoodZone, Vendor, FoodCategory, MenuItem, FoodReview } from '../types';
 import {
   initializeDatabaseSeed,
@@ -10,6 +10,47 @@ import {
   FALLBACK_MTU_CATEGORIES,
   FALLBACK_MTU_MENU_ITEMS,
 } from '../services/seedService';
+
+const MARKETPLACE_CACHE_KEY = 'bukkit_offline_marketplace_cache';
+
+interface CachedMarketplaceData {
+  universities?: University[];
+  campuses?: Campus[];
+  foodZones?: FoodZone[];
+  vendors?: Vendor[];
+  categories?: FoodCategory[];
+  menuItems?: MenuItem[];
+  reviews?: FoodReview[];
+  cachedAt?: string;
+}
+
+function loadOfflineMarketplaceCache(): CachedMarketplaceData | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = window.localStorage.getItem(MARKETPLACE_CACHE_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch (e) {
+    console.warn('[Marketplace] Offline cache read notice:', e);
+  }
+  return null;
+}
+
+function saveOfflineMarketplaceCache(data: Partial<CachedMarketplaceData>) {
+  if (typeof window === 'undefined') return;
+  try {
+    const existing = loadOfflineMarketplaceCache() || {};
+    const updated = {
+      ...existing,
+      ...data,
+      cachedAt: new Date().toISOString()
+    };
+    window.localStorage.setItem(MARKETPLACE_CACHE_KEY, JSON.stringify(updated));
+  } catch (e) {
+    // Ignore storage quota limits
+  }
+}
+
+const initialOfflineCache = loadOfflineMarketplaceCache();
 
 interface MarketplaceState {
   universities: University[];
@@ -30,6 +71,7 @@ interface MarketplaceState {
 
   isLoading: boolean;
   isInitialized: boolean;
+  isOffline: boolean;
 
   // Actions
   initMarketplace: () => Promise<void>;
@@ -56,6 +98,7 @@ interface MarketplaceState {
   addMenuItem: (item: MenuItem) => Promise<void>;
   updateMenuItem: (id: string, updates: Partial<MenuItem>) => Promise<void>;
   deleteMenuItem: (id: string) => Promise<void>;
+  addReview: (review: FoodReview) => Promise<void>;
   bulkAddRecords: (records: {
     universities?: University[];
     campuses?: Campus[];
@@ -66,13 +109,13 @@ interface MarketplaceState {
 }
 
 export const useMarketplaceStore = create<MarketplaceState>((set, get) => ({
-  universities: [FALLBACK_MTU_UNIVERSITY],
-  campuses: [FALLBACK_MTU_CAMPUS],
-  foodZones: [],
-  vendors: FALLBACK_MTU_VENDORS,
-  categories: FALLBACK_MTU_CATEGORIES,
-  menuItems: FALLBACK_MTU_MENU_ITEMS,
-  reviews: [],
+  universities: initialOfflineCache?.universities?.length ? initialOfflineCache.universities : [FALLBACK_MTU_UNIVERSITY],
+  campuses: initialOfflineCache?.campuses?.length ? initialOfflineCache.campuses : [FALLBACK_MTU_CAMPUS],
+  foodZones: initialOfflineCache?.foodZones || [],
+  vendors: initialOfflineCache?.vendors?.length ? initialOfflineCache.vendors : FALLBACK_MTU_VENDORS,
+  categories: initialOfflineCache?.categories?.length ? initialOfflineCache.categories : FALLBACK_MTU_CATEGORIES,
+  menuItems: initialOfflineCache?.menuItems?.length ? initialOfflineCache.menuItems : FALLBACK_MTU_MENU_ITEMS,
+  reviews: initialOfflineCache?.reviews || [],
 
   selectedUniversityId: 'uni_mtu',
   selectedCampusId: 'campus_mtu_main',
@@ -84,9 +127,29 @@ export const useMarketplaceStore = create<MarketplaceState>((set, get) => ({
 
   isLoading: true,
   isInitialized: false,
+  isOffline: typeof navigator !== 'undefined' ? !navigator.onLine : false,
 
   initMarketplace: async () => {
     if (get().isInitialized) return;
+
+    // 1. Configure and activate Firestore offline persistence settings for campus network resilience
+    try {
+      await configureFirestorePersistence(db);
+    } catch (persistErr) {
+      console.warn('[Marketplace] Firestore persistence configuration warning:', persistErr);
+    }
+
+    // 2. Setup live network connectivity monitoring to gracefully support unstable campus WiFi/cellular
+    if (typeof window !== 'undefined') {
+      window.addEventListener('online', () => {
+        set({ isOffline: false });
+        console.info('[Marketplace] Campus network reconnected; live syncing Firestore catalog.');
+      });
+      window.addEventListener('offline', () => {
+        set({ isOffline: true });
+        console.info('[Marketplace] Network offline; maintaining cached campus vendor and menu catalog.');
+      });
+    }
 
     try {
       initializeDatabaseSeed().catch((e) => {
@@ -96,65 +159,75 @@ export const useMarketplaceStore = create<MarketplaceState>((set, get) => ({
       console.warn('Seed initialization deferred:', e);
     }
 
-    // 1. Subscribe to Universities in central Firestore
+    // 3. Subscribe to Universities in central Firestore
     onSnapshot(collection(db, 'universities'), (snapshot) => {
       const unis = snapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as University));
       if (unis.length > 0) {
         set({ universities: unis });
+        saveOfflineMarketplaceCache({ universities: unis });
       }
     }, (err) => console.warn('[Firestore universities listener notice]:', err));
 
-    // 2. Subscribe to Campuses in central Firestore
+    // 4. Subscribe to Campuses in central Firestore
     onSnapshot(collection(db, 'campuses'), (snapshot) => {
       const camps = snapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as Campus));
       if (camps.length > 0) {
         set({ campuses: camps });
+        saveOfflineMarketplaceCache({ campuses: camps });
       }
     }, (err) => console.warn('[Firestore campuses listener notice]:', err));
 
-    // 3. Subscribe to Food Zones in central Firestore
+    // 5. Subscribe to Food Zones in central Firestore
     onSnapshot(collection(db, 'food_zones'), (snapshot) => {
       const zones = snapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as FoodZone));
       set({ foodZones: zones });
+      saveOfflineMarketplaceCache({ foodZones: zones });
     }, (err) => console.warn('[Firestore food_zones listener notice]:', err));
 
-    // 4. Subscribe to Vendors in central Firestore
+    // 6. Subscribe to Vendors in central Firestore with offline persistence
     onSnapshot(collection(db, 'vendors'), (snapshot) => {
       const vends = snapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as Vendor));
       if (vends.length > 0) {
         set({ vendors: vends, isLoading: false });
+        saveOfflineMarketplaceCache({ vendors: vends });
       } else {
-        set({ vendors: FALLBACK_MTU_VENDORS, isLoading: false });
+        const fallback = initialOfflineCache?.vendors?.length ? initialOfflineCache.vendors : FALLBACK_MTU_VENDORS;
+        set({ vendors: fallback, isLoading: false });
       }
     }, (err) => {
       console.warn('[Firestore vendors listener notice]:', err);
       set({ isLoading: false });
     });
 
-    // 5. Subscribe to Food Categories in central Firestore
+    // 7. Subscribe to Food Categories in central Firestore
     onSnapshot(collection(db, 'food_categories'), (snapshot) => {
       const cats = snapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as FoodCategory));
       if (cats.length > 0) {
         set({ categories: cats });
+        saveOfflineMarketplaceCache({ categories: cats });
       } else {
-        set({ categories: FALLBACK_MTU_CATEGORIES });
+        const fallback = initialOfflineCache?.categories?.length ? initialOfflineCache.categories : FALLBACK_MTU_CATEGORIES;
+        set({ categories: fallback });
       }
     }, (err) => console.warn('[Firestore food_categories listener notice]:', err));
 
-    // 6. Subscribe to Menu Items in central Firestore
+    // 8. Subscribe to Menu Items in central Firestore with offline persistence
     onSnapshot(collection(db, 'menu_items'), (snapshot) => {
       const items = snapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as MenuItem));
       if (items.length > 0) {
         set({ menuItems: items });
+        saveOfflineMarketplaceCache({ menuItems: items });
       } else {
-        set({ menuItems: FALLBACK_MTU_MENU_ITEMS });
+        const fallback = initialOfflineCache?.menuItems?.length ? initialOfflineCache.menuItems : FALLBACK_MTU_MENU_ITEMS;
+        set({ menuItems: fallback });
       }
     }, (err) => console.warn('[Firestore menu_items listener notice]:', err));
 
-    // 7. Subscribe to Reviews in central Firestore
+    // 9. Subscribe to Reviews in central Firestore
     onSnapshot(collection(db, 'food_reviews'), (snapshot) => {
       const revs = snapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as FoodReview));
       set({ reviews: revs });
+      saveOfflineMarketplaceCache({ reviews: revs });
     }, (err) => console.warn('[Firestore food_reviews listener notice]:', err));
 
     set({ isInitialized: true, isLoading: false });
@@ -340,6 +413,33 @@ export const useMarketplaceStore = create<MarketplaceState>((set, get) => ({
       await deleteDoc(doc(db, 'menu_items', id));
     } catch (e) {
       console.warn('[Firestore deleteMenuItem notice]:', e);
+    }
+  },
+
+  addReview: async (review: FoodReview) => {
+    set((state) => ({
+      reviews: [review, ...state.reviews.filter(r => r.id !== review.id)]
+    }));
+    try {
+      await setDoc(doc(db, 'food_reviews', review.id), cleanFirestoreData(review));
+      
+      // If vendor_id is present, update vendor average rating and review count
+      if (review.vendor_id) {
+        const currentVendor = get().vendors.find(v => v.id === review.vendor_id);
+        if (currentVendor) {
+          const vendorReviews = [...get().reviews.filter(r => r.vendor_id === review.vendor_id && r.id !== review.id), review];
+          const avg = vendorReviews.reduce((sum, r) => sum + (r.overall_rating || r.taste_rating || 5), 0) / vendorReviews.length;
+          const updatedVendor: Partial<Vendor> = {
+            rating: Number(avg.toFixed(1)),
+            total_ratings: vendorReviews.length,
+            review_count: vendorReviews.length,
+            updated_at: new Date().toISOString()
+          };
+          await updateDoc(doc(db, 'vendors', review.vendor_id), cleanFirestoreData(updatedVendor)).catch(() => {});
+        }
+      }
+    } catch (e) {
+      console.warn('[Firestore addReview notice]:', e);
     }
   },
 

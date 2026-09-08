@@ -10,6 +10,7 @@ import { useMarketplaceStore } from '../../stores/useMarketplaceStore';
 import { OrderDetailModal } from './OrderDetailModal';
 import { OrderReceiptModal } from './OrderReceiptModal';
 import { OrderFeedbackModal } from './OrderFeedbackModal';
+import { CompletedOrderReviewCard } from './CompletedOrderReviewCard';
 import { downloadOrderReceiptPDF } from '../../services/receiptService';
 import { triggerHaptic, triggerHapticSuccess } from '../../utils/haptics';
 import { staggerContainer, staggerItem } from '../../utils/motion';
@@ -362,6 +363,17 @@ export const OrdersHistory: React.FC<OrdersHistoryProps> = ({ onTrackOrder }) =>
                     )}
                   </div>
                 </div>
+
+                {/* Post-delivery Star Rating & Review System for Delivered Orders */}
+                {ord.status === 'delivered' && (
+                  <div className="pt-2 border-t border-slate-100 dark:border-slate-800" onClick={(e) => e.stopPropagation()}>
+                    <CompletedOrderReviewCard
+                      order={ord}
+                      onReviewSaved={handleFeedbackSubmitted}
+                      onOpenModal={() => setFeedbackOrder(ord)}
+                    />
+                  </div>
+                )}
               </motion.div>
             );
           })}

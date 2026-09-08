@@ -662,6 +662,7 @@ export interface Vendor {
   longitude?: number;
   rating?: number;
   review_count?: number;
+  total_ratings?: number;
   category_ids?: string[];
   delivery_fee?: number;
   estimated_delivery_time?: string;

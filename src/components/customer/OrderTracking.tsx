@@ -3,8 +3,10 @@ import { doc, onSnapshot } from "../../lib/embeddedDb";
 import { db } from '../../lib/firebase';
 import { Order, OrderStatus } from '../../types';
 import { MapPicker } from '../ui/MapPicker';
+import { OrderDetailModal } from './OrderDetailModal';
 import { RealtimeDeliveryChatModal } from '../common/RealtimeDeliveryChatModal';
 import { OrderReceiptModal } from './OrderReceiptModal';
+import { OrderStatusAnimation } from './OrderStatusAnimation';
 import {
   ArrowLeft,
   Bike,
@@ -161,6 +163,14 @@ export const OrderTracking: React.FC<OrderTrackingProps> = ({ orderId, onBack })
       </div>
 
       <div className="max-w-3xl mx-auto p-4 sm:p-6 space-y-4">
+        {/* VISUAL STATUS TRANSITION ANIMATIONS (Preparing, Out for Delivery, Delivered) */}
+        <OrderStatusAnimation
+          status={order.status}
+          vendorName={order.vendor_name || 'Campus Kitchen'}
+          riderName={order.rider_name}
+          deliveryCode={order.delivery_code || order.pickup_code}
+        />
+
         {/* SECTION 1: LIVE STATUS HERO CARD */}
         <div className="bg-white rounded-3xl p-5 shadow-xs border border-slate-200 space-y-4">
           <div className="flex items-center justify-between">
