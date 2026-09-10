@@ -240,14 +240,65 @@ export async function verifyOrderDelivery(params: {
     const cleanEntered = enteredDeliveryCode.trim();
     const cleanExpected = (order.delivery_code || order.pickup_code || '').trim();
 
-    if (method === 'pin' && cleanExpected && cleanEntered !== cleanExpected) {
+    // Check if security lockout is active
+    const nowTime = new Date();
+    if (order.pin_locked_until && new Date(order.pin_locked_until) > nowTime) {
+      const remainingSec = Math.ceil((new Date(order.pin_locked_until).getTime() - nowTime.getTime()) / 1000);
+      const remainingMin = Math.ceil(remainingSec / 60);
       return {
         success: false,
-        error: 'Invalid Delivery PIN. Please confirm the 4-digit PIN on the customer\'s BUKKIT app.'
+        error: `🔒 Security Lockout Active: Too many failed PIN attempts. Locked for ${remainingMin} more minute(s). Contact customer directly.`
+      };
+    }
+
+    if (method === 'pin' && cleanExpected && cleanEntered !== cleanExpected) {
+      const currentAttempts = (Number(order.pin_attempts) || 0) + 1;
+      const isNowLocked = currentAttempts >= 3;
+      const lockUntil = isNowLocked ? new Date(Date.now() + 5 * 60 * 1000).toISOString() : undefined;
+
+      await updateDoc(orderDocRef, cleanFirestoreData({
+        pin_attempts: currentAttempts,
+        pin_locked_until: lockUntil,
+        updated_at: new Date().toISOString()
+      }));
+
+      await logAuditEvent({
+        actor_id: rider.uid,
+        actor_name: rider.name,
+        actor_role: 'rider',
+        action: isNowLocked ? 'PIN_BRUTE_FORCE_LOCKOUT' : 'PIN_VERIFICATION_FAILED',
+        order_id: orderId,
+        previous_state: order.status,
+        new_state: order.status,
+        metadata: {
+          attempt_number: currentAttempts,
+          locked: isNowLocked
+        }
+      });
+
+      if (isNowLocked) {
+        return {
+          success: false,
+          error: '🚨 3 incorrect attempts entered! Delivery verification locked for 5 minutes to prevent unauthorized claims.'
+        };
+      }
+
+      return {
+        success: false,
+        error: `Invalid Delivery PIN. (${3 - currentAttempts} attempt${3 - currentAttempts === 1 ? '' : 's'} remaining before security lockout)`
       };
     }
 
     const now = new Date().toISOString();
+
+    // Reset attempts on successful PIN entry
+    await updateDoc(orderDocRef, cleanFirestoreData({
+      pin_attempts: 0,
+      pin_locked_until: null,
+      delivery_proof_type: 'pin',
+      delivery_verification_method: method,
+      delivery_verified_at: now
+    }));
 
     // Advance order to 'delivered'
     const transitionResult = await transitionOrderStatus(orderId, 'delivered', rider);
@@ -277,6 +328,84 @@ export async function verifyOrderDelivery(params: {
   } catch (err: any) {
     console.error('Delivery verification error:', err);
     return { success: false, error: err?.message || 'Delivery verification failed.' };
+  }
+}
+
+/**
+ * Fallback Delivery Handover: Hall Porter / Reception Custody
+ * Invoked when customer is unreachable or phone died at the hostel gate.
+ * Food is deposited securely with the Hall Porter, NOT abandoned or taken by rider.
+ */
+export async function handoverToHallPorter(params: {
+  orderId: string;
+  rider: UserProfile;
+  hallPorterName: string;
+  hallPorterPhone?: string;
+  hallPorterPhotoUrl?: string;
+  notes?: string;
+}): Promise<{ success: boolean; order?: Order; error?: string }> {
+  try {
+    const { orderId, rider, hallPorterName, hallPorterPhone, hallPorterPhotoUrl, notes } = params;
+    if (!hallPorterName.trim()) {
+      return { success: false, error: 'Hall Porter or Security Officer name is required for custody handover.' };
+    }
+
+    const orderDocRef = doc(db, 'orders', orderId);
+    const snap = await getDoc(orderDocRef);
+    if (!snap.exists()) {
+      return { success: false, error: 'Order not found.' };
+    }
+
+    const order = snap.data() as Order;
+    const now = new Date().toISOString();
+
+    // Advance order to 'delivered' with porter custody flags
+    const updatePayload = cleanFirestoreData({
+      delivery_proof_type: 'hall_porter_custody',
+      delivery_verification_method: 'hall_porter_custody',
+      hall_porter_name: hallPorterName.trim(),
+      hall_porter_phone: hallPorterPhone?.trim() || undefined,
+      hall_porter_photo_url: hallPorterPhotoUrl || undefined,
+      custody_handover_notes: notes?.trim() || undefined,
+      payout_held_in_escrow: true,
+      delivery_verified_at: now
+    });
+
+    await updateDoc(orderDocRef, updatePayload);
+
+    const transitionResult = await transitionOrderStatus(orderId, 'delivered', rider, {
+      hallPorterName: hallPorterName.trim(),
+      handoverType: 'hall_porter_custody'
+    });
+
+    if (!transitionResult.success) {
+      return transitionResult;
+    }
+
+    // Record earnings in escrow for rider protection
+    const earningResult = await recordRiderEarningsOnDelivery(order, rider);
+
+    await logAuditEvent({
+      actor_id: rider.uid,
+      actor_name: rider.name,
+      actor_role: 'rider',
+      action: 'ORDER_DELIVERED_TO_HALL_PORTER',
+      order_id: orderId,
+      previous_state: order.status,
+      new_state: 'delivered',
+      metadata: {
+        hall_porter_name: hallPorterName,
+        hall_porter_phone: hallPorterPhone,
+        notes: notes,
+        payout_held_in_escrow: true,
+        rider_earning: earningResult.earning?.rider_earning
+      }
+    });
+
+    return { success: true, order: transitionResult.order };
+  } catch (err: any) {
+    console.error('Hall Porter handover error:', err);
+    return { success: false, error: err?.message || 'Custody handover failed.' };
   }
 }
 

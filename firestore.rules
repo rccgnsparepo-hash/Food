@@ -176,8 +176,13 @@ service cloud.firestore {
       allow read, write: if true;
     }
 
-    // Promotions
+    // Promotions & Vouchers
     match /promotions/{promoId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    match /vouchers/{voucherId} {
       allow read: if true;
       allow write: if true;
     }

@@ -173,6 +173,16 @@ export default function App() {
     initMarketplace();
     seedInitialDataIfNeeded();
 
+    // Direct Order Tracking link detection (?trackOrder=... or ?orderId=...)
+    if (typeof window !== 'undefined') {
+      const urlParams = new URLSearchParams(window.location.search);
+      const trackId = urlParams.get('trackOrder') || urlParams.get('orderId') || urlParams.get('tracking');
+      if (trackId) {
+        setTrackingOrderId(trackId);
+        setActiveView('tracking');
+      }
+    }
+
     // Check notification permission state
     if (typeof window !== 'undefined' && 'Notification' in window) {
       setFcmPermissionGranted(Notification.permission === 'granted');

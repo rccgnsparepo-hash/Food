@@ -95,7 +95,7 @@ export const OrdersHistory: React.FC<OrdersHistoryProps> = ({ onTrackOrder }) =>
     }
 
     if (addedCount > 0) {
-      toast.success(`Added ${order.items.length} item(s) to cart from ${order.restaurant_name}!`);
+      toast.success(`✓ Quick Reorder: Added ${order.items.length} item(s) to cart from ${order.restaurant_name}! Ready for faster checkout.`);
       setCartOpen(true);
     } else {
       toast.error('Could not add items to cart. Please check vendor availability.');
@@ -285,16 +285,16 @@ export const OrdersHistory: React.FC<OrdersHistoryProps> = ({ onTrackOrder }) =>
                   </div>
 
                   <div className="flex flex-wrap items-center gap-2" onClick={(e) => e.stopPropagation()}>
-                    {/* Reorder Button */}
+                    {/* Quick Reorder Button */}
                     <motion.button
                       whileHover={{ scale: 1.05 }}
                       whileTap={{ scale: 0.95 }}
                       onClick={() => handleReorder(ord)}
-                      className="p-2.5 sm:px-3 bg-emerald-50 dark:bg-emerald-950/60 hover:bg-emerald-100 dark:hover:bg-emerald-900/80 text-[#0D472B] dark:text-emerald-400 rounded-2xl text-xs font-black transition-colors cursor-pointer border border-emerald-200 dark:border-emerald-800 flex items-center gap-1.5 shadow-xs"
-                      title="Add items from this past order to your cart"
+                      className="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white rounded-2xl text-xs font-black transition-all cursor-pointer border border-emerald-500 flex items-center gap-1.5 shadow-sm"
+                      title="Quick Reorder: Automatically add items from this past order into active cart for faster checkout"
                     >
                       <RotateCcw className="w-3.5 h-3.5" />
-                      <span>Reorder</span>
+                      <span>Quick Reorder</span>
                     </motion.button>
 
                     {/* Post-order Rating & Feedback Button for Delivered Orders */}

@@ -24,7 +24,12 @@ import {
   RefreshCw,
   TrendingUp,
   Tag,
-  BarChart3
+  BarChart3,
+  Gift,
+  AlertTriangle,
+  Package,
+  Calendar,
+  Flame
 } from 'lucide-react';
 import { doc, updateDoc, setDoc, collection, onSnapshot, query, where } from "../../lib/embeddedDb";
 import { db } from '../../lib/firebase';
@@ -171,8 +176,12 @@ export const KitchenDashboard: React.FC = () => {
   const [dishName, setDishName] = useState('');
   const [dishDesc, setDishDesc] = useState('');
   const [dishPrice, setDishPrice] = useState('');
+  const [dishStock, setDishStock] = useState('15');
   const [dishImage, setDishImage] = useState('https://images.unsplash.com/photo-1512058564366-18510be2db19?w=600&auto=format&fit=crop');
   const [dishCategory, setDishCategory] = useState('Rice & Grains');
+
+  // Menu Inventory Filter (Show items with stock < 5)
+  const [filterLowStockOnly, setFilterLowStockOnly] = useState(false);
 
   // Sync state if vendor changes
   useEffect(() => {
@@ -328,15 +337,51 @@ export const KitchenDashboard: React.FC = () => {
 
     triggerHaptic(30);
     const nextAvail = !item.available;
+    const currentStock = typeof item.stock_quantity === 'number' ? item.stock_quantity : (item.available ? 10 : 0);
+    // If making available from 0 stock, set to a healthy default batch of 10
+    const newStock = nextAvail && currentStock <= 0 ? 10 : (!nextAvail ? 0 : currentStock);
+
     try {
       await updateDoc(doc(db, 'menu_items', item.id), {
         available: nextAvail,
+        stock_quantity: newStock,
         updated_at: new Date().toISOString()
       });
       toast.info(`${item.name} marked as ${nextAvail ? 'AVAILABLE' : 'SOLD OUT'}`);
     } catch (e) {
       console.error('Error toggling item availability:', e);
       toast.error('Failed to update dish status.');
+    }
+  };
+
+  // Authoritative Inventory Stock Update (Low Inventory Threshold < 5 Management)
+  const handleUpdateStock = async (item: MenuItem, newQuantity: number) => {
+    if (!isAuthorizedToManageStand(item.vendor_id || item.restaurant_id)) {
+      toast.error('Unauthorized: You can only edit dishes for your own kitchen stand.');
+      return;
+    }
+
+    triggerHaptic(25);
+    const sanitizedQty = Math.max(0, newQuantity);
+    const isNowAvailable = sanitizedQty > 0;
+
+    try {
+      await updateDoc(doc(db, 'menu_items', item.id), {
+        stock_quantity: sanitizedQty,
+        available: isNowAvailable,
+        updated_at: new Date().toISOString()
+      });
+
+      if (sanitizedQty === 0) {
+        toast.warning(`⚠️ ${item.name} marked SOLD OUT (0 portions left)`);
+      } else if (sanitizedQty < 5) {
+        toast.warning(`⚠️ Low stock: ${item.name} has only ${sanitizedQty} portions left!`);
+      } else {
+        toast.success(`✓ ${item.name} stock updated to ${sanitizedQty} portions`);
+      }
+    } catch (e) {
+      console.error('Error updating stock quantity:', e);
+      toast.error('Failed to update inventory count.');
     }
   };
 
@@ -460,6 +505,7 @@ export const KitchenDashboard: React.FC = () => {
         price: parseFloat(dishPrice),
         base_price: parseFloat(dishPrice),
         available: true,
+        stock_quantity: Math.max(0, parseInt(dishStock, 10) || 15),
         image_url: dishImage || 'https://images.unsplash.com/photo-1512058564366-18510be2db19?w=600&auto=format&fit=crop',
         verification_status: 'verified',
         status: 'Published',
@@ -471,7 +517,8 @@ export const KitchenDashboard: React.FC = () => {
       setDishName('');
       setDishDesc('');
       setDishPrice('');
-      toast.success(`✓ Added "${newDish.name}" to your kitchen menu!`);
+      setDishStock('15');
+      toast.success(`✓ Added "${newDish.name}" to your kitchen menu (${newDish.stock_quantity} in stock)!`);
     } catch (e) {
       console.error('Error creating dish:', e);
       toast.error('Failed to create new dish.');
@@ -715,6 +762,7 @@ export const KitchenDashboard: React.FC = () => {
               vendor={currentVendor}
               menuItems={vendorMenu}
               onNavigateToOrders={() => setActiveTab('orders')}
+              onNavigateToMenu={() => setActiveTab('menu')}
             />
           </motion.div>
         )}
@@ -748,77 +796,225 @@ export const KitchenDashboard: React.FC = () => {
               </button>
             </div>
 
-            {/* Menu Items Grid */}
-            {vendorMenu.length === 0 ? (
-              <div className="bg-white dark:bg-slate-900 p-12 rounded-3xl border border-rose-100 dark:border-slate-800 text-center space-y-3">
-                <ChefHat className="w-12 h-12 text-slate-300 dark:text-slate-600 mx-auto" />
-                <h3 className="font-extrabold text-base text-slate-700 dark:text-slate-300">No dishes uploaded yet for this stand</h3>
-                <p className="text-xs text-slate-400 dark:text-slate-500 max-w-sm mx-auto">
-                  Click "Add New Food Item" above or use the Admin Bulk CSV importer to populate your food catalog.
-                </p>
-                <button
-                  onClick={() => setShowAddDish(true)}
-                  className="bg-slate-900 dark:bg-slate-800 text-white font-bold px-4 py-2 rounded-xl text-xs cursor-pointer hover:bg-slate-800 dark:hover:bg-slate-700"
-                >
-                  Create First Dish
-                </button>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {vendorMenu.map((item) => (
-                  <div
-                    key={item.id}
-                    className={`bg-white dark:bg-slate-900 rounded-3xl p-4 border transition-all shadow-xs flex flex-col justify-between ${
-                      item.available ? 'border-slate-200/90 dark:border-slate-800' : 'border-rose-200 dark:border-rose-900/50 bg-rose-50/20 dark:bg-rose-950/10 opacity-80'
-                    }`}
-                  >
-                    <div className="space-y-3">
-                      <div className="relative h-36 rounded-2xl overflow-hidden bg-slate-100 dark:bg-slate-800">
-                        <img
-                          src={item.image_url || 'https://images.unsplash.com/photo-1512058564366-18510be2db19?w=500&auto=format&fit=crop'}
-                          alt={item.name}
-                          className="w-full h-full object-cover"
-                        />
-                        <div className="absolute top-2 right-2">
-                          <span className={`text-[10px] font-black px-2.5 py-1 rounded-full uppercase shadow-xs ${
-                            item.available ? 'bg-emerald-500 text-white' : 'bg-rose-600 text-white'
-                          }`}>
-                            {item.available ? 'IN STOCK' : 'SOLD OUT'}
-                          </span>
+            {/* Low Inventory & Stock Management */}
+            {(() => {
+              const getStockCount = (item: MenuItem): number => {
+                if (typeof item.stock_quantity === 'number') return item.stock_quantity;
+                return item.available ? 10 : 0;
+              };
+
+              const lowStockItems = vendorMenu.filter(item => {
+                const s = getStockCount(item);
+                return item.available && s < 5;
+              });
+
+              const displayedMenu = filterLowStockOnly
+                ? vendorMenu.filter(item => {
+                    const s = getStockCount(item);
+                    return item.available && s < 5;
+                  })
+                : vendorMenu;
+
+              return (
+                <div className="space-y-4">
+                  {/* Proactive Low Inventory Alert Banner (< 5 portions) */}
+                  {lowStockItems.length > 0 && (
+                    <div className="p-4 rounded-3xl bg-amber-500/10 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800/80 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-amber-950 dark:text-amber-200">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-2xl bg-amber-500 text-white flex items-center justify-center shrink-0 shadow-xs animate-bounce">
+                          <AlertTriangle className="w-5 h-5" />
+                        </div>
+                        <div>
+                          <h3 className="font-black text-sm text-amber-950 dark:text-amber-100 flex items-center gap-1.5">
+                            <span>Low Inventory Alert ({lowStockItems.length} {lowStockItems.length === 1 ? 'Dish' : 'Dishes'} &lt; 5 Portions)</span>
+                          </h3>
+                          <p className="text-xs text-amber-800 dark:text-amber-300 font-medium">
+                            Proactively manage menu availability. Prepare backup batches or mark dishes sold out before student peak ordering times.
+                          </p>
                         </div>
                       </div>
 
-                      <div>
-                        <h3 className="font-black text-sm text-slate-900 dark:text-slate-100">{item.name}</h3>
-                        {item.description && (
-                          <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-2 mt-0.5">{item.description}</p>
-                        )}
-                        <div className="mt-2 flex items-center justify-between">
-                          <span className="text-base font-black text-[#D6001C] font-mono">
-                            ₦{Number(item.price || item.base_price || 0).toLocaleString()}
-                          </span>
-                        </div>
+                      <div className="flex items-center gap-2 shrink-0 w-full sm:w-auto">
+                        <button
+                          type="button"
+                          onClick={() => setFilterLowStockOnly(!filterLowStockOnly)}
+                          className={`px-3.5 py-2 rounded-xl text-xs font-black transition-all cursor-pointer shadow-xs w-full sm:w-auto text-center ${
+                            filterLowStockOnly
+                              ? 'bg-amber-600 text-white hover:bg-amber-700'
+                              : 'bg-white dark:bg-slate-800 text-amber-900 dark:text-amber-200 border border-amber-300 dark:border-amber-700 hover:bg-amber-50'
+                          }`}
+                        >
+                          {filterLowStockOnly ? 'Show All Dishes' : `Filter Low Stock Only (${lowStockItems.length})`}
+                        </button>
                       </div>
                     </div>
+                  )}
 
-                    {/* Action Controls */}
-                    <div className="pt-3 mt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between gap-2">
-                      <button
-                        onClick={() => handleToggleItemAvailability(item)}
-                        className={`flex-1 py-2 px-3 rounded-xl text-xs font-extrabold flex items-center justify-center gap-1.5 transition-colors cursor-pointer ${
-                          item.available
-                            ? 'bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-900/60 border border-rose-200 dark:border-rose-900/50'
-                            : 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 border border-emerald-200 dark:border-emerald-900/50'
-                        }`}
-                      >
-                        {item.available ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                        <span>{item.available ? 'Mark Sold Out' : 'Mark Available'}</span>
-                      </button>
+                  {/* Menu Items Grid */}
+                  {displayedMenu.length === 0 ? (
+                    <div className="bg-white dark:bg-slate-900 p-12 rounded-3xl border border-rose-100 dark:border-slate-800 text-center space-y-3">
+                      <ChefHat className="w-12 h-12 text-slate-300 dark:text-slate-600 mx-auto" />
+                      <h3 className="font-extrabold text-base text-slate-700 dark:text-slate-300">
+                        {filterLowStockOnly ? 'No dishes are currently running low (< 5 left)!' : 'No dishes uploaded yet for this stand'}
+                      </h3>
+                      <p className="text-xs text-slate-400 dark:text-slate-500 max-w-sm mx-auto">
+                        {filterLowStockOnly 
+                          ? 'All active dishes have healthy inventory levels (5+ portions).' 
+                          : 'Click "Add New Food Item" above or use the Admin Bulk CSV importer to populate your food catalog.'}
+                      </p>
+                      {filterLowStockOnly ? (
+                        <button
+                          onClick={() => setFilterLowStockOnly(false)}
+                          className="bg-slate-900 dark:bg-slate-800 text-white font-bold px-4 py-2 rounded-xl text-xs cursor-pointer"
+                        >
+                          Show Full Menu
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => setShowAddDish(true)}
+                          className="bg-slate-900 dark:bg-slate-800 text-white font-bold px-4 py-2 rounded-xl text-xs cursor-pointer hover:bg-slate-800 dark:hover:bg-slate-700"
+                        >
+                          Create First Dish
+                        </button>
+                      )}
                     </div>
-                  </div>
-                ))}
-              </div>
-            )}
+                  ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {displayedMenu.map((item) => {
+                        const stockCount = getStockCount(item);
+                        const isLow = item.available && stockCount < 5;
+                        const isSoldOut = !item.available || stockCount === 0;
+
+                        return (
+                          <div
+                            key={item.id}
+                            className={`bg-white dark:bg-slate-900 rounded-3xl p-4 border transition-all shadow-xs flex flex-col justify-between ${
+                              isLow
+                                ? 'border-amber-400 dark:border-amber-500/80 ring-2 ring-amber-400/25 bg-amber-50/15 dark:bg-amber-950/10'
+                                : item.available
+                                ? 'border-slate-200/90 dark:border-slate-800'
+                                : 'border-rose-200 dark:border-rose-900/50 bg-rose-50/20 dark:bg-rose-950/10 opacity-80'
+                            }`}
+                          >
+                            <div className="space-y-3">
+                              <div className="relative h-36 rounded-2xl overflow-hidden bg-slate-100 dark:bg-slate-800">
+                                <img
+                                  src={item.image_url || 'https://images.unsplash.com/photo-1512058564366-18510be2db19?w=500&auto=format&fit=crop'}
+                                  alt={item.name}
+                                  className="w-full h-full object-cover"
+                                />
+                                <div className="absolute top-2 right-2 flex flex-col items-end gap-1">
+                                  {isSoldOut ? (
+                                    <span className="text-[10px] font-black px-2.5 py-1 rounded-full uppercase shadow-xs bg-rose-600 text-white flex items-center gap-1">
+                                      <span>SOLD OUT</span>
+                                    </span>
+                                  ) : isLow ? (
+                                    <span className="text-[10px] font-black px-2.5 py-1 rounded-full uppercase shadow-xs bg-amber-500 text-white flex items-center gap-1 animate-pulse border border-amber-300">
+                                      <AlertTriangle className="w-3 h-3" />
+                                      <span>LOW STOCK ({stockCount} LEFT)</span>
+                                    </span>
+                                  ) : (
+                                    <span className="text-[10px] font-black px-2.5 py-1 rounded-full uppercase shadow-xs bg-emerald-500 text-white">
+                                      <span>IN STOCK ({stockCount})</span>
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+
+                              <div>
+                                <h3 className="font-black text-sm text-slate-900 dark:text-slate-100 flex items-center justify-between">
+                                  <span>{item.name}</span>
+                                  <span className="text-base font-black text-[#D6001C] font-mono">
+                                    ₦{Number(item.price || item.base_price || 0).toLocaleString()}
+                                  </span>
+                                </h3>
+                                {item.description && (
+                                  <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-2 mt-0.5">{item.description}</p>
+                                )}
+
+                                {/* Proactive Low Stock Warning Box on Card */}
+                                {isLow && (
+                                  <div className="mt-2.5 p-2.5 rounded-2xl bg-amber-100/80 dark:bg-amber-950/60 border border-amber-300 dark:border-amber-800 text-amber-950 dark:text-amber-200 space-y-1.5">
+                                    <div className="flex items-center justify-between text-xs font-black">
+                                      <span className="flex items-center gap-1.5 text-amber-800 dark:text-amber-300">
+                                        <AlertTriangle className="w-3.5 h-3.5 text-amber-600 animate-pulse shrink-0" />
+                                        <span>Running Low (&lt; 5 portions)</span>
+                                      </span>
+                                      <span className="bg-amber-200/90 dark:bg-amber-900/80 text-amber-950 dark:text-amber-100 px-2 py-0.5 rounded-md font-mono text-[11px]">
+                                        {stockCount} left
+                                      </span>
+                                    </div>
+                                    <p className="text-[11px] text-amber-800 dark:text-amber-300">
+                                      Low inventory warning! Restock a fresh batch or manage portions to prevent order cancellations.
+                                    </p>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleUpdateStock(item, stockCount + 10)}
+                                      className="w-full py-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-[11px] font-black flex items-center justify-center gap-1 cursor-pointer transition-colors shadow-xs"
+                                    >
+                                      <Plus className="w-3.5 h-3.5" />
+                                      <span>Restock +10 Portions</span>
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Action & Inventory Stepper Controls */}
+                            <div className="pt-3 mt-3 border-t border-slate-100 dark:border-slate-800 space-y-2">
+                              <div className="flex items-center justify-between gap-2">
+                                <div className="flex items-center gap-1.5">
+                                  <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 flex items-center gap-1">
+                                    <Package className="w-3.5 h-3.5" />
+                                    <span>Stock:</span>
+                                  </span>
+                                  <div className="inline-flex items-center border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden bg-slate-50 dark:bg-slate-800">
+                                    <button
+                                      type="button"
+                                      onClick={() => handleUpdateStock(item, Math.max(0, stockCount - 1))}
+                                      className="px-2.5 py-1 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-black text-xs cursor-pointer"
+                                      title="Decrease stock by 1"
+                                    >
+                                      -
+                                    </button>
+                                    <span className={`px-2 py-1 font-mono text-xs font-black min-w-[24px] text-center ${
+                                      isSoldOut ? 'text-rose-600' : isLow ? 'text-amber-600' : 'text-slate-800 dark:text-slate-200'
+                                    }`}>
+                                      {stockCount}
+                                    </span>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleUpdateStock(item, stockCount + 1)}
+                                      className="px-2.5 py-1 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-black text-xs cursor-pointer"
+                                      title="Increase stock by 1"
+                                    >
+                                      +
+                                    </button>
+                                  </div>
+                                </div>
+
+                                <button
+                                  type="button"
+                                  onClick={() => handleToggleItemAvailability(item)}
+                                  className={`py-1.5 px-3 rounded-xl text-xs font-extrabold flex items-center justify-center gap-1.5 transition-colors cursor-pointer ${
+                                    item.available
+                                      ? 'bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-900/60 border border-rose-200 dark:border-rose-900/50'
+                                      : 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 border border-emerald-200 dark:border-emerald-900/50'
+                                  }`}
+                                >
+                                  {item.available ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                                  <span>{item.available ? 'Mark Sold Out' : 'Mark Available'}</span>
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
           </motion.div>
         )}
 
@@ -1065,19 +1261,25 @@ export const KitchenDashboard: React.FC = () => {
                       }`}
                     >
                       <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-2">
-                        <div>
-                          <div className="flex items-center gap-1.5">
-                            <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 font-mono">ORDER #{ord.id.slice(-6)}</span>
-                            {isActionNeeded && (
-                              <span className="bg-amber-500 text-white text-[9px] font-black px-1.5 py-0.2 rounded-full uppercase tracking-wider animate-pulse">
-                                Action Needed
-                              </span>
-                            )}
+                        <div className="flex items-center gap-2.5">
+                          <div className="px-2.5 py-1.5 rounded-xl bg-slate-950 dark:bg-white text-white dark:text-slate-950 font-mono font-black text-sm tracking-wider shadow-xs flex flex-col items-center">
+                            <span className="text-[9px] uppercase tracking-normal opacity-70">BAG</span>
+                            <span>{ord.daily_token || `#${ord.id.slice(-4)}`}</span>
                           </div>
-                          <h4 className="font-extrabold text-sm text-slate-900 dark:text-slate-100">{ord.customer_name || ord.user_name || 'MTU Student'}</h4>
-                          {ord.customer_phone && (
-                            <p className="text-[11px] text-slate-500 dark:text-slate-400">{ord.customer_phone}</p>
-                          )}
+                          <div>
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 font-mono">ORDER #{ord.id.slice(-6)}</span>
+                              {isActionNeeded && (
+                                <span className="bg-amber-500 text-white text-[9px] font-black px-1.5 py-0.2 rounded-full uppercase tracking-wider animate-pulse">
+                                  Action Needed
+                                </span>
+                              )}
+                            </div>
+                            <h4 className="font-extrabold text-sm text-slate-900 dark:text-slate-100">{ord.customer_name || ord.user_name || 'MTU Student'}</h4>
+                            <span className="text-[10px] text-amber-700 dark:text-amber-400 font-bold block">
+                              🏷️ Write {ord.daily_token || `#${ord.id.slice(-4)}`} on takeaway
+                            </span>
+                          </div>
                         </div>
                         <span className={`text-[10px] font-black px-2.5 py-1 rounded-full uppercase ${
                           isActionNeeded
@@ -1093,6 +1295,27 @@ export const KitchenDashboard: React.FC = () => {
                           {ord.status.replace(/_/g, ' ')}
                         </span>
                       </div>
+
+                      {/* Roommate / Proxy Recipient Flag */}
+                      {ord.is_proxy_order && (
+                        <div className="p-2 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-[11px] text-amber-900 dark:text-amber-200 flex items-center gap-1.5">
+                          <Gift className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                          <span>Ordering for Roommate: <strong>{ord.recipient_name || 'Friend'}</strong> ({ord.recipient_phone || 'N/A'})</span>
+                        </div>
+                      )}
+
+                      {/* Scheduled Delivery Indicator */}
+                      {ord.is_scheduled && ord.scheduled_time_slot && (
+                        <div className="p-2 rounded-xl bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800 text-[11px] text-indigo-900 dark:text-indigo-200 flex items-center justify-between gap-1.5">
+                          <div className="flex items-center gap-1.5 font-bold">
+                            <Clock className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400 shrink-0" />
+                            <span>Scheduled Pre-Order:</span>
+                          </div>
+                          <span className="font-extrabold bg-indigo-200/80 dark:bg-indigo-900/80 text-indigo-950 dark:text-indigo-100 px-2 py-0.5 rounded-md text-[10px]">
+                            {ord.scheduled_delivery_date || 'Today'} • {ord.scheduled_time_slot}
+                          </span>
+                        </div>
+                      )}
 
                       {/* Delivery Destination Snapshot */}
                       <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-100 dark:border-slate-700 text-xs">
@@ -1118,15 +1341,17 @@ export const KitchenDashboard: React.FC = () => {
 
                       {/* Prominent Pickup PIN Box for Kitchen -> Rider Handover */}
                       {(ord.status === 'ready' || ord.status === 'ready_for_pickup' || ord.status === 'rider_assigned') && (
-                        <div className="p-3 rounded-2xl bg-emerald-600 text-white text-center shadow-md">
-                          <span className="text-[10px] uppercase font-bold tracking-wider opacity-90 block">
-                            Rider Pickup Verification Code
-                          </span>
+                        <div className="p-3 rounded-2xl bg-emerald-600 text-white text-center shadow-md space-y-1">
+                          <div className="flex items-center justify-center gap-2 text-[10px] uppercase font-bold tracking-wider opacity-90">
+                            <span>Bag Token: {ord.daily_token || `#${ord.id.slice(-4)}`}</span>
+                            <span>•</span>
+                            <span>Rider Pickup Code</span>
+                          </div>
                           <span className="text-2xl font-black tracking-widest block my-0.5">
                             {ord.pickup_code || '3914'}
                           </span>
                           <span className="text-[10px] opacity-80 block">
-                            Give this 4-digit PIN to the rider upon collection
+                            Courier must enter this 4-digit PIN to collect bag matching token {ord.daily_token || `#${ord.id.slice(-4)}`}
                           </span>
                         </div>
                       )}
@@ -1449,6 +1674,24 @@ export const KitchenDashboard: React.FC = () => {
                   placeholder="1800"
                   value={dishPrice}
                   onChange={(e) => setDishPrice(e.target.value)}
+                  className="w-full p-2.5 rounded-2xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs font-mono font-bold"
+                />
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-extrabold text-slate-700 dark:text-slate-300">
+                    Initial Inventory / Stock (Portions) *
+                  </label>
+                  <span className="text-[10px] text-amber-600 font-bold">Threshold &lt; 5 triggers low-stock warning</span>
+                </div>
+                <input
+                  type="number"
+                  required
+                  min="0"
+                  placeholder="15"
+                  value={dishStock}
+                  onChange={(e) => setDishStock(e.target.value)}
                   className="w-full p-2.5 rounded-2xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs font-mono font-bold"
                 />
               </div>

@@ -1,3 +1,6 @@
+import dotenv from 'dotenv';
+dotenv.config();
+
 import express from 'express';
 import cors from 'cors';
 import path from 'path';
@@ -356,7 +359,7 @@ async function startServer() {
   // 2. Authoritative Paystack Payment Initialization (Primary & Alias)
   const handlePaymentInit = async (req: express.Request, res: express.Response) => {
     try {
-      const { email, orderId, callbackUrl } = req.body;
+      const { email, orderId, callbackUrl, amount } = req.body;
       if (!orderId) {
         return res.status(400).json({
           status: false,
@@ -368,7 +371,8 @@ async function startServer() {
       const result = await paymentService.initializeOrderPayment({
         orderId,
         email: email || 'student@mtu.edu.ng',
-        callbackUrl
+        callbackUrl,
+        amount: amount ? Number(amount) : undefined
       });
 
       res.json(result);

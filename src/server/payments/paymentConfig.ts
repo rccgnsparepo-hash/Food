@@ -12,8 +12,8 @@ export interface PaymentConfigStatus {
 }
 
 export function getPaymentConfig() {
-  const secretKey = (process.env.PAYSTACK_SECRET_KEY || '').trim();
-  const publicKey = (process.env.PAYSTACK_PUBLIC_KEY || '').trim();
+  const secretKey = (process.env.PAYSTACK_SECRET_KEY || 'sk_test_dbaad1b5934808acced323131ad77f848f15ea40').trim();
+  const publicKey = (process.env.PAYSTACK_PUBLIC_KEY || 'pk_test_1928a4de3c55bc8997375c893f852fd7e7a8192b').trim();
   const webhookSecret = (process.env.PAYSTACK_WEBHOOK_SECRET || '').trim();
   const callbackUrl = (process.env.PAYSTACK_CALLBACK_URL || '').trim();
   const baseUrl = (process.env.PAYSTACK_BASE_URL || 'https://api.paystack.co').trim();

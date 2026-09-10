@@ -65,7 +65,7 @@ export async function buildValidatedOrderReceipt(
     const deliveryFee = Number(order.delivery_fee) >= 0 ? Number(order.delivery_fee) : 350;
     const serviceFee = Number(order.service_fee) >= 0 ? Number(order.service_fee) : 0;
     const tax = 0; // Standard 0% campus VAT
-    const discount = 0;
+    const discount = Number(order.discount) >= 0 ? Number(order.discount) : 0;
 
     const calculatedTotal = computedSubtotal + deliveryFee + serviceFee + tax - discount;
     const storedTotal = Number(order.total_price);

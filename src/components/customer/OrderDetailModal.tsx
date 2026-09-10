@@ -272,11 +272,11 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({ order, onClo
             className={`flex-1 font-extrabold py-3.5 px-5 rounded-2xl text-xs flex items-center justify-center gap-2 cursor-pointer transition-all ${
               isActive
                 ? 'bg-slate-200 hover:bg-slate-300 text-slate-800'
-                : 'bg-[#D6001C] hover:bg-red-700 text-white shadow-md shadow-red-500/20'
+                : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-md shadow-emerald-600/20'
             }`}
           >
             <RefreshCw className="w-4 h-4" />
-            <span>Reorder Items</span>
+            <span>Quick Reorder</span>
           </button>
         </div>
 

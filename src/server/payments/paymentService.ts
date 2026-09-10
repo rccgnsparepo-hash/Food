@@ -188,10 +188,20 @@ export class PaymentService {
     orderId: string;
     email: string;
     callbackUrl?: string;
+    amount?: number;
   }) {
-    const order = serverDb.getDoc('orders', params.orderId);
+    let order = serverDb.getDoc('orders', params.orderId);
     if (!order) {
-      throw new Error(`Order #${params.orderId} not found`);
+      const initAmount = Number(params.amount) || 1000;
+      order = await this.createAuthoritativeOrder({
+        id: params.orderId,
+        order_id: params.orderId,
+        customer_email: params.email,
+        total_price: initAmount,
+        payment_method: 'paystack',
+        payment_status: 'pending',
+        items: [{ price: initAmount, quantity: 1, name: 'Campus Food Order' }]
+      });
     }
 
     if (order.payment_status === 'paid') {

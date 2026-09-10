@@ -69,6 +69,13 @@ export interface CreateMasterOrderInput {
   deliveryFee: number;
   serviceFee: number;
   discount?: number;
+  voucherCode?: string;
+  isProxyOrder?: boolean;
+  recipientName?: string;
+  recipientPhone?: string;
+  isScheduled?: boolean;
+  scheduledTimeSlot?: string;
+  scheduledDeliveryDate?: string;
   walletAmountUsed?: number;
   otherPaymentAmount?: number;
   totalPrice: number;
@@ -97,6 +104,8 @@ export async function createAuthoritativeOrder(
   // Generate 4-digit secure verification codes
   const pickupCode = Math.floor(1000 + Math.random() * 9000).toString();
   const deliveryCode = Math.floor(1000 + Math.random() * 9000).toString();
+  // Generate a clean 3-digit Daily Token (e.g. #042) for physical bag marking
+  const dailyToken = `#${String(Math.floor(10 + ((Math.floor(timestamp / 1000)) % 990))).padStart(3, '0')}`;
 
   // Determine initial payment status
   const isPaidInstantly = input.paymentMethod === 'wallet' || input.paymentMethod === 'paystack' || input.paymentMethod === 'split_wallet_paystack';
@@ -209,6 +218,7 @@ export async function createAuthoritativeOrder(
     delivery_fee: Number(input.deliveryFee) || 0,
     service_fee: Number(input.serviceFee) || 0,
     discount: Number(input.discount) || 0,
+    voucher_code: input.voucherCode || undefined,
     wallet_amount_used: Number(input.walletAmountUsed) || 0,
     other_payment_amount: Number(input.otherPaymentAmount) || 0,
     total_price: Number(input.totalPrice) || 0,
@@ -232,6 +242,18 @@ export async function createAuthoritativeOrder(
     // Security & Verification Codes
     pickup_code: pickupCode,
     delivery_code: deliveryCode,
+    daily_token: dailyToken,
+    pin_attempts: 0,
+
+    // Proxy / Roommate Order Information
+    is_proxy_order: Boolean(input.isProxyOrder),
+    recipient_name: input.recipientName || undefined,
+    recipient_phone: input.recipientPhone || undefined,
+
+    // Scheduled Delivery / Future Time Slot (Stored in Firestore)
+    is_scheduled: Boolean(input.isScheduled),
+    scheduled_time_slot: input.scheduledTimeSlot || undefined,
+    scheduled_delivery_date: input.scheduledDeliveryDate || undefined,
 
     // Geographic Coordinates & Live Tracking
     latitude: Number(input.latitude) || 6.783,
@@ -347,6 +369,8 @@ export async function transitionOrderStatus(
     riderPhone?: string;
     riderVehicle?: string;
     riderAvatar?: string;
+    hallPorterName?: string;
+    handoverType?: string;
   }
 ): Promise<{ success: boolean; order?: Order; error?: string }> {
   try {

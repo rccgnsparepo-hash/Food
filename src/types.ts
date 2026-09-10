@@ -280,6 +280,9 @@ export interface CustomerDeliveryInfo {
   delivery_instructions: string;
   preferred_option: PreferredDeliveryOption;
   contactless: boolean;
+  is_scheduled?: boolean;
+  scheduled_time_slot?: string;
+  scheduled_delivery_date?: string;
 }
 
 // --- MASTER ORDER STATUS STATE MACHINE ---
@@ -388,6 +391,7 @@ export interface Order {
   delivery_fee: number;
   service_fee: number;
   discount: number;
+  voucher_code?: string;
   wallet_amount_used: number;
   other_payment_amount: number;
   total_price: number; // final total
@@ -403,9 +407,28 @@ export interface Order {
   // Security & Verification Codes
   pickup_code: string; // 4-digit PIN shown by vendor, verified by rider
   delivery_code: string; // 4-digit PIN shown by customer, verified by rider
+  daily_token?: string; // Daily 3-digit order sequence token (e.g. #042) for physical bag marking
   pickup_verified_at?: string;
   delivery_verified_at?: string;
-  delivery_verification_method?: 'pin' | 'qr_scan' | 'customer_confirm';
+  delivery_verification_method?: 'pin' | 'qr_scan' | 'customer_confirm' | 'hall_porter_custody';
+  pin_attempts?: number;
+  pin_locked_until?: string;
+  delivery_proof_type?: 'pin' | 'qr_scan' | 'hall_porter_custody';
+  hall_porter_name?: string;
+  hall_porter_phone?: string;
+  hall_porter_photo_url?: string;
+  custody_handover_notes?: string;
+  payout_held_in_escrow?: boolean;
+
+  // Proxy / Gift Recipient Information (Ordering for someone else / roommate)
+  is_proxy_order?: boolean;
+  recipient_name?: string;
+  recipient_phone?: string;
+
+  // Scheduled Delivery / Future Time Slot (Stored in Firestore)
+  is_scheduled?: boolean;
+  scheduled_time_slot?: string;
+  scheduled_delivery_date?: string;
 
   // Geographic Coordinates & Live Tracking
   latitude: number;
@@ -749,6 +772,7 @@ export interface MenuItem {
   base_price?: number | null;
   price?: number;
   available: boolean;
+  stock_quantity?: number; // Kitchen inventory count; low stock indicator triggers when < 5
   featured?: boolean;
   popular?: boolean;
   is_popular?: boolean;
@@ -803,6 +827,36 @@ export interface RiderLocation {
   latitude: number;
   longitude: number;
   updated_at: string;
+}
+
+// Promo Codes & Vouchers
+export type DiscountType = 'percentage' | 'fixed' | 'free_delivery';
+
+export interface Voucher {
+  id: string;
+  code: string;
+  title: string;
+  description: string;
+  discount_type: DiscountType;
+  discount_value: number; // e.g., 10 for 10%, 300 for ₦300
+  min_order_amount?: number; // Minimum subtotal required in ₦
+  max_discount_amount?: number; // Max discount in ₦ for percentage-based
+  is_active: boolean;
+  start_date?: string;
+  expiry_date?: string;
+  applicable_vendor_ids?: string[];
+  usage_limit?: number;
+  usage_count?: number;
+  university_id?: string;
+  campus_id?: string;
+  created_at?: string;
+}
+
+export interface VoucherValidationResult {
+  isValid: boolean;
+  voucher?: Voucher;
+  discountAmount: number;
+  error?: string;
 }
 
 export interface FoodReview {

@@ -15,7 +15,9 @@ import {
   UtensilsCrossed,
   ArrowUpRight,
   Star,
-  Users
+  Users,
+  AlertTriangle,
+  Package
 } from 'lucide-react';
 import { Order, MenuItem, Vendor } from '../../types';
 import { triggerHaptic } from '../../utils/haptics';
@@ -25,13 +27,15 @@ interface KitchenSummaryDashboardProps {
   vendor?: Vendor | null;
   menuItems: MenuItem[];
   onNavigateToOrders?: () => void;
+  onNavigateToMenu?: () => void;
 }
 
 export const KitchenSummaryDashboard: React.FC<KitchenSummaryDashboardProps> = ({
   orders,
   vendor,
   menuItems,
-  onNavigateToOrders
+  onNavigateToOrders,
+  onNavigateToMenu
 }) => {
   const [timeRange, setTimeRange] = useState<'today' | 'week' | 'all'>('today');
 
@@ -402,6 +406,52 @@ export const KitchenSummaryDashboard: React.FC<KitchenSummaryDashboardProps> = (
               })}
             </div>
           </div>
+
+          {/* Low Stock Inventory Alert Box */}
+          {(() => {
+            const lowStockList = menuItems.filter(item => {
+              const stock = typeof item.stock_quantity === 'number' ? item.stock_quantity : (item.available ? 10 : 0);
+              return item.available && stock < 5;
+            });
+
+            if (lowStockList.length === 0) return null;
+
+            return (
+              <div className="bg-amber-500/10 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800/80 rounded-3xl p-5 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <AlertTriangle className="w-4 h-4 text-amber-600 animate-pulse" />
+                    <h4 className="font-black text-xs text-amber-950 dark:text-amber-100 uppercase tracking-wider">
+                      Low Inventory Warning
+                    </h4>
+                  </div>
+                  <span className="px-2 py-0.5 rounded-md bg-amber-500 text-white font-mono font-black text-[10px]">
+                    {lowStockList.length} items &lt; 5
+                  </span>
+                </div>
+                <div className="space-y-1.5">
+                  {lowStockList.slice(0, 3).map((it) => (
+                    <div key={it.id} className="flex items-center justify-between text-xs">
+                      <span className="font-bold text-slate-800 dark:text-slate-200 truncate max-w-[150px]">{it.name}</span>
+                      <span className="font-mono text-amber-700 dark:text-amber-400 font-extrabold bg-amber-100 dark:bg-amber-900/60 px-1.5 py-0.5 rounded text-[10px]">
+                        {it.stock_quantity ?? 0} portions left
+                      </span>
+                    </div>
+                  ))}
+                </div>
+                {onNavigateToMenu && (
+                  <button
+                    type="button"
+                    onClick={onNavigateToMenu}
+                    className="w-full py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-xs font-black transition-colors flex items-center justify-center gap-1 cursor-pointer shadow-xs"
+                  >
+                    <Package className="w-3.5 h-3.5" />
+                    <span>Restock Dishes in Menu</span>
+                  </button>
+                )}
+              </div>
+            );
+          })()}
 
           {/* Quick Action Link to Orders Queue */}
           {onNavigateToOrders && (

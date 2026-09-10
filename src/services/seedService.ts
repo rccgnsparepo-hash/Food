@@ -241,6 +241,7 @@ export const FALLBACK_MTU_MENU_ITEMS: MenuItem[] = [
     base_price: 2800,
     price: 2800,
     available: true,
+    stock_quantity: 4, // Running low (< 5)
     popular: true,
     is_popular: true,
     student_friendly: false,
@@ -262,6 +263,7 @@ export const FALLBACK_MTU_MENU_ITEMS: MenuItem[] = [
     base_price: 2500,
     price: 2500,
     available: true,
+    stock_quantity: 3, // Running low (< 5)
     popular: true,
     is_popular: true,
     student_friendly: false,
@@ -283,6 +285,7 @@ export const FALLBACK_MTU_MENU_ITEMS: MenuItem[] = [
     base_price: 1000,
     price: 1000,
     available: true,
+    stock_quantity: 18,
     popular: true,
     is_popular: true,
     student_friendly: true,
@@ -808,7 +811,11 @@ export async function initializeDatabaseSeed() {
       await setDoc(doc(db, 'menu_items', item.id), item, { merge: true });
     }
 
-    console.log('Mountain Top University (MTU) 5 Official Vendors successfully synchronized.');
+    // 7. Active Campus Promo Vouchers
+    const { seedVouchersToFirestore } = await import('./voucherService');
+    await seedVouchersToFirestore();
+
+    console.log('Mountain Top University (MTU) 5 Official Vendors and Vouchers successfully synchronized.');
   } catch (error: any) {
     console.info('Database seed notice:', error?.message || error);
   }

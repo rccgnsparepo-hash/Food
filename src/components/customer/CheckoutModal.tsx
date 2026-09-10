@@ -14,7 +14,17 @@ import {
   Sparkles,
   Phone,
   User,
-  Info
+  Info,
+  Tag,
+  Ticket,
+  Check,
+  X,
+  Loader2,
+  Gift,
+  UserCheck,
+  Share2,
+  Plus,
+  ShoppingBag
 } from 'lucide-react';
 import { useCartStore } from '../../stores/useCartStore';
 import { useAuthStore } from '../../stores/useAuthStore';
@@ -22,7 +32,8 @@ import {
   Order,
   PreferredDeliveryOption,
   CustomerDeliveryInfo,
-  CampusLocation
+  CampusLocation,
+  Voucher
 } from '../../types';
 import { MapPicker } from '../ui/MapPicker';
 import { PaystackModal } from '../ui/PaystackModal';
@@ -33,7 +44,10 @@ import { createAuthoritativeOrder } from '../../services/orderLifecycleService';
 import { subscribeToWallet } from '../../services/walletService';
 import { calculateDeliveryFee } from '../../services/deliveryFeeService';
 import { DEFAULT_MTU_CAMPUS_LOCATIONS, DEFAULT_MTU_BOUNDARY, isWithinCampusBoundary } from '../../services/campusLocationService';
+import { validatePromoCode, fetchActiveVouchersFromFirestore } from '../../services/voucherService';
 import { BukkitLogo } from '../common/BukkitLogo';
+
+export const STANDARD_CAMPUS_DELIVERY_THRESHOLD = 2500;
 
 interface CheckoutModalProps {
   onClose: () => void;
@@ -74,6 +88,11 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ onClose, onOrderCr
   const [preferredOption, setPreferredOption] = useState<PreferredDeliveryOption>('room_delivery');
   const [contactless, setContactless] = useState<boolean>(false);
 
+  // Ordering for someone else / Roommate proxy order
+  const [isProxyOrder, setIsProxyOrder] = useState(false);
+  const [recipientName, setRecipientName] = useState('');
+  const [recipientPhone, setRecipientPhone] = useState('');
+
   // Map Coordinates (Defaults to Mountain Top University Central Campus)
   const [lat, setLat] = useState(user?.latitude || 6.7638);
   const [lng, setLng] = useState(user?.longitude || 3.3782);
@@ -97,15 +116,115 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ onClose, onOrderCr
   const [showPaystack, setShowPaystack] = useState(false);
   const [isPlacing, setIsPlacing] = useState(false);
 
+  // Promo code & Active Voucher state
+  const [promoCodeInput, setPromoCodeInput] = useState('');
+  const [appliedVoucher, setAppliedVoucher] = useState<Voucher | null>(null);
+  const [discountAmount, setDiscountAmount] = useState<number>(0);
+  const [isValidatingPromo, setIsValidatingPromo] = useState(false);
+  const [promoError, setPromoError] = useState<string | null>(null);
+  const [activeVouchers, setActiveVouchers] = useState<Voucher[]>([]);
+  const [showVoucherList, setShowVoucherList] = useState(false);
+
+  // Load active vouchers from Firestore on mount
+  useEffect(() => {
+    fetchActiveVouchersFromFirestore()
+      .then((vouchers) => {
+        setActiveVouchers(vouchers);
+      })
+      .catch((err) => {
+        console.warn('Failed to load active vouchers:', err);
+      });
+  }, []);
+
   const subtotal = getSubtotal();
   const deliveryFee = getDeliveryFee();
   const serviceFee = getServiceFee();
-  const total = getTotal();
+  const grossTotal = subtotal + deliveryFee + serviceFee;
+
+  // Re-calculate discount dynamically if subtotal or deliveryFee changes
+  useEffect(() => {
+    if (appliedVoucher) {
+      if (appliedVoucher.min_order_amount && subtotal < appliedVoucher.min_order_amount) {
+        setAppliedVoucher(null);
+        setDiscountAmount(0);
+        setPromoError(`Code "${appliedVoucher.code}" removed: subtotal dropped below ₦${appliedVoucher.min_order_amount.toLocaleString()}`);
+        toast.error(`Promo removed: order subtotal is below ₦${appliedVoucher.min_order_amount.toLocaleString()}`);
+        return;
+      }
+
+      let newDiscount = 0;
+      if (appliedVoucher.discount_type === 'percentage') {
+        const raw = (subtotal * (appliedVoucher.discount_value || 0)) / 100;
+        newDiscount = appliedVoucher.max_discount_amount ? Math.min(raw, appliedVoucher.max_discount_amount) : raw;
+      } else if (appliedVoucher.discount_type === 'fixed') {
+        newDiscount = Math.min(appliedVoucher.discount_value || 0, subtotal);
+      } else if (appliedVoucher.discount_type === 'free_delivery') {
+        newDiscount = deliveryFee;
+      }
+      setDiscountAmount(Math.round(Math.max(0, newDiscount)));
+    }
+  }, [subtotal, deliveryFee, appliedVoucher]);
+
+  const effectiveDiscount = Math.min(discountAmount, grossTotal);
+  const total = Math.max(0, grossTotal - effectiveDiscount);
+
+  // Standard Campus Delivery Fee Threshold calculations
+  const isBelowDeliveryThreshold = total < STANDARD_CAMPUS_DELIVERY_THRESHOLD;
+  const thresholdDifference = Math.max(0, STANDARD_CAMPUS_DELIVERY_THRESHOLD - total);
+  const thresholdProgress = Math.min(100, Math.round((total / STANDARD_CAMPUS_DELIVERY_THRESHOLD) * 100));
 
   // Compute full/split calculations
   const canPayFullWallet = walletBalance >= total;
   const walletDeduction = paymentMethod === 'wallet' ? total : paymentMethod === 'split_wallet_paystack' ? Math.min(walletBalance, total) : 0;
   const remainingCardAmount = Math.max(0, total - walletDeduction);
+
+  const handleApplyPromoCode = async (overrideCode?: string) => {
+    const code = (overrideCode || promoCodeInput).trim().toUpperCase();
+    if (!code) {
+      setPromoError('Please enter a promo code');
+      triggerHapticError();
+      return;
+    }
+
+    setIsValidatingPromo(true);
+    setPromoError(null);
+    triggerHaptic(30);
+
+    try {
+      const result = await validatePromoCode(code, {
+        subtotal,
+        deliveryFee,
+        vendorId: restaurantId,
+      });
+
+      if (!result.isValid || !result.voucher) {
+        setPromoError(result.error || 'Invalid promo code');
+        triggerHapticError();
+        toast.error(result.error || 'Invalid promo code');
+      } else {
+        setAppliedVoucher(result.voucher);
+        setDiscountAmount(result.discountAmount);
+        setPromoCodeInput(result.voucher.code);
+        setPromoError(null);
+        triggerHapticSuccess();
+        toast.success(`✓ Code "${result.voucher.code}" applied! Saved ₦${result.discountAmount.toLocaleString()}`);
+      }
+    } catch (err: any) {
+      setPromoError('Unable to validate promo code. Please try again.');
+      triggerHapticError();
+    } finally {
+      setIsValidatingPromo(false);
+    }
+  };
+
+  const handleRemovePromoCode = () => {
+    triggerHaptic(20);
+    setAppliedVoucher(null);
+    setDiscountAmount(0);
+    setPromoError(null);
+    setPromoCodeInput('');
+    toast.info('Promo code removed');
+  };
 
   const handleCreateOrder = async (payRef?: string) => {
     if (!user) {
@@ -115,6 +234,16 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ onClose, onOrderCr
 
     if (!customerPhone.trim()) {
       toast.error('Please provide a valid phone number for rider delivery contact.');
+      return;
+    }
+
+    if (isProxyOrder && !recipientName.trim()) {
+      toast.error('Please provide the recipient / roommate name.');
+      return;
+    }
+
+    if (isProxyOrder && !recipientPhone.trim()) {
+      toast.error('Please provide the recipient / roommate phone number.');
       return;
     }
 
@@ -164,7 +293,11 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ onClose, onOrderCr
           subtotal,
           deliveryFee,
           serviceFee,
-          discount: 0,
+          discount: effectiveDiscount,
+          voucherCode: appliedVoucher?.code,
+          isProxyOrder,
+          recipientName: isProxyOrder ? recipientName.trim() : undefined,
+          recipientPhone: isProxyOrder ? recipientPhone.trim() : undefined,
           walletAmountUsed: walletDeduction,
           otherPaymentAmount: remainingCardAmount,
           totalPrice: total,
@@ -481,6 +614,174 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ onClose, onOrderCr
               className="w-5 h-5 accent-emerald-600 cursor-pointer rounded"
             />
           </div>
+
+          {/* SECTION 2.5: ORDER FOR ROOMMATE / FRIEND (ANTI-SCAM PROXY VERIFICATION) */}
+          <div className="rounded-2xl border border-emerald-200 dark:border-emerald-900/50 bg-emerald-50/50 dark:bg-emerald-950/20 p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-emerald-100 dark:bg-emerald-900/60 text-emerald-700 dark:text-emerald-300 flex items-center justify-center">
+                  <Gift className="w-4 h-4" />
+                </div>
+                <div>
+                  <span className="text-xs font-black text-slate-900 dark:text-slate-100 block">
+                    Ordering for a Roommate or Friend?
+                  </span>
+                  <span className="text-[11px] text-slate-500 dark:text-slate-400 block">
+                    Issue a secure Pickup Pass & 4-digit PIN directly to them
+                  </span>
+                </div>
+              </div>
+              <input
+                type="checkbox"
+                checked={isProxyOrder}
+                onChange={(e) => {
+                  triggerHaptic(20);
+                  setIsProxyOrder(e.target.checked);
+                }}
+                className="w-5 h-5 accent-emerald-600 cursor-pointer rounded"
+              />
+            </div>
+
+            {isProxyOrder && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                className="pt-2 border-t border-emerald-200/60 dark:border-emerald-900/40 space-y-3"
+              >
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-[11px] font-bold text-slate-700 dark:text-slate-300 block mb-1">
+                      Recipient / Roommate Name *
+                    </label>
+                    <input
+                      type="text"
+                      value={recipientName}
+                      onChange={(e) => setRecipientName(e.target.value)}
+                      placeholder="e.g. Chinedu Okafor"
+                      className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs font-medium text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-emerald-600 outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[11px] font-bold text-slate-700 dark:text-slate-300 block mb-1">
+                      Recipient Phone / WhatsApp *
+                    </label>
+                    <input
+                      type="tel"
+                      value={recipientPhone}
+                      onChange={(e) => setRecipientPhone(e.target.value)}
+                      placeholder="e.g. 08012345678"
+                      className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs font-medium text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-emerald-600 outline-none"
+                    />
+                  </div>
+                </div>
+
+                <div className="p-2.5 rounded-xl bg-white/80 dark:bg-slate-900/80 border border-emerald-200 dark:border-emerald-800/40 text-[11px] text-emerald-800 dark:text-emerald-300 flex items-start gap-2">
+                  <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                  <p>
+                    <strong>Anti-Impersonation Protection:</strong> The courier cannot release the meal without your 4-digit Handshake PIN. You will get a 1-tap button on the tracking page to forward the official Pickup Pass to {recipientName || 'your roommate'} via WhatsApp.
+                  </p>
+                </div>
+              </motion.div>
+            )}
+          </div>
+        </motion.div>
+
+        {/* MINI-NOTIFICATION BANNER: Campus Delivery Fee Threshold Alert */}
+        <motion.div
+          variants={staggerItem}
+          className={`rounded-3xl p-4.5 border transition-all ${
+            isBelowDeliveryThreshold
+              ? 'bg-amber-50/90 dark:bg-amber-950/40 border-amber-200 dark:border-amber-800/80 text-amber-950 dark:text-amber-100 shadow-xs'
+              : 'bg-emerald-50/80 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800 text-emerald-950 dark:text-emerald-100'
+          }`}
+        >
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-start gap-3">
+              <div
+                className={`p-2.5 rounded-2xl shrink-0 ${
+                  isBelowDeliveryThreshold
+                    ? 'bg-amber-500 text-white'
+                    : 'bg-emerald-600 text-white'
+                }`}
+              >
+                {isBelowDeliveryThreshold ? (
+                  <ShoppingBag className="w-5 h-5" />
+                ) : (
+                  <CheckCircle2 className="w-5 h-5" />
+                )}
+              </div>
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <span
+                    className={`text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full ${
+                      isBelowDeliveryThreshold
+                        ? 'bg-amber-200 dark:bg-amber-900/70 text-amber-900 dark:text-amber-200'
+                        : 'bg-emerald-200 dark:bg-emerald-900/70 text-emerald-900 dark:text-emerald-200'
+                    }`}
+                  >
+                    {isBelowDeliveryThreshold
+                      ? 'Campus Delivery Fee Optimization'
+                      : 'Delivery Value Reached'}
+                  </span>
+                  <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400">
+                    Threshold: ₦{STANDARD_CAMPUS_DELIVERY_THRESHOLD.toLocaleString()}
+                  </span>
+                </div>
+                <p className="text-xs font-medium leading-relaxed">
+                  {isBelowDeliveryThreshold ? (
+                    <>
+                      Your order total is{' '}
+                      <strong className="text-amber-800 dark:text-amber-300 font-bold">
+                        ₦{thresholdDifference.toLocaleString()} below
+                      </strong>{' '}
+                      the standard campus delivery fee threshold (₦{STANDARD_CAMPUS_DELIVERY_THRESHOLD.toLocaleString()}).
+                      Add more snacks, drinks, or sides to make the most of your ₦{deliveryFee.toLocaleString()} delivery fee!
+                    </>
+                  ) : (
+                    <>
+                      Your order total meets the standard campus delivery threshold (₦{STANDARD_CAMPUS_DELIVERY_THRESHOLD.toLocaleString()}+)! You are maximizing your ₦{deliveryFee.toLocaleString()} campus delivery fee value.
+                    </>
+                  )}
+                </p>
+              </div>
+            </div>
+
+            {isBelowDeliveryThreshold && (
+              <button
+                type="button"
+                onClick={() => {
+                  triggerHaptic(40);
+                  onClose();
+                }}
+                className="self-start sm:self-center shrink-0 px-3.5 py-2 bg-amber-600 hover:bg-amber-700 active:scale-95 text-white text-xs font-black rounded-xl transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
+                title="Return to vendor menu to add items to active cart"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>+ Add More Items</span>
+              </button>
+            )}
+          </div>
+
+          {/* Threshold Progress Bar */}
+          <div className="mt-3 pt-2.5 border-t border-amber-200/60 dark:border-amber-900/40 space-y-1.5">
+            <div className="w-full bg-slate-200/80 dark:bg-slate-700/80 h-2 rounded-full overflow-hidden">
+              <div
+                className={`h-full rounded-full transition-all duration-500 ${
+                  isBelowDeliveryThreshold ? 'bg-amber-500' : 'bg-emerald-500'
+                }`}
+                style={{ width: `${thresholdProgress}%` }}
+              />
+            </div>
+            <div className="flex justify-between text-[10px] font-bold opacity-80">
+              <span>Current Order Total: ₦{total.toLocaleString()}</span>
+              <span>
+                {isBelowDeliveryThreshold
+                  ? `Add ₦${thresholdDifference.toLocaleString()} more`
+                  : 'Threshold Reached!'}
+              </span>
+            </div>
+          </div>
         </motion.div>
 
         {/* SECTION 3: ORDER ITEMS SNAPSHOT */}
@@ -505,7 +806,166 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ onClose, onOrderCr
           </div>
         </motion.div>
 
-        {/* SECTION 4: PAYMENT SELECTION (WALLET / SPLIT / PAYSTACK) */}
+        {/* SECTION 4: CAMPUS PROMO CODE & ACTIVE VOUCHERS */}
+        <motion.div variants={staggerItem} className="bg-white dark:bg-slate-900 rounded-3xl p-5 shadow-xs border border-slate-200 dark:border-slate-800 space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="p-1.5 rounded-lg bg-rose-50 dark:bg-rose-950/60 text-[#D6001C] dark:text-rose-400">
+                <Tag className="w-4 h-4" />
+              </div>
+              <div>
+                <h2 className="font-extrabold text-slate-900 dark:text-slate-100 text-sm">Promo Code & Vouchers</h2>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400">Validated against live Firestore vouchers</p>
+              </div>
+            </div>
+
+            {appliedVoucher && (
+              <span className="text-[11px] font-black text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 px-2 py-0.5 rounded-full flex items-center gap-1">
+                <Check className="w-3 h-3" />
+                <span>Applied</span>
+              </span>
+            )}
+          </div>
+
+          {appliedVoucher ? (
+            /* Applied Voucher Card */
+            <div className="p-4 rounded-2xl bg-emerald-50/80 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/80 flex items-center justify-between gap-3">
+              <div className="flex items-start gap-3">
+                <div className="p-2 rounded-xl bg-emerald-600 text-white shrink-0 mt-0.5">
+                  <Ticket className="w-4 h-4" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono font-black text-xs text-emerald-800 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-900/60 px-2 py-0.5 rounded-md">
+                      {appliedVoucher.code}
+                    </span>
+                    <span className="text-xs font-black text-emerald-700 dark:text-emerald-400">
+                      - ₦{effectiveDiscount.toLocaleString()} OFF
+                    </span>
+                  </div>
+                  <p className="text-xs font-bold text-slate-900 dark:text-slate-100 mt-1">{appliedVoucher.title}</p>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400">{appliedVoucher.description}</p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleRemovePromoCode}
+                className="p-2 rounded-xl bg-white dark:bg-slate-800 hover:bg-rose-50 dark:hover:bg-rose-950/50 text-slate-500 hover:text-rose-600 border border-slate-200 dark:border-slate-700 transition-colors cursor-pointer shrink-0"
+                title="Remove Promo Code"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          ) : (
+            /* Promo Code Input Field */
+            <div className="space-y-3">
+              <div className="flex gap-2">
+                <div className="relative flex-1">
+                  <Tag className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  <input
+                    type="text"
+                    value={promoCodeInput}
+                    onChange={(e) => {
+                      setPromoCodeInput(e.target.value.toUpperCase());
+                      if (promoError) setPromoError(null);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleApplyPromoCode();
+                      }
+                    }}
+                    placeholder="Enter code (e.g. MTUFIRST10)"
+                    disabled={isValidatingPromo}
+                    className="w-full pl-10 pr-9 py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-mono font-bold uppercase tracking-wider text-slate-900 dark:text-slate-100 placeholder:normal-case placeholder:font-sans placeholder:font-normal placeholder:tracking-normal placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all"
+                  />
+                  {promoCodeInput && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPromoCodeInput('');
+                        setPromoError(null);
+                      }}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+
+                <motion.button
+                  type="button"
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  disabled={!promoCodeInput.trim() || isValidatingPromo}
+                  onClick={() => handleApplyPromoCode()}
+                  className="px-4 py-2.5 bg-slate-900 hover:bg-slate-800 dark:bg-emerald-600 dark:hover:bg-emerald-700 text-white text-xs font-extrabold rounded-xl transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5 shrink-0"
+                >
+                  {isValidatingPromo ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      <span>Verifying...</span>
+                    </>
+                  ) : (
+                    <span>Apply</span>
+                  )}
+                </motion.button>
+              </div>
+
+              {promoError && (
+                <div className="flex items-center gap-1.5 text-xs text-rose-600 dark:text-rose-400 font-medium">
+                  <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                  <span>{promoError}</span>
+                </div>
+              )}
+
+              {/* Active Campus Vouchers Suggestions */}
+              {activeVouchers.length > 0 && (
+                <div className="pt-2 border-t border-slate-100 dark:border-slate-800">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 flex items-center gap-1">
+                      <Sparkles className="w-3 h-3 text-amber-500" />
+                      <span>Available Campus Vouchers:</span>
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setShowVoucherList(!showVoucherList)}
+                      className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 hover:underline cursor-pointer"
+                    >
+                      {showVoucherList ? 'Hide' : 'View all'}
+                    </button>
+                  </div>
+
+                  <div className="flex flex-wrap gap-1.5">
+                    {activeVouchers.slice(0, showVoucherList ? activeVouchers.length : 3).map((v) => (
+                      <button
+                        key={v.id}
+                        type="button"
+                        onClick={() => {
+                          setPromoCodeInput(v.code);
+                          handleApplyPromoCode(v.code);
+                        }}
+                        className="group text-[11px] font-bold bg-slate-50 dark:bg-slate-800 hover:bg-emerald-50 dark:hover:bg-emerald-950/50 text-slate-700 dark:text-slate-300 hover:text-emerald-700 dark:hover:text-emerald-400 border border-slate-200 dark:border-slate-700 hover:border-emerald-300 dark:hover:border-emerald-700/60 px-2.5 py-1 rounded-lg transition-all flex items-center gap-1.5 cursor-pointer"
+                      >
+                        <span className="font-mono font-black">{v.code}</span>
+                        <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-black">
+                          {v.discount_type === 'percentage'
+                            ? `${v.discount_value}% OFF`
+                            : v.discount_type === 'free_delivery'
+                            ? 'FREE DELIVERY'
+                            : `₦${v.discount_value} OFF`}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </motion.div>
+
+        {/* SECTION 5: PAYMENT SELECTION (WALLET / SPLIT / PAYSTACK) */}
         <motion.div variants={staggerItem} className="bg-white dark:bg-slate-900 rounded-3xl p-5 shadow-xs border border-slate-200 dark:border-slate-800 space-y-3">
           <div className="flex items-center justify-between">
             <h2 className="font-extrabold text-slate-900 dark:text-slate-100 text-sm">Authoritative Payment Method</h2>
@@ -600,7 +1060,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ onClose, onOrderCr
           )}
         </motion.div>
 
-        {/* SECTION 5: FINANCIAL TOTALS */}
+        {/* SECTION 6: FINANCIAL TOTALS */}
         <motion.div variants={staggerItem} className="bg-slate-900 text-white rounded-3xl p-5 space-y-2 shadow-xl">
           <div className="flex justify-between text-xs text-slate-300">
             <span>Meal Subtotal</span>
@@ -610,12 +1070,34 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ onClose, onOrderCr
             <span>Campus Delivery Fee</span>
             <span>₦{deliveryFee.toLocaleString()}</span>
           </div>
+          {serviceFee > 0 && (
+            <div className="flex justify-between text-xs text-slate-300">
+              <span>Service Fee</span>
+              <span>₦{serviceFee.toLocaleString()}</span>
+            </div>
+          )}
+          {effectiveDiscount > 0 && (
+            <div className="flex items-center justify-between text-xs text-emerald-400 font-bold bg-emerald-950/60 border border-emerald-800/60 rounded-xl px-3 py-1.5">
+              <span className="flex items-center gap-1.5">
+                <Tag className="w-3.5 h-3.5" />
+                <span>Promo Discount ({appliedVoucher?.code})</span>
+              </span>
+              <span>- ₦{effectiveDiscount.toLocaleString()}</span>
+            </div>
+          )}
           <div className="border-t border-slate-800 pt-2.5 flex justify-between items-baseline">
             <div>
               <span className="text-base font-black text-white block">Final Total</span>
               <span className="text-[10px] text-slate-400">Includes secure delivery verification codes</span>
             </div>
-            <span className="text-xl font-black text-emerald-400">₦{total.toLocaleString()}</span>
+            <div className="text-right">
+              {effectiveDiscount > 0 && (
+                <span className="text-xs line-through text-slate-400 block font-bold">
+                  ₦{grossTotal.toLocaleString()}
+                </span>
+              )}
+              <span className="text-xl font-black text-emerald-400">₦{total.toLocaleString()}</span>
+            </div>
           </div>
         </motion.div>
       </motion.div>

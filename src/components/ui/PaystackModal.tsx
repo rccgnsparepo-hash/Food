@@ -83,6 +83,7 @@ export const PaystackModal: React.FC<PaystackModalProps> = ({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           orderId,
+          amount,
           email: email || 'student@mtu.edu.ng',
           callbackUrl: window.location.origin
         })

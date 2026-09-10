@@ -15,7 +15,8 @@ import {
   Clock,
   Sparkles,
   User,
-  AlertCircle
+  AlertCircle,
+  Gift
 } from 'lucide-react';
 import { collection, query, where, onSnapshot, doc, updateDoc, setDoc, orderBy } from "../../lib/embeddedDb";
 import { db } from '../../lib/firebase';
@@ -32,6 +33,7 @@ import {
   updateRiderAvailability,
   verifyOrderPickup,
   verifyOrderDelivery,
+  handoverToHallPorter,
   subscribeToRiderEarnings,
   updateRiderLiveLocation
 } from '../../services/riderService';
@@ -100,6 +102,13 @@ export const RiderDashboard: React.FC = () => {
   const [deliveryModalOpen, setDeliveryModalOpen] = useState(false);
   const [deliveryCodeInput, setDeliveryCodeInput] = useState('');
   const [isVerifyingDelivery, setIsVerifyingDelivery] = useState(false);
+
+  // Hall Porter / Security Custody Handover State
+  const [showPorterModal, setShowPorterModal] = useState(false);
+  const [porterName, setPorterName] = useState('');
+  const [porterPhone, setPorterPhone] = useState('');
+  const [porterNotes, setPorterNotes] = useState('');
+  const [isSubmittingPorter, setIsSubmittingPorter] = useState(false);
 
   // Initialize or fetch authoritative Rider Profile
   useEffect(() => {
@@ -266,6 +275,38 @@ export const RiderDashboard: React.FC = () => {
     }
   };
 
+  // Perform Secure Handover to Hall Porter
+  const handleConfirmPorterHandover = async () => {
+    if (!myActiveOrder || !user) return;
+    if (!porterName.trim()) {
+      toast.error('Please enter the Hall Porter or Security Officer name.');
+      return;
+    }
+
+    setIsSubmittingPorter(true);
+    triggerHaptic([60, 40, 60]);
+
+    const result = await handoverToHallPorter({
+      orderId: myActiveOrder.id,
+      rider: user,
+      hallPorterName: porterName.trim(),
+      hallPorterPhone: porterPhone.trim(),
+      notes: porterNotes.trim()
+    });
+
+    setIsSubmittingPorter(false);
+    if (result.success) {
+      setShowPorterModal(false);
+      setDeliveryModalOpen(false);
+      setPorterName('');
+      setPorterPhone('');
+      setPorterNotes('');
+      toast.success('✓ Order deposited with Hall Porter. Payout safely logged in escrow.');
+    } else {
+      toast.error(result.error || 'Failed to record Hall Porter handover.');
+    }
+  };
+
   const totalCalculatedEarnings = earningsLedger.reduce((sum, e) => sum + e.rider_earning, 0) || (riderProfile?.earnings_balance ?? 14500);
 
   return (
@@ -374,32 +415,52 @@ export const RiderDashboard: React.FC = () => {
               </div>
 
               {/* Delivery destination info */}
-              <div className="p-4 rounded-2xl bg-emerald-50/60 dark:bg-slate-800/80 border border-emerald-200 dark:border-emerald-800/50">
-                <span className="text-[10px] font-extrabold text-emerald-700 dark:text-emerald-400 uppercase tracking-wider block mb-1">
-                  2. CUSTOMER DESTINATION
-                </span>
-                <h3 className="font-extrabold text-slate-900 dark:text-slate-100 text-sm">
-                  {myActiveOrder.customer_name || myActiveOrder.user_name}
-                </h3>
-                <p className="text-xs font-bold text-slate-800 dark:text-slate-200">{myActiveOrder.delivery_address}</p>
-                {myActiveOrder.delivery_room && (
-                  <p className="text-xs font-black text-emerald-800 dark:text-emerald-400 mt-0.5">Room: {myActiveOrder.delivery_room}</p>
-                )}
-                {myActiveOrder.notes && (
-                  <p className="text-[11px] text-slate-600 dark:text-slate-300 italic mt-1 bg-white dark:bg-slate-900 p-2 rounded-xl border border-emerald-100 dark:border-slate-700">
-                    "{myActiveOrder.notes}"
-                  </p>
+              <div className="p-4 rounded-2xl bg-emerald-50/60 dark:bg-slate-800/80 border border-emerald-200 dark:border-emerald-800/50 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-extrabold text-emerald-700 dark:text-emerald-400 uppercase tracking-wider block">
+                    2. CUSTOMER DESTINATION
+                  </span>
+                  <span className="px-2 py-0.5 rounded-lg bg-slate-900 text-white font-mono font-black text-[11px]">
+                    BAG {myActiveOrder.daily_token || `#${myActiveOrder.id.slice(-4)}`}
+                  </span>
+                </div>
+
+                <div>
+                  <h3 className="font-extrabold text-slate-900 dark:text-slate-100 text-sm">
+                    {myActiveOrder.customer_name || myActiveOrder.user_name}
+                  </h3>
+                  <p className="text-xs font-bold text-slate-800 dark:text-slate-200">{myActiveOrder.delivery_address}</p>
+                  {myActiveOrder.delivery_room && (
+                    <p className="text-xs font-black text-emerald-800 dark:text-emerald-400 mt-0.5">Room: {myActiveOrder.delivery_room}</p>
+                  )}
+                  {myActiveOrder.notes && (
+                    <p className="text-[11px] text-slate-600 dark:text-slate-300 italic mt-1 bg-white dark:bg-slate-900 p-2 rounded-xl border border-emerald-100 dark:border-slate-700">
+                      "{myActiveOrder.notes}"
+                    </p>
+                  )}
+                </div>
+
+                {/* Proxy Roommate Delivery Notice */}
+                {myActiveOrder.is_proxy_order && (
+                  <div className="p-2.5 rounded-xl bg-amber-100/70 dark:bg-amber-950/50 border border-amber-300/60 dark:border-amber-800/60 text-xs text-amber-950 dark:text-amber-200 space-y-0.5">
+                    <div className="flex items-center gap-1.5 font-black text-xs text-amber-800 dark:text-amber-300">
+                      <Gift className="w-3.5 h-3.5" />
+                      <span>Roommate Order: Hand to Recipient</span>
+                    </div>
+                    <p>Recipient: <strong>{myActiveOrder.recipient_name || 'Friend'}</strong></p>
+                    <p className="text-[11px]">Phone: <strong>{myActiveOrder.recipient_phone || 'N/A'}</strong></p>
+                  </div>
                 )}
               </div>
 
               {/* Contact Actions */}
               <div className="flex items-center gap-3">
                 <a
-                  href={`tel:${myActiveOrder.customer_phone || '+2348100000000'}`}
+                  href={`tel:${myActiveOrder.recipient_phone || myActiveOrder.customer_phone || '+2348100000000'}`}
                   className="flex-1 py-2.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 rounded-xl text-xs font-bold flex items-center justify-center gap-2"
                 >
                   <Phone className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                  <span>Call Customer</span>
+                  <span>Call {myActiveOrder.is_proxy_order ? 'Roommate' : 'Customer'}</span>
                 </a>
                 <button
                   onClick={() => setShowChat(true)}
@@ -649,6 +710,105 @@ export const RiderDashboard: React.FC = () => {
                 className="flex-1 py-3 rounded-xl bg-emerald-600 font-black text-xs text-white hover:bg-emerald-700 shadow-md shadow-emerald-600/30 cursor-pointer"
               >
                 {isVerifyingDelivery ? 'Verifying...' : 'Complete Run'}
+              </button>
+            </div>
+
+            <div className="pt-2 border-t border-slate-100 dark:border-slate-800 space-y-1">
+              <button
+                type="button"
+                onClick={() => {
+                  setDeliveryModalOpen(false);
+                  setShowPorterModal(true);
+                }}
+                className="w-full py-2.5 px-3 rounded-xl bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/40 text-amber-900 dark:text-amber-200 border border-amber-200 dark:border-amber-800 text-xs font-bold cursor-pointer flex items-center justify-center gap-1.5 transition-colors"
+              >
+                <Building className="w-4 h-4 text-amber-700 shrink-0" />
+                <span>Customer Absent? Handover to Hall Porter</span>
+              </button>
+              <p className="text-[10px] text-slate-400 dark:text-slate-500">
+                Never abandon food. Hall Porter custody safeguards your delivery payout in escrow.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 3: HALL PORTER / SECURITY CUSTODY HANDOVER */}
+      {showPorterModal && (
+        <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 max-w-sm w-full space-y-4 shadow-2xl border border-amber-200 dark:border-slate-800 text-left">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 flex items-center justify-center shrink-0">
+                <Building className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="font-black text-slate-900 dark:text-slate-100 text-sm">Hall Porter Custody</h3>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                  Deposit meal with official hostel security / front desk
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <label className="text-[11px] font-bold text-slate-700 dark:text-slate-300 block mb-1">
+                  Porter / Officer Name *
+                </label>
+                <input
+                  type="text"
+                  value={porterName}
+                  onChange={(e) => setPorterName(e.target.value)}
+                  placeholder="e.g. Officer Sunday / Daniel Hall Porter"
+                  className="w-full text-xs font-medium bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-2.5 text-slate-900 dark:text-slate-100 outline-none focus:ring-2 focus:ring-amber-500"
+                />
+              </div>
+
+              <div>
+                <label className="text-[11px] font-bold text-slate-700 dark:text-slate-300 block mb-1">
+                  Porter Phone (Optional)
+                </label>
+                <input
+                  type="tel"
+                  value={porterPhone}
+                  onChange={(e) => setPorterPhone(e.target.value)}
+                  placeholder="e.g. 08012345678"
+                  className="w-full text-xs font-medium bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-2.5 text-slate-900 dark:text-slate-100 outline-none focus:ring-2 focus:ring-amber-500"
+                />
+              </div>
+
+              <div>
+                <label className="text-[11px] font-bold text-slate-700 dark:text-slate-300 block mb-1">
+                  Handover Notes / Location
+                </label>
+                <textarea
+                  rows={2}
+                  value={porterNotes}
+                  onChange={(e) => setPorterNotes(e.target.value)}
+                  placeholder="e.g. Deposited on table at Daniel Hall lodge, customer room 214"
+                  className="w-full text-xs font-medium bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-2 text-slate-900 dark:text-slate-100 outline-none focus:ring-2 focus:ring-amber-500 resize-none"
+                />
+              </div>
+
+              <div className="p-2.5 rounded-xl bg-amber-50/80 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900/40 text-[11px] text-amber-800 dark:text-amber-300">
+                🛡️ <strong>Escrow Custody:</strong> Meal is marked delivered and customer is notified with Bag Token {myActiveOrder?.daily_token || `#${myActiveOrder?.id.slice(-4)}`}. Payout is safely held in escrow.
+              </div>
+            </div>
+
+            <div className="flex gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowPorterModal(false)}
+                className="flex-1 py-3 rounded-xl bg-slate-100 dark:bg-slate-800 font-bold text-xs text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmPorterHandover}
+                disabled={isSubmittingPorter}
+                className="flex-1 py-3 rounded-xl bg-amber-600 hover:bg-amber-700 font-black text-xs text-white shadow-md shadow-amber-600/30 cursor-pointer"
+              >
+                {isSubmittingPorter ? 'Recording...' : 'Confirm Handover'}
               </button>
             </div>
           </div>
