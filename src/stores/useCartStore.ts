@@ -3,6 +3,7 @@ import { CartItem, MenuItem, Restaurant } from '../types';
 import { toast } from 'sonner';
 import { getItemAvailability } from '../utils/availability';
 import { useMarketplaceStore } from './useMarketplaceStore';
+import { triggerHaptic, triggerHapticSuccess } from '../utils/haptics';
 
 interface CartState {
   items: CartItem[];
@@ -93,11 +94,13 @@ export const useCartStore = create<CartState>((set, get) => ({
       restaurantName: incomingVendorName,
       deliveryFee: fee,
     });
+    triggerHapticSuccess();
     toast.success(`Added ${menuItem.name} to cart`);
     return true;
   },
 
   removeItem: (itemId: string) => {
+    triggerHaptic(30);
     const item = get().items.find((i) => i.menuItem.id === itemId);
     const updated = get().items.filter((i) => i.menuItem.id !== itemId);
     set({
@@ -125,6 +128,7 @@ export const useCartStore = create<CartState>((set, get) => ({
 
     const removedCount = currentItems.length - validItems.length;
     if (removedCount > 0) {
+      triggerHaptic(40);
       set({
         items: validItems,
         restaurantId: validItems.length === 0 ? null : get().restaurantId,
@@ -136,6 +140,7 @@ export const useCartStore = create<CartState>((set, get) => ({
   },
 
   updateQuantity: (itemId: string, quantity: number) => {
+    triggerHaptic(25);
     if (quantity <= 0) {
       get().removeItem(itemId);
       return;

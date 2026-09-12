@@ -92,6 +92,7 @@ export const CompletedOrderReviewCard: React.FC<CompletedOrderReviewCardProps> =
     try {
       const now = new Date().toISOString();
       const feedbackPayload = {
+        rating: foodRating,
         food_rating: foodRating,
         delivery_rating: deliveryRating,
         feedback_tags: selectedTags,

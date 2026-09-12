@@ -459,6 +459,7 @@ export interface Order {
   cancellation_reason?: string;
 
   // Post-Order Customer Rating & Feedback
+  rating?: number; // 1 to 5 stars
   food_rating?: number; // 1 to 5 stars
   delivery_rating?: number; // 1 to 5 stars
   feedback_tags?: string[];

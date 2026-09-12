@@ -24,7 +24,9 @@ import {
   UserCheck,
   Share2,
   Plus,
-  ShoppingBag
+  ShoppingBag,
+  Clock,
+  Calendar
 } from 'lucide-react';
 import { useCartStore } from '../../stores/useCartStore';
 import { useAuthStore } from '../../stores/useAuthStore';
@@ -87,6 +89,11 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ onClose, onOrderCr
   const [deliveryInstructions, setDeliveryInstructions] = useState('Please call when you arrive at the hostel gate.');
   const [preferredOption, setPreferredOption] = useState<PreferredDeliveryOption>('room_delivery');
   const [contactless, setContactless] = useState<boolean>(false);
+
+  // Scheduled Delivery / Future Time-slot Options
+  const [isScheduled, setIsScheduled] = useState<boolean>(false);
+  const [scheduledDate, setScheduledDate] = useState<string>('Today');
+  const [scheduledTimeSlot, setScheduledTimeSlot] = useState<string>('12:30 PM - 1:00 PM (Lunch Rush)');
 
   // Ordering for someone else / Roommate proxy order
   const [isProxyOrder, setIsProxyOrder] = useState(false);
@@ -298,6 +305,9 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ onClose, onOrderCr
           isProxyOrder,
           recipientName: isProxyOrder ? recipientName.trim() : undefined,
           recipientPhone: isProxyOrder ? recipientPhone.trim() : undefined,
+          isScheduled,
+          scheduledTimeSlot: isScheduled ? scheduledTimeSlot : undefined,
+          scheduledDeliveryDate: isScheduled ? scheduledDate : undefined,
           walletAmountUsed: walletDeduction,
           otherPaymentAmount: remainingCardAmount,
           totalPrice: total,
@@ -599,6 +609,109 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ onClose, onOrderCr
                 </button>
               ))}
             </div>
+          </div>
+
+          {/* Delivery Timing: Instant vs Scheduled Pre-Order */}
+          <div className="p-3.5 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Clock className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                <div>
+                  <span className="text-xs font-extrabold text-slate-900 dark:text-slate-100 block">
+                    Delivery Timing
+                  </span>
+                  <span className="text-[11px] text-slate-500 dark:text-slate-400">
+                    Order now or schedule ahead for class breaks
+                  </span>
+                </div>
+              </div>
+
+              {/* Timing Toggle Buttons */}
+              <div className="inline-flex rounded-xl p-0.5 bg-slate-200/80 dark:bg-slate-700">
+                <button
+                  type="button"
+                  onClick={() => setIsScheduled(false)}
+                  className={`px-3 py-1 text-xs font-extrabold rounded-lg transition-all cursor-pointer ${
+                    !isScheduled
+                      ? 'bg-white dark:bg-slate-900 text-emerald-700 dark:text-emerald-400 shadow-2xs'
+                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+                  }`}
+                >
+                  Now (ASAP)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsScheduled(true)}
+                  className={`px-3 py-1 text-xs font-extrabold rounded-lg transition-all cursor-pointer flex items-center gap-1 ${
+                    isScheduled
+                      ? 'bg-emerald-600 text-white shadow-2xs'
+                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+                  }`}
+                >
+                  <Calendar className="w-3 h-3" />
+                  <span>Schedule</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Scheduled Time Slots Drawer */}
+            {isScheduled && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                className="pt-2 border-t border-slate-200 dark:border-slate-700 space-y-2.5"
+              >
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] font-bold text-slate-600 dark:text-slate-400">Date:</span>
+                  {['Today', 'Tomorrow'].map((d) => (
+                    <button
+                      key={d}
+                      type="button"
+                      onClick={() => setScheduledDate(d)}
+                      className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                        scheduledDate === d
+                          ? 'bg-emerald-100 text-emerald-900 border border-emerald-300 dark:bg-emerald-900/60 dark:text-emerald-200'
+                          : 'bg-white dark:bg-slate-900 text-slate-600 border border-slate-200 dark:border-slate-700'
+                      }`}
+                    >
+                      {d}
+                    </button>
+                  ))}
+                </div>
+
+                <div>
+                  <label className="text-[11px] font-bold text-slate-600 dark:text-slate-400 block mb-1.5">
+                    Select Target Delivery Time Slot:
+                  </label>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                    {[
+                      '12:00 PM - 12:30 PM (Lunch Break)',
+                      '12:30 PM - 1:00 PM (Lunch Rush)',
+                      '1:00 PM - 1:30 PM (Post-Lecture)',
+                      '5:30 PM - 6:00 PM (Dinner Early)',
+                      '6:30 PM - 7:00 PM (Hostel Dinner)',
+                      '7:30 PM - 8:00 PM (Late Study Dinner)'
+                    ].map((slot) => (
+                      <button
+                        key={slot}
+                        type="button"
+                        onClick={() => setScheduledTimeSlot(slot)}
+                        className={`p-2 rounded-xl text-left text-xs font-bold transition-all cursor-pointer border ${
+                          scheduledTimeSlot === slot
+                            ? 'bg-emerald-600 text-white border-emerald-600 shadow-2xs'
+                            : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-slate-300'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <span>{slot}</span>
+                          {scheduledTimeSlot === slot && <Check className="w-3.5 h-3.5" />}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </motion.div>
+            )}
           </div>
 
           {/* Contactless Toggle */}

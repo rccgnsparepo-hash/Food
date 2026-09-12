@@ -54,6 +54,44 @@ export const OrderTracking: React.FC<OrderTrackingProps> = ({ orderId, onBack })
   const [showChat, setShowChat] = useState(false);
   const [showReceipt, setShowReceipt] = useState(false);
   const [hasCopiedLink, setHasCopiedLink] = useState(false);
+  const [isSharing, setIsSharing] = useState(false);
+
+  const handleShareOrder = async () => {
+    if (!order) return;
+    triggerHaptic(40);
+    setIsSharing(true);
+
+    const trackingUrl = `${window.location.origin}${window.location.pathname}?trackOrder=${encodeURIComponent(order.id)}`;
+    const statusLabel = order.status.replace(/_/g, ' ').toUpperCase();
+    const vendorName = order.vendor_name || 'BUKKIT Kitchen';
+    const tokenInfo = order.daily_token ? ` Token #${order.daily_token}` : '';
+    const shareTitle = `BUKKIT Order #${order.id.slice(-6)}: ${statusLabel}`;
+    const shareText = `Tracking my BUKKIT meal from ${vendorName}!\nStatus: ${statusLabel}${tokenInfo ? ` • ${tokenInfo}` : ''}\nTotal: ₦${order.total_price.toLocaleString()}\nLive Tracking:`;
+
+    if (typeof navigator !== 'undefined' && typeof navigator.share === 'function') {
+      try {
+        await navigator.share({
+          title: shareTitle,
+          text: shareText,
+          url: trackingUrl,
+        });
+        triggerHaptic(60);
+        toast.success('✓ Order status shared successfully!');
+      } catch (err: any) {
+        if (err?.name !== 'AbortError') {
+          console.warn('Web Share API error, falling back to copy:', err);
+          await handleCopyTrackingLink();
+        }
+      } finally {
+        setIsSharing(false);
+      }
+    } else {
+      // Fallback for browsers / iframes that do not support Web Share API
+      await handleCopyTrackingLink();
+      setIsSharing(false);
+      toast.info('Direct tracking link copied to clipboard. Share on WhatsApp or messaging apps!');
+    }
+  };
 
   const handleCopyTrackingLink = async () => {
     if (!order) return;
@@ -253,10 +291,20 @@ export const OrderTracking: React.FC<OrderTrackingProps> = ({ orderId, onBack })
           </div>
           <div className="flex items-center gap-1.5 sm:gap-2">
             <button
+              onClick={handleShareOrder}
+              disabled={isSharing}
+              className="p-2 sm:px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white transition-colors flex items-center gap-1.5 text-xs font-bold cursor-pointer shadow-xs disabled:opacity-75"
+              title="Share live order status via external messaging apps"
+            >
+              <Share2 className="w-4 h-4 text-white" />
+              <span className="hidden sm:inline">Share Order</span>
+            </button>
+
+            <button
               onClick={handleCopyTrackingLink}
               className={`p-2 sm:px-3 rounded-xl transition-colors flex items-center gap-1.5 text-xs font-bold cursor-pointer ${
                 hasCopiedLink
-                  ? 'bg-emerald-600 text-white shadow-xs'
+                  ? 'bg-slate-800 text-white shadow-xs'
                   : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
               }`}
               title="Copy direct live tracking link to clipboard"
@@ -304,6 +352,22 @@ export const OrderTracking: React.FC<OrderTrackingProps> = ({ orderId, onBack })
               <span className="text-xs text-slate-400 font-bold block">Authoritative Total</span>
               <span className="text-xl font-black text-slate-900">₦{order.total_price.toLocaleString()}</span>
             </div>
+          </div>
+
+          {/* Quick Share Status Action Banner */}
+          <div className="flex items-center justify-between gap-3 p-3 rounded-2xl bg-emerald-50/70 border border-emerald-100">
+            <div className="flex items-center gap-2 text-xs text-emerald-900 font-medium min-w-0">
+              <Share2 className="w-4 h-4 text-emerald-600 shrink-0" />
+              <span className="truncate">Share live delivery status & ETA with roommates via external apps:</span>
+            </div>
+            <button
+              onClick={handleShareOrder}
+              disabled={isSharing}
+              className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs transition-colors flex items-center gap-1.5 shrink-0 cursor-pointer shadow-xs disabled:opacity-75"
+            >
+              <Share2 className="w-3.5 h-3.5" />
+              <span>Share Status</span>
+            </button>
           </div>
 
           {/* Hall Porter Custody Alert (If applicable) */}
@@ -456,7 +520,7 @@ export const OrderTracking: React.FC<OrderTrackingProps> = ({ orderId, onBack })
                       <span className="text-[10px] uppercase tracking-wider font-black text-slate-400">
                         Current Status
                       </span>
-                      {isCurrentStepIdxActive(order.status) && (
+                      {!isDelivered && (
                         <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
                       )}
                     </div>

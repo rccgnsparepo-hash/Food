@@ -19,14 +19,17 @@ import {
 } from 'lucide-react';
 import { useAuthStore } from '../../stores/useAuthStore';
 import { pageVariants, staggerContainer, staggerItem } from '../../utils/motion';
-import { triggerHaptic } from '../../utils/haptics';
+import { triggerHaptic, triggerHapticSuccess } from '../../utils/haptics';
 import { db } from '../../lib/firebase';
 import { collection, query, where, onSnapshot, orderBy } from "../../lib/embeddedDb";
 import { WalletTransaction } from '../../types';
+import { PaystackModal } from '../ui/PaystackModal';
+import { toast } from 'sonner';
 
 export const WalletDealsView: React.FC = () => {
   const { user, topUpWallet } = useAuthStore();
   const [showTopUpModal, setShowTopUpModal] = useState(false);
+  const [showPaystackModal, setShowPaystackModal] = useState(false);
   const [topUpAmount, setTopUpAmount] = useState<number>(2000);
   const [customAmount, setCustomAmount] = useState<string>('');
   const [isProcessing, setIsProcessing] = useState(false);
@@ -63,21 +66,32 @@ export const WalletDealsView: React.FC = () => {
     }
   }, [user?.uid]);
 
-  const handleTopUp = async () => {
+  const handleInitiatePaystack = () => {
     const amount = customAmount ? parseFloat(customAmount) : topUpAmount;
-    if (isNaN(amount) || amount <= 0) return;
+    if (isNaN(amount) || amount < 100) {
+      toast.error('Please enter a valid top-up amount (minimum ₦100).');
+      return;
+    }
+    triggerHaptic(40);
+    setShowPaystackModal(true);
+  };
 
+  const handlePaystackSuccess = async (reference: string) => {
+    const amount = customAmount ? parseFloat(customAmount) : topUpAmount;
+    setShowPaystackModal(false);
+    setShowTopUpModal(false);
     setIsProcessing(true);
-    triggerHaptic(50);
+    triggerHapticSuccess();
 
     try {
-      await topUpWallet(amount, `PAYSTACK_${Date.now()}`);
-      setSuccessMessage(`₦${amount.toLocaleString()} has been credited to your Campus Wallet.`);
-      setShowTopUpModal(false);
+      await topUpWallet(amount, reference);
+      setSuccessMessage(`✓ Verified Paystack payment! ₦${amount.toLocaleString()} has been credited to your Campus Wallet (Ref: ${reference}).`);
+      toast.success(`🎉 ₦${amount.toLocaleString()} credited to your Campus Wallet!`);
       setCustomAmount('');
-      setTimeout(() => setSuccessMessage(null), 5000);
+      setTimeout(() => setSuccessMessage(null), 6000);
     } catch (e) {
       console.error('Failed to top up wallet:', e);
+      toast.error('Payment succeeded but balance update encountered an issue.');
     } finally {
       setIsProcessing(false);
     }
@@ -355,17 +369,18 @@ export const WalletDealsView: React.FC = () => {
               <motion.button
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
-                onClick={handleTopUp}
+                onClick={handleInitiatePaystack}
                 disabled={isProcessing}
                 className="w-full py-3.5 bg-[#D6001C] hover:bg-red-700 disabled:opacity-50 text-white font-extrabold rounded-2xl text-xs flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-red-600/30 transition-all"
               >
                 {isProcessing ? (
                   <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                 ) : (
-                  <span>
-                    Pay ₦
+                  <span className="flex items-center gap-2">
+                    <CreditCard className="w-4 h-4" />
+                    Top-up ₦
                     {(customAmount ? parseFloat(customAmount) || 0 : topUpAmount).toLocaleString()}{' '}
-                    & Credit Wallet
+                    with Paystack
                   </span>
                 )}
               </motion.button>
@@ -373,6 +388,19 @@ export const WalletDealsView: React.FC = () => {
           </div>
         )}
       </AnimatePresence>
+
+      {/* Embedded Authoritative Paystack Gateway Modal for Wallet Top-Up */}
+      {showPaystackModal && (
+        <PaystackModal
+          amount={customAmount ? parseFloat(customAmount) || topUpAmount : topUpAmount}
+          email={user?.email || 'student@mtu.edu.ng'}
+          orderId={`WALLET_TOPUP_${Date.now()}`}
+          foodSubtotal={customAmount ? parseFloat(customAmount) || topUpAmount : topUpAmount}
+          deliveryFee={0}
+          onClose={() => setShowPaystackModal(false)}
+          onSuccess={(ref) => handlePaystackSuccess(ref)}
+        />
+      )}
     </motion.div>
   );
 };

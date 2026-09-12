@@ -1000,6 +1000,14 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
     try {
       await updateDoc(doc(db, 'users', user.uid), cleanFirestoreData({ wallet_balance: newBal }));
+      await setDoc(doc(db, 'wallets', user.uid), cleanFirestoreData({
+        wallet_id: `WAL_${user.uid}`,
+        user_id: user.uid,
+        available_balance: newBal,
+        currency: 'NGN',
+        status: 'active',
+        updated_at: new Date().toISOString()
+      }), { merge: true }).catch(() => {});
 
       const txId = `tx_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
       await setDoc(doc(db, 'wallet_transactions', txId), cleanFirestoreData({
